@@ -1,3 +1,8 @@
+plaid_api:
+  client_id:
+    TOKEN
+  client_secret:
+    TOKEN
 access_tokens:
   bank1:
     PUT_ACCESS_TOKEN_FROM_PLAID_HERE

@@ -1,5 +1,5 @@
 require 'sinatra'
-require "sinatra/reloader"
+require 'sinatra/reloader'
 
 require_relative './api'
 
@@ -8,7 +8,7 @@ set :bind, '0.0.0.0'
 set :logging, true
 
 get '/bank/institutions' do
-  api = Api.new
+  api = Plaid::Api.new
 
   content_type :json
 
@@ -18,7 +18,7 @@ end
 get '/bank/:bank' do
   bank = params[:bank]
 
-  api = Api.new
+  api = Plaid::Api.new
 
   content_type :json
 
@@ -28,7 +28,7 @@ end
 get '/bank/:bank/balance' do
   bank = params[:bank]
 
-  api = Api.new
+  api = Plaid::Api.new
 
   content_type :json
 

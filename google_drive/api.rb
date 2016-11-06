@@ -1,54 +1,140 @@
 require 'google_drive'
 require 'pry'
+require 'rest-client'
+require 'json'
 
 require_relative './google_session_config'
 
-class GoogleDriveSpreadsheetApi
+module FinanceSpreadsheet
 
-  def runner
-    config = GoogleSessionConfig.new
+  class SheetNotFoundError < StandardError
 
-    session = GoogleDrive::Session.from_config(config)
-
-    spreadsheet = session.spreadsheet_by_title('Budget_Play')
-
-    ws = spreadsheet.worksheets.select {|x| x.title == 'Yearly'}.first
-
-    ws.save
-  end
-  
-  def normalize_price(price)
-    return 0 if price.nil?
-    price.gsub(/[$,]/, "").to_f.round(2)
   end
 
-  def processing
-    places = {}
+  class Api
+    
+    SPREADSHEET_NAME = 'Budget'
+    DATABASE_API_BASE_URL = 'http://localhost:3000'
+    DATABASE_API_TRANSACTIONS_URL = "#{DATABASE_API_BASE_URL}/transactions/"
 
-    spreadsheet_id = '1x36xpb1To2hF4J_evUz6DG-SDiZCc-lBwN8YbmgGq24'
+    NAME_COLUMN = 1
+    CATEGORY_COLUMN = 2
+    AMOUNT_COLUMN = 3
+    PLAID_ID_COLUMN = 4
 
-    spreadsheet_range = '!A5:C'
-    sheets = ['Feb 2015','March 2015','April 2015','May 2015','June 2015','July 2015','Aug 2015','Sept 2015','Oct 2015','Nov 2015','Dec 2015','Jan 2016','Feb 2016','March 2016','April 2016','May 2016','June 2016']
+    def initialize
+      
+    end
 
-    sheets.each do |sheet|
-      range = "#{sheet}#{spreadsheet_range}"
-      response = service.get_spreadsheet_values(spreadsheet_id, range)
+    def runner
+      config = GoogleSessionConfig.new
 
-      response.values.each do |row|
-        key = row[0]
-        if row[2] && row[2].include?('500')
-          puts "#{sheet}: #{row[0]}"
-        end
-        if places[key]
-          places[key][:count] = places[key][:count] + 1
-          places[key][:amount] = (places[key][:amount] + normalize_price(row[2])).round(2)
-        else
-          places[key] = {:count => 1, :amount => normalize_price(row[2])}
+      session = GoogleDrive::Session.from_config(config)
+
+      spreadsheet = session.spreadsheet_by_title(SPREADSHEET_NAME)
+      worksheets = spreadsheet.worksheets
+
+      yearly_worksheet = worksheets.select {|x| x.title == 'Yearly'}.first
+
+      begin
+        are_all_sheets_created?(worksheets)
+      rescue SheetNotFoundError => e
+        print e.message
+      end
+
+      transaction_response = RestClient.get(DATABASE_API_TRANSACTIONS_URL)
+      transactions = JSON.parse(transaction_response)
+
+      transactions.each do |transaction|
+        submit_transaction_to_sheet(worksheets, transaction)
+        marked_transaction_as_uploaded(transaction)
+      end
+
+      # puts JSON.pretty_generate(already_found_transactions(transactions, worksheets))
+    end
+
+    def submit_transaction_to_sheet(worksheets, transaction)
+      date_of_transaction = DateTime.parse(transaction['transacted_at'])
+
+      worksheet = worksheets.select do |ws|
+        ws.title.include?(date_of_transaction.strftime("%b")) && 
+          ws.title.include?(date_of_transaction.strftime("%Y"))
+      end.first
+
+      last_row = worksheet.num_rows + 1
+
+      if (worksheet.max_rows - worksheet.num_rows) < 5
+        worksheet.max_rows += 5
+      end
+      
+      plaid_name = transaction['plaid_name'].gsub(/\w+/) {|w| w.capitalize}
+      
+      worksheet[last_row, NAME_COLUMN] = plaid_name
+      worksheet[last_row, AMOUNT_COLUMN] = transaction['amount']
+      worksheet[last_row, PLAID_ID_COLUMN] = transaction['plaid_id']
+
+      worksheet.save
+    end
+
+    def marked_transaction_as_uploaded(transaction)
+      transaction['uploaded'] = true
+      headers = {content_type: :json, accept: :json}
+      RestClient.put "#{DATABASE_API_TRANSACTIONS_URL}/#{transaction['id']}", transaction.to_json, headers
+
+      print("TRANSACTION #{transaction['id']} UPLOADED: #{transaction['plaid_name']}\n")
+    end
+
+    def already_found_transactions(transactions, worksheets)
+      already_record_transactions = []
+
+      transactions.each do |transaction|
+        if transaction_found?(transaction, worksheets)
+          already_record_transactions << transaction
         end
       end
+
+      already_record_transactions
     end
+
+    def transaction_found?(transaction, worksheets)
+      date_of_transaction = DateTime.parse(transaction['transacted_at'])
+
+      worksheet = worksheets.select do |ws|
+        ws.title.include?(date_of_transaction.strftime("%b")) && 
+          ws.title.include?(date_of_transaction.strftime("%Y"))
+      end
+
+      worksheet.each do |worksheet|
+        (1..worksheet.num_rows).each do |row_number|
+          if worksheet[row_number, AMOUNT_COLUMN].gsub('$', '').to_f == transaction['amount'].to_f
+            return true
+          end
+        end
+      end
+
+      false
+    end
+
+    private
+
+    def are_all_sheets_created?(worksheets)
+      beginning_date = Date.parse("2015-01-01")
+      now_date = DateTime.now
+      date_to_compare = beginning_date
+      while date_to_compare < now_date
+        month_segment = date_to_compare.strftime("%b")
+        year_segment = date_to_compare.strftime("%Y")
+        if !worksheets.select {|x| x.title.include?(month_segment) && x.title.include?(year_segment)}.any?
+          raise SheetNotFoundError, "#{month_segment} #{year_segment} sheet not found. Please create one"
+        end
+        date_to_compare = date_to_compare >> 1
+      end
+    end
+
+
+
   end
 
 end
 
-GoogleDriveSpreadsheetApi.new.runner
+FinanceSpreadsheet::Api.new.runner

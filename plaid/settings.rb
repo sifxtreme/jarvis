@@ -3,6 +3,10 @@ require 'yaml'
 class Settings
   class << self
 
+    def plaid
+      config['plaid_api']
+    end
+
     def access_tokens
       config['access_tokens']
     end

@@ -1,8 +1,8 @@
 Rails.application.routes.draw do
 
-  resources :transactions, only: [:index] do
+  resources :transactions, only: [:index, :update] do
     collection do
-      get 'batch_upload'
+      post 'batch_upload'
     end
   end
 

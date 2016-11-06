@@ -30,3 +30,7 @@
 plaid/config.yml
 google_drive/config.yml
 google_drive/config.json
+
+.idea/*
+
+backup.sql
