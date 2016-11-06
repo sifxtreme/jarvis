@@ -27,5 +27,6 @@
 # unless supporting rvm < 1.11.0 or doing something fancy, ignore this:
 .rvmrc
 
-plaid/banks.yml
+plaid/config.yml
+google_drive/config.yml
 google_drive/config.json

@@ -1,4 +1,4 @@
-require "google_drive"
+require 'google_drive'
 require 'pry'
 
 require_relative './google_session_config'
@@ -6,7 +6,7 @@ require_relative './google_session_config'
 class GoogleDriveSpreadsheetApi
 
   def runner
-    config = CustomConfig.new
+    config = GoogleSessionConfig.new
 
     session = GoogleDrive::Session.from_config(config)
 
@@ -48,9 +48,6 @@ class GoogleDriveSpreadsheetApi
       end
     end
   end
-
-
-
 
 end
 

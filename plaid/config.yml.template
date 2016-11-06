@@ -1,0 +1,5 @@
+access_tokens:
+  bank1:
+    PUT_ACCESS_TOKEN_FROM_PLAID_HERE
+  bank2:
+    PUT_ACCESS_TOKEN_FROM_PLAID_HERE

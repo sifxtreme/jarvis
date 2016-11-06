@@ -1,7 +1,7 @@
 require 'sinatra'
 require "sinatra/reloader"
 
-require './api.rb'
+require_relative './api'
 
 set :bind, '0.0.0.0'
 

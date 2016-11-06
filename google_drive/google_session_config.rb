@@ -1,13 +1,14 @@
 require 'json'
 
-class CustomConfig
+require_relative './settings'
 
-  ACCESS_TOKEN = ""
+class GoogleSessionConfig
+
   FIELDS = %w(client_id client_secret scope refresh_token).freeze
   attr_accessor(*FIELDS)
 
   def initialize(token = nil)
-    @refresh_token = token || ACCESS_TOKEN
+    @refresh_token = token || Settings.google_access_token
 
     @config_path = './config.json'
 
@@ -22,7 +23,8 @@ class CustomConfig
   end
 
   def save
-    ::File.open(@config_path, 'w', 0600) { |f| f.write(to_json) }
+    # puts to_json
+    # ::File.open(@config_path, 'w', 0600) { |f| f.write(to_json) }
   end
 
   private
