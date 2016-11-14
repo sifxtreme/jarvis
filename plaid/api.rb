@@ -5,7 +5,6 @@ require 'json'
 require_relative './settings'
 
 module Plaid
-
   class Api
 
     ENDPOINT = 'https://tartan.plaid.com'
@@ -18,8 +17,8 @@ module Plaid
 
     def initialize
       @endpoint = ENDPOINT
-      @client_id = Settings.plaid['client_id']
-      @secret = Settings.plaid['client_secret']
+      @client_id = PlaidSettings.plaid['client_id']
+      @secret = PlaidSettings.plaid['client_secret']
     end
 
     def institutions
@@ -96,6 +95,7 @@ module Plaid
         data = {transactions: bank_transactions}
         headers = {content_type: :json, accept: :json}
         RestClient.post DATABASE_API_UPLOAD_URL, data.to_json, headers
+        print "Pulling #{bank_transactions.count} #{type} transactions from PLAID to DB\n"
       rescue StandardError => e
         print e.message
         print type
@@ -105,7 +105,7 @@ module Plaid
     private
 
     def access_tokens
-      Settings.access_tokens
+      PlaidSettings.access_tokens
     end
 
     def transaction_is_payment?(transaction)

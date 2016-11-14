@@ -1,6 +1,6 @@
 require 'yaml'
 
-class Settings
+class PlaidSettings
   class << self
 
     def plaid

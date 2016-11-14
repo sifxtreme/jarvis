@@ -1,19 +1,31 @@
 class TransactionsController < ApplicationController
 
   def index
-    render json: FinancialTransaction.
-      select(:id, :plaid_id, :plaid_name, :amount, :transacted_at).
-      where(uploaded: false).
-      order(:transacted_at)
+    if params[:sync_to_drive]
+      render json: FinancialTransaction.
+        select(:id, :plaid_id, :plaid_name, :amount, :transacted_at).
+        where(uploaded: false).
+        order(:transacted_at)
+    elsif params[:sync_from_drive]
+      render json: FinancialTransaction.
+        select(:id, :plaid_id, :plaid_name, :amount, :transacted_at).
+        where('transacted_at >= ?', '2016-11-01 00:00:00').
+        where('plaid_name IS NULL').
+        where(uploaded: true).
+        order(:transacted_at)
+    else
+      render json: FinancialTransaction.all
+    end
   end
 
   def update
-    data = params.permit(:id, :spreadsheet_name, :uploaded, :category).to_h
+    data = params.permit(:plaid_id, :spreadsheet_name, :uploaded, :category, :hidden).to_h
 
-    f = FinancialTransaction.find(data['id'])
+    f = FinancialTransaction.where(plaid_id: data['plaid_id']).first
     f.uploaded = data['uploaded']
     f.spreadsheet_name = data['spreadsheet_name']
     f.category = data['category']
+    f.hidden = data['hidden']
     f.save!
 
     head :no_content

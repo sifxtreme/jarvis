@@ -1,6 +1,6 @@
 require 'yaml'
 
-class Settings
+class GoogleDriveSettings
   class << self
 
     def google_access_token

@@ -15,7 +15,9 @@ module FinanceSpreadsheet
     
     SPREADSHEET_NAME = 'Budget'
     DATABASE_API_BASE_URL = 'http://localhost:3000'
-    DATABASE_API_TRANSACTIONS_URL = "#{DATABASE_API_BASE_URL}/transactions/"
+    DATABASE_API_TRANSACTIONS_URL = "#{DATABASE_API_BASE_URL}/transactions"
+
+    attr_accessor :worksheets
 
     NAME_COLUMN = 1
     CATEGORY_COLUMN = 2
@@ -23,43 +25,42 @@ module FinanceSpreadsheet
     PLAID_ID_COLUMN = 4
 
     def initialize
-      
-    end
-
-    def runner
       config = GoogleSessionConfig.new
 
       session = GoogleDrive::Session.from_config(config)
 
       spreadsheet = session.spreadsheet_by_title(SPREADSHEET_NAME)
-      worksheets = spreadsheet.worksheets
+      @worksheets = spreadsheet.worksheets
+    end
 
-      yearly_worksheet = worksheets.select {|x| x.title == 'Yearly'}.first
-
+    def sync_to_drive
       begin
-        are_all_sheets_created?(worksheets)
+        are_all_sheets_created?
       rescue SheetNotFoundError => e
         print e.message
       end
 
-      transaction_response = RestClient.get(DATABASE_API_TRANSACTIONS_URL)
+      transaction_response = RestClient.get("#{DATABASE_API_TRANSACTIONS_URL}/?sync_to_drive=true")
+      transactions = JSON.parse(transaction_response)
+      
+      transactions.each do |transaction|
+        submit_transaction_to_sheet(transaction)
+        marked_transaction_as_uploaded(transaction)
+      end
+    end
+
+    def sync_from_drive
+      transaction_response = RestClient.get("#{DATABASE_API_TRANSACTIONS_URL}/?sync_from_drive=true")
       transactions = JSON.parse(transaction_response)
 
       transactions.each do |transaction|
-        submit_transaction_to_sheet(worksheets, transaction)
-        marked_transaction_as_uploaded(transaction)
+        data = get_transaction_date_from_spreadsheet(transaction)
+        submit_metadata_to_database(data, transaction)
       end
-
-      # puts JSON.pretty_generate(already_found_transactions(transactions, worksheets))
     end
 
-    def submit_transaction_to_sheet(worksheets, transaction)
-      date_of_transaction = DateTime.parse(transaction['transacted_at'])
-
-      worksheet = worksheets.select do |ws|
-        ws.title.include?(date_of_transaction.strftime("%b")) && 
-          ws.title.include?(date_of_transaction.strftime("%Y"))
-      end.first
+    def submit_transaction_to_sheet(transaction)
+      worksheet = worksheet_for_date(transaction)
 
       last_row = worksheet.num_rows + 1
 
@@ -76,19 +77,43 @@ module FinanceSpreadsheet
       worksheet.save
     end
 
-    def marked_transaction_as_uploaded(transaction)
-      transaction['uploaded'] = true
+    def get_transaction_date_from_spreadsheet(transaction)
+      worksheet = worksheet_for_date(transaction)
+      
+      (1..worksheet.num_rows).each do |row_number|
+        if worksheet[row_number, PLAID_ID_COLUMN] == transaction['plaid_id']
+          return {
+            spreadsheet_name: worksheet[row_number, NAME_COLUMN],
+            category: worksheet[row_number, CATEGORY_COLUMN],
+            hidden: false
+          }
+        end
+      end
+
+      return {hidden: true}
+    end
+
+    def marked_transaction_as_uploaded(transaction, data = nil)
       headers = {content_type: :json, accept: :json}
-      RestClient.put "#{DATABASE_API_TRANSACTIONS_URL}/#{transaction['id']}", transaction.to_json, headers
+      data_to_send = transaction.merge({uploaded:  true}).merge(data)
+      RestClient.put "#{DATABASE_API_TRANSACTIONS_URL}/#{transaction['id']}", data_to_send.to_json, headers
 
       print("TRANSACTION #{transaction['id']} UPLOADED: #{transaction['plaid_name']}\n")
     end
 
-    def already_found_transactions(transactions, worksheets)
+    def submit_metadata_to_database(data, transaction)
+      headers = {content_type: :json, accept: :json}
+      data_to_send = transaction.merge({uploaded: true}).merge(data)
+      RestClient.put "#{DATABASE_API_TRANSACTIONS_URL}/#{transaction['id']}", data_to_send.to_json, headers
+
+      print("METADATA #{transaction['id']} SYNCED: #{transaction['spreadsheet_name'] || transaction['plaid_name']}\n")
+    end
+
+    def already_found_transactions(transactions)
       already_record_transactions = []
 
       transactions.each do |transaction|
-        if transaction_found?(transaction, worksheets)
+        if transaction_found?(transaction)
           already_record_transactions << transaction
         end
       end
@@ -96,19 +121,12 @@ module FinanceSpreadsheet
       already_record_transactions
     end
 
-    def transaction_found?(transaction, worksheets)
-      date_of_transaction = DateTime.parse(transaction['transacted_at'])
+    def transaction_found?(transaction)
+      worksheet = worksheet_for_date(transaction)
 
-      worksheet = worksheets.select do |ws|
-        ws.title.include?(date_of_transaction.strftime("%b")) && 
-          ws.title.include?(date_of_transaction.strftime("%Y"))
-      end
-
-      worksheet.each do |worksheet|
-        (1..worksheet.num_rows).each do |row_number|
-          if worksheet[row_number, AMOUNT_COLUMN].gsub('$', '').to_f == transaction['amount'].to_f
-            return true
-          end
+      (1..worksheet.num_rows).each do |row_number|
+        if worksheet[row_number, AMOUNT_COLUMN].gsub('$', '').to_f == transaction['amount'].to_f
+          return true
         end
       end
 
@@ -117,7 +135,16 @@ module FinanceSpreadsheet
 
     private
 
-    def are_all_sheets_created?(worksheets)
+    def worksheet_for_date(transaction)
+      date_of_transaction = DateTime.parse(transaction['transacted_at'])
+
+      worksheets.select do |ws|
+        ws.title.include?(date_of_transaction.strftime("%b")) && 
+          ws.title.include?(date_of_transaction.strftime("%Y"))
+      end.first
+    end
+
+    def are_all_sheets_created?
       beginning_date = Date.parse("2015-01-01")
       now_date = DateTime.now
       date_to_compare = beginning_date
@@ -132,9 +159,6 @@ module FinanceSpreadsheet
     end
 
 
-
   end
 
 end
-
-FinanceSpreadsheet::Api.new.runner
