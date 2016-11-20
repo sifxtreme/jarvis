@@ -47,7 +47,7 @@ module Plaid
       response = RestClient.post "#{endpoint}/balance", data
       response_json = JSON.parse response.body
 
-      response_json['accounts'].first['balance']
+      response_json['accounts'].map {|x| x['balance']}
     end
 
     def transactions(type)

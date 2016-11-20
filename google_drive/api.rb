@@ -93,7 +93,7 @@ module FinanceSpreadsheet
       return {hidden: true}
     end
 
-    def marked_transaction_as_uploaded(transaction, data = nil)
+    def marked_transaction_as_uploaded(transaction, data = {})
       headers = {content_type: :json, accept: :json}
       data_to_send = transaction.merge({uploaded:  true}).merge(data)
       RestClient.put "#{DATABASE_API_TRANSACTIONS_URL}/#{transaction['id']}", data_to_send.to_json, headers

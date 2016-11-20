@@ -10,8 +10,9 @@ class TransactionsController < ApplicationController
       render json: FinancialTransaction.
         select(:id, :plaid_id, :plaid_name, :amount, :transacted_at).
         where('transacted_at >= ?', '2016-11-01 00:00:00').
-        where('plaid_name IS NULL').
+        where('spreadsheet_name IS NULL').
         where(uploaded: true).
+        where(hidden: [false, nil]).
         order(:transacted_at)
     else
       render json: FinancialTransaction.all
