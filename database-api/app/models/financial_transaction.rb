@@ -1,3 +1,0 @@
-class FinancialTransaction < ApplicationRecord
-
-end

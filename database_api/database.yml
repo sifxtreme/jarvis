@@ -4,7 +4,7 @@ default: &default
   encoding: utf8
   reconnect: false
   database: jarvis
-  pool: 5
+  pool: 30
   username: root
   password: root
   host: jarvis
