@@ -1,7 +1,6 @@
 require 'sinatra'
-require 'sinatra/reloader'
 
-require_relative './api'
+require_relative '../lib/plaid/api'
 
 set :bind, '0.0.0.0'
 

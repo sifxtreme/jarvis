@@ -2,7 +2,7 @@ require 'pry'
 require 'rest-client'
 require 'json'
 
-require_relative './settings'
+require_relative '../config/settings'
 
 module Plaid
   class Api
@@ -17,8 +17,8 @@ module Plaid
 
     def initialize
       @endpoint = ENDPOINT
-      @client_id = PlaidSettings.plaid['client_id']
-      @secret = PlaidSettings.plaid['client_secret']
+      @client_id = Settings.plaid_api['client_id']
+      @secret = Settings.plaid_api['client_secret']
     end
 
     def institutions
@@ -105,7 +105,7 @@ module Plaid
     private
 
     def access_tokens
-      PlaidSettings.access_tokens
+      Settings.plaid_access_tokens
     end
 
     def transaction_is_payment?(transaction)

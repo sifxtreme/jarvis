@@ -1,5 +1,5 @@
-require_relative './plaid/api'
-require_relative './google_drive/api'
+require_relative './lib/plaid/api'
+require_relative './lib/google_drive/api'
 
 plaid = Plaid::Api.new
 spreadsheet = FinanceSpreadsheet::Api.new

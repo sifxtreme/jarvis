@@ -1,0 +1,15 @@
+plaid:
+  api:
+    client_id:
+      TOKEN
+    client_secret:
+      TOKEN
+  access_tokens:
+    bank1:
+      PUT_ACCESS_TOKEN_FROM_PLAID_HERE
+    bank2:
+      PUT_ACCESS_TOKEN_FROM_PLAID_HERE
+
+google_drive:
+  google_access_token:
+    INSERT_ACCESS_TOKEN_HERE

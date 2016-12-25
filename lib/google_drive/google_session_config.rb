@@ -1,6 +1,6 @@
 require 'json'
 
-require_relative './settings'
+require_relative '../config/settings'
 
 class GoogleSessionConfig
 
@@ -8,7 +8,7 @@ class GoogleSessionConfig
   attr_accessor(*FIELDS)
 
   def initialize(token = nil)
-    @refresh_token = token || GoogleDriveSettings.google_access_token
+    @refresh_token = token || Settings.google_access_token
 
     @config_path = './config.json'
 
