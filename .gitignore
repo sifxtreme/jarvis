@@ -27,8 +27,10 @@
 # unless supporting rvm < 1.11.0 or doing something fancy, ignore this:
 .rvmrc
 
-lib/config/config.yml
+# jarvis specific
+
 lib/config/config.yml
 **/config.yml
-
 logs/jarvis.log
+scheduler/tmp/*
+scheduler/log/*
