@@ -37,7 +37,7 @@ module FinanceSpreadsheet
       begin
         are_all_sheets_created?
       rescue SheetNotFoundError => e
-        print e.message
+        j_log.warn e.message
       end
 
       transaction_response = RestClient.get("#{DATABASE_API_TRANSACTIONS_URL}/?sync_to_drive=true")
@@ -98,7 +98,7 @@ module FinanceSpreadsheet
       data_to_send = transaction.merge({uploaded:  true}).merge(data)
       RestClient.put "#{DATABASE_API_TRANSACTIONS_URL}/#{transaction['id']}", data_to_send.to_json, headers
 
-      print("TRANSACTION #{transaction['id']} UPLOADED: #{transaction['plaid_name']}\n")
+      j_log.info("TRANSACTION #{transaction['id']} UPLOADED: #{transaction['plaid_name']}")
     end
 
     def submit_metadata_to_database(data, transaction)
@@ -106,7 +106,7 @@ module FinanceSpreadsheet
       data_to_send = transaction.merge({uploaded: true}).merge(data)
       RestClient.put "#{DATABASE_API_TRANSACTIONS_URL}/#{transaction['id']}", data_to_send.to_json, headers
 
-      print("METADATA #{transaction['id']} SYNCED: #{transaction['spreadsheet_name'] || transaction['plaid_name']}\n")
+      j_log.info("METADATA #{transaction['id']} SYNCED: #{transaction['spreadsheet_name'] || transaction['plaid_name']}")
     end
 
     def already_found_transactions(transactions)
@@ -134,6 +134,10 @@ module FinanceSpreadsheet
     end
 
     private
+
+    def j_log
+      JarvisLogger.new.logger
+    end
 
     def worksheet_for_date(transaction)
       date_of_transaction = DateTime.parse(transaction['transacted_at'])

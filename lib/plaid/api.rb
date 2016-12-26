@@ -2,7 +2,8 @@ require 'pry'
 require 'rest-client'
 require 'json'
 
-require_relative '../config/settings'
+require_relative '../../config/settings'
+require_relative '../../logs/logger'
 
 module Plaid
   class Api
@@ -95,14 +96,18 @@ module Plaid
         data = {transactions: bank_transactions}
         headers = {content_type: :json, accept: :json}
         RestClient.post DATABASE_API_UPLOAD_URL, data.to_json, headers
-        print "Pulling #{bank_transactions.count} #{type} transactions from PLAID to DB\n"
+        j_log.info "Pulling #{bank_transactions.count} #{type} transactions from PLAID to DB"
       rescue StandardError => e
-        print e.message
-        print type
+        j_log.error e.message
+        j_log.error type
       end
     end
 
     private
+
+    def j_log
+      JarvisLogger.new.logger
+    end
 
     def access_tokens
       Settings.plaid_access_tokens

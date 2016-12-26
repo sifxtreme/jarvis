@@ -28,3 +28,7 @@
 .rvmrc
 
 lib/config/config.yml
+lib/config/config.yml
+**/config.yml
+
+logs/jarvis.log

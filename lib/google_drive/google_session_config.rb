@@ -1,6 +1,6 @@
 require 'json'
 
-require_relative '../config/settings'
+require_relative '../../config/settings'
 
 class GoogleSessionConfig
 
