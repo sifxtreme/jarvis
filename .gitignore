@@ -34,3 +34,4 @@ lib/config/config.yml
 logs/jarvis.log
 scheduler/tmp/*
 scheduler/log/*
+lib/southwest/*.html
