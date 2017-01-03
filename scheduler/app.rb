@@ -15,10 +15,10 @@ class SchedulerApp < Sinatra::Base
 
     scheduler = Rufus::Scheduler.new
 
-    plaid = Plaid::Api.new
-    spreadsheet = FinanceSpreadsheet::Api.new
-
     scheduler.cron '0 14 * * *' do
+      plaid = Plaid::Api.new
+      spreadsheet = FinanceSpreadsheet::Api.new
+      
       plaid.sync_all
       spreadsheet.sync_to_drive
     end
