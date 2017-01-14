@@ -88,7 +88,7 @@ module FinanceSpreadsheet
       worksheet = worksheet_for_date(transaction)
       
       (1..worksheet.num_rows).each do |row_number|
-        if worksheet[row_number, PLAID_ID_COLUMN] == transaction[:id]
+        if worksheet[row_number, ID_COLUMN] == transaction[:id].to_s
           return {
             spreadsheet_name: worksheet[row_number, NAME_COLUMN],
             category: worksheet[row_number, CATEGORY_COLUMN],

@@ -12,5 +12,3 @@ if pull_down == 'sync_to_drive'
 elsif pull_down == 'sync_from_drive'
   spreadsheet.sync_from_drive
 end
-
-spreadsheet.sync_from_drive

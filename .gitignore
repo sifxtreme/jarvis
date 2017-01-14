@@ -29,9 +29,6 @@
 
 # jarvis specific
 
-lib/config/config.yml
 **/config.yml
-logs/jarvis.log
-scheduler/tmp/*
-scheduler/log/*
-lib/southwest/*.html
+**/*.log
+**/southwest/*.html
