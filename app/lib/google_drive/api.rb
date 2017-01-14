@@ -22,7 +22,7 @@ module FinanceSpreadsheet
     NAME_COLUMN = 1
     CATEGORY_COLUMN = 2
     AMOUNT_COLUMN = 3
-    PLAID_ID_COLUMN = 4
+    ID_COLUMN = 4
 
     def initialize
       config = GoogleSessionConfig.new
@@ -41,7 +41,7 @@ module FinanceSpreadsheet
       end
 
       transactions = FinancialTransaction.
-        select(:id, :plaid_id, :plaid_name, :amount, :transacted_at).
+        select(:id, :plaid_name, :amount, :transacted_at).
         where(uploaded: false).
         order(:transacted_at)
       
@@ -53,7 +53,7 @@ module FinanceSpreadsheet
 
     def sync_from_drive
       transactions = FinancialTransaction.
-        select(:id, :plaid_id, :plaid_name, :amount, :transacted_at).
+        select(:id, :plaid_name, :amount, :transacted_at).
         where('transacted_at >= ?', '2016-11-01 00:00:00').
         where('spreadsheet_name IS NULL').
         where(uploaded: true).
@@ -79,7 +79,7 @@ module FinanceSpreadsheet
       
       worksheet[last_row, NAME_COLUMN] = plaid_name
       worksheet[last_row, AMOUNT_COLUMN] = transaction[:amount]
-      worksheet[last_row, PLAID_ID_COLUMN] = transaction[:plaid_id]
+      worksheet[last_row, ID_COLUMN] = transaction[:id]
 
       worksheet.save
     end
@@ -88,7 +88,7 @@ module FinanceSpreadsheet
       worksheet = worksheet_for_date(transaction)
       
       (1..worksheet.num_rows).each do |row_number|
-        if worksheet[row_number, PLAID_ID_COLUMN] == transaction[:plaid_id]
+        if worksheet[row_number, PLAID_ID_COLUMN] == transaction[:id]
           return {
             spreadsheet_name: worksheet[row_number, NAME_COLUMN],
             category: worksheet[row_number, CATEGORY_COLUMN],
