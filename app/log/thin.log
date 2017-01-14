@@ -1,0 +1,13 @@
+Writing PID to tmp/pids/thin.pid
+Exiting!
+/Users/aahmed/.rvm/gems/ruby-2.3.1/gems/thin-1.7.0/lib/rack/adapter/loader.rb:32:in `read': No such file or directory @ rb_sysopen - config.ru (Errno::ENOENT)
+	from /Users/aahmed/.rvm/gems/ruby-2.3.1/gems/thin-1.7.0/lib/rack/adapter/loader.rb:32:in `load'
+	from /Users/aahmed/.rvm/gems/ruby-2.3.1/gems/thin-1.7.0/lib/thin/controllers/controller.rb:182:in `load_rackup_config'
+	from /Users/aahmed/.rvm/gems/ruby-2.3.1/gems/thin-1.7.0/lib/thin/controllers/controller.rb:72:in `start'
+	from /Users/aahmed/.rvm/gems/ruby-2.3.1/gems/thin-1.7.0/lib/thin/runner.rb:200:in `run_command'
+	from /Users/aahmed/.rvm/gems/ruby-2.3.1/gems/thin-1.7.0/lib/thin/runner.rb:156:in `run!'
+	from /Users/aahmed/.rvm/gems/ruby-2.3.1/gems/thin-1.7.0/bin/thin:6:in `<top (required)>'
+	from /Users/aahmed/.rvm/gems/ruby-2.3.1/bin/thin:23:in `load'
+	from /Users/aahmed/.rvm/gems/ruby-2.3.1/bin/thin:23:in `<main>'
+	from /Users/aahmed/.rvm/gems/ruby-2.3.1/bin/ruby_executable_hooks:15:in `eval'
+	from /Users/aahmed/.rvm/gems/ruby-2.3.1/bin/ruby_executable_hooks:15:in `<main>'

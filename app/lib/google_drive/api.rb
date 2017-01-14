@@ -1,8 +1,10 @@
-require 'google_drive'
 require 'pry'
 require 'rest-client'
 require 'json'
 
+require 'google_drive'
+
+require_relative '../../db/models/financial_transaction'
 require_relative './google_session_config'
 
 module FinanceSpreadsheet
@@ -14,8 +16,6 @@ module FinanceSpreadsheet
   class Api
     
     SPREADSHEET_NAME = 'Budget'
-    DATABASE_API_BASE_URL = 'http://localhost:3000'
-    DATABASE_API_TRANSACTIONS_URL = "#{DATABASE_API_BASE_URL}/transactions"
 
     attr_accessor :worksheets
 
@@ -40,8 +40,10 @@ module FinanceSpreadsheet
         j_log.warn e.message
       end
 
-      transaction_response = RestClient.get("#{DATABASE_API_TRANSACTIONS_URL}/?sync_to_drive=true")
-      transactions = JSON.parse(transaction_response)
+      transactions = FinancialTransaction.
+        select(:id, :plaid_id, :plaid_name, :amount, :transacted_at).
+        where(uploaded: false).
+        order(:transacted_at)
       
       transactions.each do |transaction|
         submit_transaction_to_sheet(transaction)
@@ -50,8 +52,13 @@ module FinanceSpreadsheet
     end
 
     def sync_from_drive
-      transaction_response = RestClient.get("#{DATABASE_API_TRANSACTIONS_URL}/?sync_from_drive=true")
-      transactions = JSON.parse(transaction_response)
+      transactions = FinancialTransaction.
+        select(:id, :plaid_id, :plaid_name, :amount, :transacted_at).
+        where('transacted_at >= ?', '2016-11-01 00:00:00').
+        where('spreadsheet_name IS NULL').
+        where(uploaded: true).
+        where(hidden: [false, nil]).
+        order(:transacted_at)
 
       transactions.each do |transaction|
         data = get_transaction_date_from_spreadsheet(transaction)
@@ -68,11 +75,11 @@ module FinanceSpreadsheet
         worksheet.max_rows += 5
       end
       
-      plaid_name = transaction['plaid_name'].gsub(/\w+/) {|w| w.capitalize}
+      plaid_name = transaction[:plaid_name].gsub(/\w+/) {|w| w.capitalize}
       
       worksheet[last_row, NAME_COLUMN] = plaid_name
-      worksheet[last_row, AMOUNT_COLUMN] = transaction['amount']
-      worksheet[last_row, PLAID_ID_COLUMN] = transaction['plaid_id']
+      worksheet[last_row, AMOUNT_COLUMN] = transaction[:amount]
+      worksheet[last_row, PLAID_ID_COLUMN] = transaction[:plaid_id]
 
       worksheet.save
     end
@@ -81,7 +88,7 @@ module FinanceSpreadsheet
       worksheet = worksheet_for_date(transaction)
       
       (1..worksheet.num_rows).each do |row_number|
-        if worksheet[row_number, PLAID_ID_COLUMN] == transaction['plaid_id']
+        if worksheet[row_number, PLAID_ID_COLUMN] == transaction[:plaid_id]
           return {
             spreadsheet_name: worksheet[row_number, NAME_COLUMN],
             category: worksheet[row_number, CATEGORY_COLUMN],
@@ -94,17 +101,19 @@ module FinanceSpreadsheet
     end
 
     def marked_transaction_as_uploaded(transaction, data = {})
-      headers = {content_type: :json, accept: :json}
-      data_to_send = transaction.merge({uploaded:  true}).merge(data)
-      RestClient.put "#{DATABASE_API_TRANSACTIONS_URL}/#{transaction['id']}", data_to_send.to_json, headers
+      transaction = FinancialTransaction.find(transaction[:id])
+      transaction.uploaded = true
+      transaction.save!
 
       j_log.info("TRANSACTION #{transaction['id']} UPLOADED: #{transaction['plaid_name']}")
     end
 
     def submit_metadata_to_database(data, transaction)
-      headers = {content_type: :json, accept: :json}
-      data_to_send = transaction.merge({uploaded: true}).merge(data)
-      RestClient.put "#{DATABASE_API_TRANSACTIONS_URL}/#{transaction['id']}", data_to_send.to_json, headers
+      transaction = FinancialTransaction.find(transaction[:id])
+      transaction.spreadsheet_name = data[:spreadsheet_name]
+      transaction.category = data[:category]
+      transaction.hidden = data[:hidden]
+      transaction.save!
 
       j_log.info("METADATA #{transaction['id']} SYNCED: #{transaction['spreadsheet_name'] || transaction['plaid_name']}")
     end
@@ -136,11 +145,11 @@ module FinanceSpreadsheet
     private
 
     def j_log
-      JarvisLogger.new.logger
+      JarvisLogger.logger
     end
 
     def worksheet_for_date(transaction)
-      date_of_transaction = DateTime.parse(transaction['transacted_at'])
+      date_of_transaction = transaction[:transacted_at]
 
       worksheets.select do |ws|
         ws.title.include?(date_of_transaction.strftime("%b")) && 

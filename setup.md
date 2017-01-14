@@ -12,15 +12,8 @@ docker run -d -p 3307:3306 --name jarvis -v ~/code/docker/data/jarvis:/var/lib/m
 sudo docker run -d -p 3307:3306 --name jarvis -v /var/lib/data/jarvis:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=root mysql:5.7
 ```
 
-## database-api
+## app
 ```bash
-cd jarvis/database_api_app
-rackup -p 3000 -D
-```
-
-## scheduler
-
-```
-cd jarvis/scheduler
+cd jarvis/app
 bundle exec thin -R config.ru start -p 2020 -d
 ```

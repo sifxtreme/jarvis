@@ -2,29 +2,28 @@ require 'pry'
 require 'rest-client'
 require 'json'
 
+require_relative '../../db/models/financial_transaction'
 require_relative '../../config/settings'
-require_relative '../../logs/logger'
+require_relative '../../log/logger'
 
 module Plaid
   class Api
 
-    ENDPOINT = 'https://tartan.plaid.com'
-    DATABASE_API_BASE_URL = 'http://localhost:3000'
-    DATABASE_API_UPLOAD_URL = "#{DATABASE_API_BASE_URL}/transactions/batch_upload"
+    PLAID_API_URL = 'https://tartan.plaid.com'
 
-    attr_accessor :endpoint
+    attr_accessor :api_url
     attr_accessor :client_id
     attr_accessor :secret
 
     def initialize
-      @endpoint = ENDPOINT
+      @api_url = PLAID_API_URL
       @client_id = Settings.plaid_api['client_id']
       @secret = Settings.plaid_api['client_secret']
     end
 
     def institutions
       @institutions ||= begin
-        response = RestClient.get "#{endpoint}/institutions"
+        response = RestClient.get "#{api_url}/institutions"
         response_json = JSON.parse response.body
 
         banks = response_json.map do |bank|
@@ -45,7 +44,7 @@ module Plaid
           access_token: access_tokens[type],
       }
 
-      response = RestClient.post "#{endpoint}/balance", data
+      response = RestClient.post "#{api_url}/balance", data
       response_json = JSON.parse response.body
 
       response_json['accounts'].map {|x| x['balance']}
@@ -63,7 +62,7 @@ module Plaid
           }
       }
 
-      response = RestClient.post "#{endpoint}/connect/get", data
+      response = RestClient.post "#{api_url}/connect/get", data
       response_json = JSON.parse response.body
 
       raw_transactions = response_json['transactions']
@@ -92,11 +91,19 @@ module Plaid
 
     def sync_to_database(type)
       begin
-        bank_transactions = transactions(type)
-        data = {transactions: bank_transactions}
-        headers = {content_type: :json, accept: :json}
-        RestClient.post DATABASE_API_UPLOAD_URL, data.to_json, headers
-        j_log.info "Pulling #{bank_transactions.count} #{type} transactions from PLAID to DB"
+        transactions(type).each do |data|
+          next if FinancialTransaction.where(plaid_id: data[:id]).any?
+          
+          f = FinancialTransaction.find_or_initialize_by(plaid_id: data[:id])
+          f.transacted_at = data[:date]
+          f.plaid_name = data[:name]
+          f.amount = data[:amount]
+          f.source = data[:type]
+          f.save!
+        end
+
+        j_log.info "Syncing #{transactions(type).count} #{type} transactions from PLAID to DB"
+
       rescue StandardError => e
         j_log.error e.message
         j_log.error type
@@ -106,7 +113,7 @@ module Plaid
     private
 
     def j_log
-      JarvisLogger.new.logger
+      JarvisLogger.logger
     end
 
     def access_tokens
