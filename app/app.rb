@@ -14,6 +14,7 @@ require_relative './db/models/financial_transaction'
 require_relative './log/logger'
 require_relative './lib/plaid/api'
 require_relative './lib/google_drive/api'
+require_relative './lib/southwest/search'
 
 
 class JarvisApp < Sinatra::Base
@@ -33,6 +34,10 @@ class JarvisApp < Sinatra::Base
       
       plaid.sync_all
       spreadsheet.sync_to_drive
+    end
+
+    scheduler.cron '30 */3 * * *' do
+      Southwest.new.runner
     end
 
     # scheduler.join

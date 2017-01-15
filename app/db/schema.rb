@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20161112225639) do
+ActiveRecord::Schema.define(version: 20170115004837) do
 
   create_table "financial_transactions", force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=utf8" do |t|
     t.string   "plaid_id"
@@ -29,6 +29,19 @@ ActiveRecord::Schema.define(version: 20161112225639) do
     t.index ["plaid_name"], name: "index_financial_transactions_on_plaid_name", using: :btree
     t.index ["spreadsheet_name"], name: "index_financial_transactions_on_spreadsheet_name", using: :btree
     t.index ["transacted_at"], name: "index_financial_transactions_on_transacted_at", using: :btree
+  end
+
+  create_table "flights", force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=utf8" do |t|
+    t.string   "origin"
+    t.string   "destination"
+    t.datetime "departure_date"
+    t.datetime "arrival_date"
+    t.json     "search_data"
+    t.json     "flexible_data"
+    t.datetime "created_at",     null: false
+    t.datetime "updated_at",     null: false
+    t.index ["destination"], name: "index_flights_on_destination", using: :btree
+    t.index ["origin"], name: "index_flights_on_origin", using: :btree
   end
 
 end

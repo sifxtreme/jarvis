@@ -1,6 +1,8 @@
 require 'mechanize'
 require 'pry'
 
+require_relative '../../db/models/flight'
+
 class Southwest
 
   ROOT_URL = 'https://www.southwest.com'
@@ -15,12 +17,59 @@ class Southwest
     end
   end
 
-  def debug
-    flexible_page = mechanize_agent.get("file:///Users/aahmed/code/dev/jarvis/lib/southwest/flexible_LAX_ABQ_01102017_01132017.html")
-    search_page = mechanize_agent.get("file:///Users/aahmed/code/dev/jarvis/lib/southwest/results_LAX_ABQ_01102017_01132017.html")
+  def runner
+    paths = desired_paths
+    dates = desired_dates
 
-    cheapest_flexible = analyze_flexible_page(flexible_page)
+    paths.each do |path|
+      dates.each do |date|
+        search(path, date)
+      end
+    end
   end
+
+  def search(path, dates)
+    mechanize_agent.get(SEARCH_URL) do |page|
+
+      form = page.form('buildItineraryForm')
+
+      form.originAirport = path[0]
+      form.destinationAirport = path[1]
+
+      form.outboundDateString = dates[0]
+      form.returnDateString = dates[1]
+      
+      search_page = mechanize_agent.submit(form)
+
+      click_for_flexible_page = search_page.search(".shortcutNotification a").first
+
+      flexible_page = mechanize_agent.click(click_for_flexible_page)
+
+      cheapest_flexible = analyze_flexible_page(flexible_page)
+      cheapest_search = analyze_search_page(search_page)
+
+      f = Flight.new
+      f.origin = path[0]
+      f.destination = path[1]
+
+      f.departure_date = DateTime.strptime(dates[0], '%m/%d/%Y')
+      f.arrival_date = DateTime.strptime(dates[1], '%m/%d/%Y')
+
+      f.flexible_data = cheapest_flexible
+      f.search_data = cheapest_search
+
+      f.save!
+
+      # file_suffix = "#{path.join("_")}_#{dates.join("_").gsub("/",'')}"
+      # results_filename = "results_#{file_suffix}.html"
+      # flexible_results_filename = "flexible_#{file_suffix}.html"
+      
+      # File.write("#{File.dirname(__FILE__)}/#{results_filename}", search_page.content)
+      # File.write("#{File.dirname(__FILE__)}/#{flexible_results_filename}", flexible_page.content)
+    end
+  end
+
+  private
 
   def analyze_flexible_page(flexible_page)
     flexible_depart_cells = flexible_page.search(".outboundCalendar_calendarCell .screenreader-only").map { |x| filter_text(x.text) }
@@ -40,9 +89,6 @@ class Southwest
 
     depart = formatting.call(flexible_depart_cells)
     arrive = formatting.call(flexible_arrive_cells)
-
-    puts depart.to_yaml
-    puts arrive.to_yaml
 
     {
       depart: depart,
@@ -72,49 +118,12 @@ class Southwest
     text.gsub(/\s+/, "..").split("..").reject(&:empty?)[0,3].join(' ')
   end
 
-  def runner
-    paths = desired_paths
-    dates = desired_dates
-
-    paths.each do |path|
-      dates.each do |date|
-        search(path, date)
-        break
-      end
-    end
-  end
-
-  def search(path, dates)
-    mechanize_agent.get(SEARCH_URL) do |page|
-      form = page.form('buildItineraryForm')
-
-      form.originAirport = path[0]
-      form.destinationAirport = path[1]
-
-      form.outboundDateString = dates[0]
-      form.returnDateString = dates[1]
-      
-      new_page = mechanize_agent.submit(form)
-
-      click_for_flexible_page = new_page.search(".shortcutNotification a").first
-
-      flexible_page = mechanize_agent.click(click_for_flexible_page)
-      
-      # file_suffix = "#{path.join("_")}_#{dates.join("_").gsub("/",'')}"
-      # results_filename = "results_#{file_suffix}.html"
-      # flexible_results_filename = "flexible_#{file_suffix}.html"
-      
-      # File.write("#{File.dirname(__FILE__)}/#{results_filename}", new_page.content)
-      # File.write("#{File.dirname(__FILE__)}/#{flexible_results_filename}", flexible_page.content)
-    end
-  end
-
   def desired_paths
     [
       ['LAX', 'ABQ'],
-      # ['LAX', 'DAL'],
-      # ['ABQ', 'LAX'],
-      # ['DAL', 'LAX'],
+      ['ABQ', 'LAX'],
+      ['LAX', 'DAL'],
+      ['DAL', 'LAX'],
     ]
   end
 
@@ -137,10 +146,3 @@ class Southwest
   end
 
 end
-
-
-# Southwest.new.runner
-Southwest.new.debug
-
-
-
