@@ -21,6 +21,7 @@ module Plaid
       @secret = Settings.plaid_api['client_secret']
     end
 
+    # lists all of plaids accepted banks/credit cards
     def institutions
       @institutions ||= begin
         response = RestClient.get "#{api_url}/institutions"
@@ -37,6 +38,7 @@ module Plaid
       end
     end
 
+    # what is the balance on my credit card?
     def balance(type)
       data = {
           client_id: client_id,
@@ -102,19 +104,15 @@ module Plaid
           f.save!
         end
 
-        j_log.info "Syncing #{transactions(type).count} #{type} transactions from PLAID to DB"
+        JarvisLogger.logger.info "Syncing #{transactions(type).count} #{type} transactions from PLAID to DB"
 
       rescue StandardError => e
-        j_log.error e.message
-        j_log.error type
+        JarvisLogger.logger.error e.message
+        JarvisLogger.logger.error type
       end
     end
 
     private
-
-    def j_log
-      JarvisLogger.logger
-    end
 
     def access_tokens
       Settings.plaid_access_tokens

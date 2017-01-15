@@ -37,7 +37,8 @@ module FinanceSpreadsheet
       begin
         are_all_sheets_created?
       rescue SheetNotFoundError => e
-        j_log.warn e.message
+        JarvisLogger.logger.warn e.message
+        return
       end
 
       transactions = FinancialTransaction.
@@ -51,6 +52,7 @@ module FinanceSpreadsheet
       end
     end
 
+    # sync name and category from google spreadsheet
     def sync_from_drive
       transactions = FinancialTransaction.
         select(:id, :plaid_name, :amount, :transacted_at).
@@ -61,16 +63,17 @@ module FinanceSpreadsheet
         order(:transacted_at)
 
       transactions.each do |transaction|
-        data = get_transaction_date_from_spreadsheet(transaction)
-        submit_metadata_to_database(data, transaction)
+        data = get_spreadsheet_data_for(transaction)
+        save_metadata_to_database(data, transaction)
       end
     end
 
     def submit_transaction_to_sheet(transaction)
-      worksheet = worksheet_for_date(transaction)
+      worksheet = worksheet_for_date_of(transaction)
 
       last_row = worksheet.num_rows + 1
 
+      # do we have enough rows?
       if (worksheet.max_rows - worksheet.num_rows) < 5
         worksheet.max_rows += 5
       end
@@ -84,8 +87,8 @@ module FinanceSpreadsheet
       worksheet.save
     end
 
-    def get_transaction_date_from_spreadsheet(transaction)
-      worksheet = worksheet_for_date(transaction)
+    def get_spreadsheet_data_for(transaction)
+      worksheet = worksheet_for_date_of(transaction)
       
       (1..worksheet.num_rows).each do |row_number|
         if worksheet[row_number, ID_COLUMN] == transaction[:id].to_s
@@ -101,37 +104,29 @@ module FinanceSpreadsheet
     end
 
     def marked_transaction_as_uploaded(transaction, data = {})
-      transaction = FinancialTransaction.find(transaction[:id])
-      transaction.uploaded = true
-      transaction.save!
+      t = FinancialTransaction.find(transaction[:id])
+      t.uploaded = true
+      t.save!
 
-      j_log.info("TRANSACTION #{transaction['id']} UPLOADED: #{transaction['plaid_name']}")
+      JarvisLogger.logger.info("TRANSACTION #{transaction['id']} UPLOADED: #{transaction['plaid_name']}")
     end
 
-    def submit_metadata_to_database(data, transaction)
-      transaction = FinancialTransaction.find(transaction[:id])
-      transaction.spreadsheet_name = data[:spreadsheet_name]
-      transaction.category = data[:category]
-      transaction.hidden = data[:hidden]
-      transaction.save!
+    def save_metadata_to_database(data, transaction)
+      t = FinancialTransaction.find(transaction[:id])
+      t.spreadsheet_name = data[:spreadsheet_name]
+      t.category = data[:category]
+      t.hidden = data[:hidden]
+      t.save!
 
-      j_log.info("METADATA #{transaction['id']} SYNCED: #{transaction['spreadsheet_name'] || transaction['plaid_name']}")
+      JarvisLogger.logger.info("METADATA #{transaction['id']} SYNCED: #{transaction['spreadsheet_name'] || transaction['plaid_name']}")
     end
 
     def already_found_transactions(transactions)
-      already_record_transactions = []
-
-      transactions.each do |transaction|
-        if transaction_found?(transaction)
-          already_record_transactions << transaction
-        end
-      end
-
-      already_record_transactions
+      transactions.select {|transaction| transaction_found?(transaction)}
     end
 
     def transaction_found?(transaction)
-      worksheet = worksheet_for_date(transaction)
+      worksheet = worksheet_for_date_of(transaction)
 
       (1..worksheet.num_rows).each do |row_number|
         if worksheet[row_number, AMOUNT_COLUMN].gsub('$', '').to_f == transaction['amount'].to_f
@@ -144,11 +139,7 @@ module FinanceSpreadsheet
 
     private
 
-    def j_log
-      JarvisLogger.logger
-    end
-
-    def worksheet_for_date(transaction)
+    def worksheet_for_date_of(transaction)
       date_of_transaction = transaction[:transacted_at]
 
       worksheets.select do |ws|
@@ -170,7 +161,6 @@ module FinanceSpreadsheet
         date_to_compare = date_to_compare >> 1
       end
     end
-
 
   end
 
