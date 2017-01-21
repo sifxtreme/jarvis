@@ -63,8 +63,12 @@ module FinanceSpreadsheet
         order(:transacted_at)
 
       transactions.each do |transaction|
-        data = get_spreadsheet_data_for(transaction)
-        save_metadata_to_database(data, transaction)
+        begin
+          data = get_spreadsheet_data_for(transaction)
+          save_metadata_to_database(data, transaction)
+        rescue StandardError => e
+          JarvisLogger.logger.error e.message
+        end
       end
     end
 
@@ -104,19 +108,17 @@ module FinanceSpreadsheet
     end
 
     def marked_transaction_as_uploaded(transaction, data = {})
-      t = FinancialTransaction.find(transaction[:id])
-      t.uploaded = true
-      t.save!
+      transaction.uploaded = true
+      transaction.save!
 
       JarvisLogger.logger.info("TRANSACTION #{transaction['id']} UPLOADED: #{transaction['plaid_name']}")
     end
 
     def save_metadata_to_database(data, transaction)
-      t = FinancialTransaction.find(transaction[:id])
-      t.spreadsheet_name = data[:spreadsheet_name]
-      t.category = data[:category]
-      t.hidden = data[:hidden]
-      t.save!
+      transaction.spreadsheet_name = data[:spreadsheet_name]
+      transaction.category = data[:category]
+      transaction.hidden = data[:hidden]
+      transaction.save!
 
       JarvisLogger.logger.info("METADATA #{transaction['id']} SYNCED: #{transaction['spreadsheet_name'] || transaction['plaid_name']}")
     end
