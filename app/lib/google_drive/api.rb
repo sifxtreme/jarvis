@@ -82,7 +82,7 @@ module FinanceSpreadsheet
         worksheet.max_rows += 5
       end
       
-      plaid_name = transaction[:plaid_name].gsub(/\w+/) {|w| w.capitalize}
+      plaid_name = transaction[:plaid_name].gsub(/(?=.*\w)^(\w|')+$/) {|w| w.capitalize}
       
       worksheet[last_row, NAME_COLUMN] = plaid_name
       worksheet[last_row, AMOUNT_COLUMN] = transaction[:amount]
