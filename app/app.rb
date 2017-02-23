@@ -15,6 +15,7 @@ require_relative './log/logger'
 require_relative './lib/plaid/api'
 require_relative './lib/google_drive/api'
 require_relative './lib/southwest/search'
+require_relative './lib/analysis/finances'
 
 
 class JarvisApp < Sinatra::Base
@@ -34,6 +35,10 @@ class JarvisApp < Sinatra::Base
       
       plaid.sync_all
       spreadsheet.sync_to_drive
+    end
+
+    scheduler.cron '0 15 * * *' do
+      Analysis::Finances.new.email_report
     end
 
     scheduler.cron '30 */3 * * *' do

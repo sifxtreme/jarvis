@@ -16,5 +16,3 @@ module Notifications
     end
   end
 end
-
-Notifications::Android.new.send_data

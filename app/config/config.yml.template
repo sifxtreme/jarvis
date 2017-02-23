@@ -13,3 +13,6 @@ plaid:
 google_drive:
   google_access_token:
     INSERT_ACCESS_TOKEN_HERE
+
+gmail:
+  INSERT_GMAIL_TOKEN_HERE

@@ -19,5 +19,9 @@ class Settings
       config['plaid']['access_tokens']
     end
 
+    def gmail_token
+      config['gmail']
+    end
+
   end
 end
