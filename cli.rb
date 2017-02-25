@@ -2,11 +2,13 @@ require_relative './app/lib/plaid/api'
 require_relative './app/lib/google_drive/api'
 require_relative './app/lib/southwest/search'
 require_relative './app/lib/analysis/finances'
+require_relative './app/lib/reddit/newsletter'
 
 plaid = Plaid::Api.new
 spreadsheet = FinanceSpreadsheet::Api.new
 southwest = Southwest.new
 analysis = Analysis::Finances.new
+reddit = Reddit::Newsletter.new
 
 arg = ARGV[0]
 
@@ -24,6 +26,9 @@ begin
 
   elsif arg == 'email'
     analysis.email_report
+
+  elsif arg == 'reddit'
+    reddit.email_report
 
   end
 

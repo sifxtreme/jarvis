@@ -16,6 +16,7 @@ require_relative './lib/plaid/api'
 require_relative './lib/google_drive/api'
 require_relative './lib/southwest/search'
 require_relative './lib/analysis/finances'
+require_relative './lib/reddit/newsletter'
 
 
 class JarvisApp < Sinatra::Base
@@ -44,6 +45,12 @@ class JarvisApp < Sinatra::Base
     scheduler.cron '30 */3 * * *' do
       Southwest.new.runner
     end
+
+    scheduler.cron '0 7 * * 6' do
+      Reddit::Newsletter.new.email_report
+    end
+
+    
 
     # scheduler.join
     # let the current thread join the scheduler thread
