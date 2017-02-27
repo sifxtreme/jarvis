@@ -1,2 +1,2 @@
-require_relative './app'
+require_relative './scheduler_app'
 run JarvisApp

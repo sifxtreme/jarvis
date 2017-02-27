@@ -50,15 +50,8 @@ class JarvisApp < Sinatra::Base
       Reddit::Newsletter.new.email_report
     end
 
-    
-
     # scheduler.join
     # let the current thread join the scheduler thread
-  end
-
-  get '/transactions/' do
-    content_type :json
-    FinancialTransaction.all.to_json
   end
 
 end

@@ -35,7 +35,10 @@ module Reddit
       message << "<h2>#{subreddit}</h2>"
 
       data.each do |d|
-        message << "<p><a href='#{d[:url]}'>#{d[:title]}</a></p>"
+        message << "<p>"
+        message << "<a href='#{d[:url]}'>#{d[:title]}</a><br />"
+        message << "<a href='http://www.reddit.com#{d[:comments]}'>Comments</a>"
+        message << "</p>"
       end
 
       message
@@ -46,7 +49,13 @@ module Reddit
     def get_subreddit_info(subreddit)
       response = RestClient.get("https://www.reddit.com/r/#{subreddit}/top/.json?sort=top&t=week")
       info = JSON.parse(response.body)
-      info["data"]["children"].first(10).map {|x| {title: x["data"]["title"], url: x["data"]["url"]} }
+      info["data"]["children"].first(10).map do |x|
+        {
+          title: x["data"]["title"], 
+          url: x["data"]["url"],
+          comments: x["data"]["permalink"]
+        } 
+      end
     end
     
   end

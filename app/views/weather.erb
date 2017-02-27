@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Weather</title>
+</head>
+<body>
+  <canvas id="myChart" width="400" height="400"></canvas>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.5.0/Chart.bundle.min.js"></script>
+  <script type="text/javascript">
+    var ctx = document.getElementById("myChart");
+
+    var randomColor = function(){
+      var randomDigit = function(){
+        var max = 256;
+        return [Math.floor(Math.random() * max)]  
+      }
+
+      return [randomDigit(), randomDigit(), randomDigit()]
+    }
+
+    var createDataSet = function(name, data){
+
+      var color = randomColor()
+
+      return {
+          label: name,
+          fill: false,
+          lineTension: 0.1,
+          backgroundColor: `rgba(${color[0]},${color[1]},${color[2]},0.4)`,
+          borderColor: `rgba(${color[0]},${color[1]},${color[2]},1)`,
+          borderCapStyle: 'butt',
+          borderDash: [],
+          borderDashOffset: 0.0,
+          borderJoinStyle: 'miter',
+          pointBorderColor: `rgba(${color[0]},${color[1]},${color[2]},1)`,
+          pointBackgroundColor: "#fff",
+          pointBorderWidth: 1,
+          pointHoverRadius: 5,
+          pointHoverBackgroundColor: `rgba(${color[0]},${color[1]},${color[2]},1)`,
+          pointHoverBorderColor: `rgba(${color[1]},${color[1]},${color[1]},1)`,
+          pointHoverBorderWidth: 2,
+          pointRadius: 1,
+          pointHitRadius: 10,
+          data: data,
+          spanGaps: false,
+        }
+    }
+
+    var createDataSets = function(data){
+      var dataSets = []
+      for(var key in data){
+        dataSets.push(createDataSet(key, data[key]))
+      }
+      return dataSets
+    }
+
+    var createData = function(labels, data){
+      return {
+        labels: labels,
+        datasets: createDataSets(data),
+      }
+    }
+
+    var options = {
+      scales: {
+        yAxes: [{
+          ticks: {
+            beginAtZero:true
+          }
+        }]
+      }
+    }
+
+    var drawChart = function(ctx, data, options){
+      new Chart(ctx, {
+        type: 'line',
+        data: data,
+        options: options
+      });      
+    }
+
+    function loadDoc() {
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+          var response = JSON.parse(this.responseText)
+
+          var data = createData(response.dates, response.cities);
+          drawChart(ctx, data, options)
+        }
+      };
+      xhttp.open("GET", "/api/weather/<%= params[:attribute] %>", true);
+      xhttp.send();
+    }
+
+    loadDoc()
+
+  </script>
+</body>
+</html>
