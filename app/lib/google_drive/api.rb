@@ -82,13 +82,17 @@ module FinanceSpreadsheet
         worksheet.max_rows += 5
       end
       
-      plaid_name = transaction[:plaid_name].gsub(/(?=.*\w)^(\w|')+$/) {|w| w.capitalize}
+      plaid_name = titleize(transaction[:plaid_name])
       
       worksheet[last_row, NAME_COLUMN] = plaid_name
       worksheet[last_row, AMOUNT_COLUMN] = transaction[:amount]
       worksheet[last_row, ID_COLUMN] = transaction[:id]
 
       worksheet.save
+    end
+
+    def titleize(x)
+      "#{x.split.each{|x| x.capitalize!}.join(' ')}"
     end
 
     def get_spreadsheet_data_for(transaction)

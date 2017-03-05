@@ -21,7 +21,7 @@ class Weather
 
       c = cities[city]
 
-      (DateTime.new(2015, 01, 01)..DateTime.new(2016, 12, 31)).each do |date|
+      (DateTime.new(2013, 01, 01)..DateTime.new(2014, 12, 31)).each do |date|
         url = "#{base_url}/#{api_key}/#{c.first},#{c.last},#{date.to_i}"
         x = RestClient.get url
         w = Weather.new
@@ -37,6 +37,6 @@ class Weather
 
 end
 
-city = "Albuquerque"
+city = "Los Angeles"
 
 Weather::Darksky.new.runner(city)
