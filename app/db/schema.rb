@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20170226151900) do
+ActiveRecord::Schema.define(version: 20170305191241) do
 
   create_table "financial_transactions", force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=utf8" do |t|
     t.string   "plaid_id"
@@ -24,6 +24,7 @@ ActiveRecord::Schema.define(version: 20170226151900) do
     t.datetime "updated_at",                                               null: false
     t.boolean  "hidden",                                   default: false
     t.boolean  "uploaded",                                 default: false
+    t.boolean  "downloaded",                               default: false
     t.index ["category"], name: "index_financial_transactions_on_category", using: :btree
     t.index ["plaid_id"], name: "index_financial_transactions_on_plaid_id", using: :btree
     t.index ["plaid_name"], name: "index_financial_transactions_on_plaid_name", using: :btree

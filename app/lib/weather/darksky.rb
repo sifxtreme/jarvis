@@ -37,6 +37,6 @@ class Weather
 
 end
 
-city = "Los Angeles"
+city = "Austin"
 
 Weather::Darksky.new.runner(city)

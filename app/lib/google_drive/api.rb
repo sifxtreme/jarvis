@@ -7,6 +7,8 @@ require 'google_drive'
 require_relative '../../db/models/financial_transaction'
 require_relative './google_session_config'
 
+require_relative '../utils'
+
 module FinanceSpreadsheet
 
   class SheetNotFoundError < StandardError
@@ -14,6 +16,8 @@ module FinanceSpreadsheet
   end
 
   class Api
+
+    include Utils
     
     SPREADSHEET_NAME = 'Budget'
 
@@ -33,6 +37,7 @@ module FinanceSpreadsheet
       @worksheets = spreadsheet.worksheets
     end
 
+    # uploaded transactions from database to google spreadsheet
     def sync_to_drive
       begin
         are_all_sheets_created?
@@ -56,11 +61,7 @@ module FinanceSpreadsheet
     def sync_from_drive
       transactions = FinancialTransaction.
         select(:id, :plaid_name, :amount, :transacted_at).
-        where('transacted_at >= ?', '2016-11-01 00:00:00').
-        where('spreadsheet_name IS NULL').
-        where(uploaded: true).
-        where(hidden: [false, nil]).
-        order(:transacted_at)
+        where(downloaded: false)
 
       transactions.each do |transaction|
         begin
@@ -82,17 +83,12 @@ module FinanceSpreadsheet
         worksheet.max_rows += 5
       end
       
-      plaid_name = titleize(transaction[:plaid_name])
-      
-      worksheet[last_row, NAME_COLUMN] = plaid_name
+      worksheet[last_row, NAME_COLUMN] = transaction[:plaid_name]
+      worksheet[last_row, CATEGORY_COLUMN] = transaction[:category]
       worksheet[last_row, AMOUNT_COLUMN] = transaction[:amount]
       worksheet[last_row, ID_COLUMN] = transaction[:id]
 
       worksheet.save
-    end
-
-    def titleize(x)
-      "#{x.split.each{|x| x.capitalize!}.join(' ')}"
     end
 
     def get_spreadsheet_data_for(transaction)
@@ -122,25 +118,10 @@ module FinanceSpreadsheet
       transaction.spreadsheet_name = data[:spreadsheet_name]
       transaction.category = data[:category]
       transaction.hidden = data[:hidden]
+      transaction.downloaded = true
       transaction.save!
 
       JarvisLogger.logger.info("METADATA #{transaction['id']} SYNCED: #{transaction['spreadsheet_name'] || transaction['plaid_name']}")
-    end
-
-    def already_found_transactions(transactions)
-      transactions.select {|transaction| transaction_found?(transaction)}
-    end
-
-    def transaction_found?(transaction)
-      worksheet = worksheet_for_date_of(transaction)
-
-      (1..worksheet.num_rows).each do |row_number|
-        if worksheet[row_number, AMOUNT_COLUMN].gsub('$', '').to_f == transaction['amount'].to_f
-          return true
-        end
-      end
-
-      false
     end
 
     private

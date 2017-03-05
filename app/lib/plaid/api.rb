@@ -6,6 +6,8 @@ require_relative '../../db/models/financial_transaction'
 require_relative '../../config/settings'
 require_relative '../../log/logger'
 
+require_relative '../analysis/finances'
+
 module Plaid
   class Api
 
@@ -101,6 +103,9 @@ module Plaid
           f.plaid_name = data[:name]
           f.amount = data[:amount]
           f.source = data[:type]
+
+          f.spreadsheet_name = analysis.predicted_name(data[:name])
+          f.category = analysis.predicted_category(data[:name])
           f.save!
         end
 
@@ -110,6 +115,10 @@ module Plaid
         JarvisLogger.logger.error e.message
         JarvisLogger.logger.error type
       end
+    end
+
+    def analysis
+      Analysis::Finances.new
     end
 
     private
