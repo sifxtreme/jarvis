@@ -60,7 +60,7 @@ module FinanceSpreadsheet
     # sync name and category from google spreadsheet
     def sync_from_drive
       transactions = FinancialTransaction.
-        select(:id, :plaid_name, :amount, :transacted_at).
+        select(:id, :plaid_name, :spreadsheet_name, :amount, :transacted_at).
         where(downloaded: false)
 
       transactions.each do |transaction|
