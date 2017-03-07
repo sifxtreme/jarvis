@@ -83,7 +83,7 @@ module FinanceSpreadsheet
         worksheet.max_rows += 5
       end
       
-      worksheet[last_row, NAME_COLUMN] = transaction[:plaid_name]
+      worksheet[last_row, NAME_COLUMN] = transaction[:spreadsheet_name] || transaction[:plaid_name]
       worksheet[last_row, CATEGORY_COLUMN] = transaction[:category]
       worksheet[last_row, AMOUNT_COLUMN] = transaction[:amount]
       worksheet[last_row, ID_COLUMN] = transaction[:id]
@@ -107,7 +107,7 @@ module FinanceSpreadsheet
       return {hidden: true}
     end
 
-    def marked_transaction_as_uploaded(transaction, data = {})
+    def marked_transaction_as_uploaded(transaction)
       transaction.uploaded = true
       transaction.save!
 
