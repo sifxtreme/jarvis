@@ -31,11 +31,9 @@ class JarvisApp < Sinatra::Base
     scheduler = Rufus::Scheduler.new
 
     scheduler.cron '0 14 * * *' do
-      plaid = Plaid::Api.new
-      spreadsheet = FinanceSpreadsheet::Api.new
-      
-      plaid.sync_all
-      spreadsheet.sync_to_drive
+      Plaid::Api.new.sync_all
+      Analysis::Finances.new.analyze_new_transactions
+      FinanceSpreadsheet::Api.new.sync_to_drive
     end
 
     scheduler.cron '0 15 * * *' do
