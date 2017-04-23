@@ -12,6 +12,9 @@ begin
   
   if arg == 'sync_to_db'
     Plaid::Api.new.sync_all
+
+  elsif arg == 'sync_analysis'
+    Analysis::Finances.new.analyze_new_transactions
     
   elsif arg == 'sync_to_drive'
     FinanceSpreadsheet::Api.new.sync_to_drive

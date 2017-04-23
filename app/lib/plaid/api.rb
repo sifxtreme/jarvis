@@ -6,8 +6,6 @@ require_relative '../../db/models/financial_transaction'
 require_relative '../../config/settings'
 require_relative '../../log/logger'
 
-require_relative '../analysis/finances'
-
 module Plaid
   class Api
 
@@ -23,46 +21,50 @@ module Plaid
       @secret = Settings.plaid_api['client_secret']
     end
 
-    # lists all of plaids accepted banks/credit cards
-    def institutions
-      @institutions ||= begin
-        response = RestClient.get "#{api_url}/institutions"
-        response_json = JSON.parse response.body
-
-        banks = response_json.map do |bank|
-          {
-              name: bank['name'],
-              type: bank['type']
-          }
-        end
-
-        banks
+    def sync_all
+      access_tokens.each do |bank, _|
+        next if bank == 'amex'
+        sync_to_database(bank)
       end
     end
 
-    # what is the balance on my credit card?
-    def balance(type)
-      data = {
-          client_id: client_id,
-          secret: secret,
-          access_token: access_tokens[type],
-      }
+    def sync_to_database(type)
+      begin
+        transactions = get_transactions_for_account(type)
 
-      response = RestClient.post "#{api_url}/balance", data
-      response_json = JSON.parse response.body
+        count = 0
+        
+        transactions.each do |data|
+          next if FinancialTransaction.where(plaid_id: data[:id]).any?
 
-      response_json['accounts'].map {|x| x['balance']}
+          count += 1
+          
+          f = FinancialTransaction.find_or_initialize_by(plaid_id: data[:id])
+          f.transacted_at = data[:date]
+          f.plaid_name = data[:name]
+          f.amount = data[:amount]
+          f.source = data[:type]
+
+          f.save!
+        end
+
+        JarvisLogger.logger.info "Syncing #{count} #{type} transactions from PLAID to DB"
+
+      rescue StandardError => e
+        JarvisLogger.logger.error e.message
+        JarvisLogger.logger.error type
+      end
     end
 
-    def transactions(type)
-      sixty_days_ago = (Date.today - 90)
+    def get_transactions_for_account(type)
+      time_period = (Date.today - 90)
 
       data = {
           client_id: client_id,
           secret: secret,
           access_token: access_tokens[type],
           options: {
-              gte: sixty_days_ago.to_s
+              gte: time_period.to_s
           }
       }
 
@@ -84,41 +86,6 @@ module Plaid
       end
 
       transactions
-    end
-
-    def sync_all
-      access_tokens.each do |bank, _|
-        next if bank == 'amex'
-        sync_to_database(bank)
-      end
-    end
-
-    def sync_to_database(type)
-      begin
-        transactions(type).each do |data|
-          next if FinancialTransaction.where(plaid_id: data[:id]).any?
-          
-          f = FinancialTransaction.find_or_initialize_by(plaid_id: data[:id])
-          f.transacted_at = data[:date]
-          f.plaid_name = data[:name]
-          f.amount = data[:amount]
-          f.source = data[:type]
-
-          f.spreadsheet_name = analysis.predicted_name(data[:name])
-          f.category = analysis.predicted_category(data[:name])
-          f.save!
-        end
-
-        JarvisLogger.logger.info "Syncing #{transactions(type).count} #{type} transactions from PLAID to DB"
-
-      rescue StandardError => e
-        JarvisLogger.logger.error e.message
-        JarvisLogger.logger.error type
-      end
-    end
-
-    def analysis
-      Analysis::Finances.new
     end
 
     private

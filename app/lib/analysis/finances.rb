@@ -10,49 +10,43 @@ module Analysis
 
     include Utils
 
-    def analyzer
-      categories = get_categories(finances)
-      names = get_names(finances)
+    def analyze_new_transactions
+      transactions = FinancialTransaction.where(uploaded: false)
+      transactions.each do |f|
+        f.spreadsheet_name = predicted_name(f.plaid_name)
+        f.category = predicted_category(f.plaid_name)
+        f.save!
 
-      puts categories.to_json
-      puts names.to_json
+        if f.spreadsheet_name.nil? || f.category.nil?
+          JarvisLogger.logger.info puts "Transaction #{f.plaid_name} cannot be smartly named OR categorized"
+        else
+          JarvisLogger.logger.info puts "Transaction #{f.plaid_name} analyzed with #{f.spreadsheet_name} AND #{f.category}"
+        end
 
-      # find_problematic_predictions(names, categories)
+      end
     end
 
     def predicted_category(plaid_name)
-      categories = get_categories(finances)
+      normalized_plaid_name = translate_plaid_name(plaid_name)
+      predicted_hash = predictable_categories[normalized_plaid_name]
 
-      predicted_hash = categories[translate_plaid_name(plaid_name)]
-
-      if predicted_hash && predicted_hash.count == 1
-        predicted_hash.keys.first
-      end
+      predicted_hash.keys.first if predicted_hash && predicted_hash.count == 1
     end
 
     def predicted_name(plaid_name)
-      names = get_names(finances)
+      normalized_plaid_name = translate_plaid_name(plaid_name)
+      predicted_hash = predictable_names[normalized_plaid_name]
 
-      predicted_hash = names[translate_plaid_name(plaid_name)]
-
-      if predicted_hash && predicted_hash.count == 1
-        predicted_hash.keys.first
-      end
+      predicted_hash.keys.first if predicted_hash && predicted_hash.count == 1
     end
 
-    def find_problematic_predictions(names, categories)
-      names = Hash[names.sort]
-      categories = Hash[categories.sort]
+    # def find_problematic_predictions(names, categories)
+    #   names = Hash[names.sort]
+    #   categories = Hash[categories.sort]
 
-      problematic_names = names.select {|k,v| v.size > 1}
-      problematic_categories = categories.select {|k,v| v.size > 1}
-
-      puts problematic_names.count
-      puts problematic_categories.count
-
-      puts problematic_names.to_json
-      puts problematic_categories.to_json
-    end
+    #   problematic_names = names.select {|k,v| v.size > 1}
+    #   problematic_categories = categories.select {|k,v| v.size > 1}
+    # end
   
     def email_report
       message = ""
@@ -77,53 +71,57 @@ module Analysis
 
     private
 
-    def get_categories(finances)
-      categories = {}
+    def predictable_categories
+      @predictable_categories ||= begin
+        categories = {}
 
-      finances.each do |f|
-        plaid_name = f.plaid_name
+        finances.each do |f|
+          plaid_name = f.plaid_name
 
-        if categories[translate_plaid_name(plaid_name)]
-          if categories[translate_plaid_name(plaid_name)][f.category]
-            categories[translate_plaid_name(plaid_name)][f.category] += 1
+          if categories[translate_plaid_name(plaid_name)]
+            if categories[translate_plaid_name(plaid_name)][f.category]
+              categories[translate_plaid_name(plaid_name)][f.category] += 1
+            else
+              categories[translate_plaid_name(plaid_name)][f.category] = 1
+            end
           else
-            categories[translate_plaid_name(plaid_name)][f.category] = 1
+            categories[translate_plaid_name(plaid_name)] = {"#{f.category}" => 1}
           end
-        else
-          categories[translate_plaid_name(plaid_name)] = {"#{f.category}" => 1}
         end
-      end
 
-      categories
+        categories
+      end
     end
 
-    def get_names(finances)
-      names = {}
+    def predictable_names
+      @predictable_names ||= begin
+        names = {}
 
-      finances.each do |f|
-        plaid_name = f.plaid_name
+        finances.each do |f|
+          plaid_name = f.plaid_name
 
-        if names[translate_plaid_name(plaid_name)]
-          if names[translate_plaid_name(plaid_name)][f.spreadsheet_name]
-            names[translate_plaid_name(plaid_name)][f.spreadsheet_name] += 1
+          if names[translate_plaid_name(plaid_name)]
+            if names[translate_plaid_name(plaid_name)][f.spreadsheet_name]
+              names[translate_plaid_name(plaid_name)][f.spreadsheet_name] += 1
+            else
+              names[translate_plaid_name(plaid_name)][f.spreadsheet_name] = 1
+            end
           else
-            names[translate_plaid_name(plaid_name)][f.spreadsheet_name] = 1
+            names[translate_plaid_name(plaid_name)] = {"#{f.spreadsheet_name}" => 1}
           end
-        else
-          names[translate_plaid_name(plaid_name)] = {"#{f.spreadsheet_name}" => 1}
         end
-      end
 
-      names
+        names
+      end
     end
 
     def finances
-      FinancialTransaction.where(hidden: 0).
+      @finances ||= FinancialTransaction.where(hidden: 0).
         where("spreadsheet_name is not NULL")
     end
 
     def uncategorized_records
-      FinancialTransaction.select(:plaid_name, :amount).
+      @uncategorized_records ||= FinancialTransaction.select(:plaid_name, :amount).
         where(hidden: 0).
         where('category is NULL').
         where("YEAR(transacted_at) = ?", year).
@@ -131,7 +129,7 @@ module Analysis
     end
 
     def all_categories
-      FinancialTransaction.select("category, sum(amount) as total").
+      @all_categories ||= FinancialTransaction.select("category, sum(amount) as total").
         where(hidden: 0).
         where("YEAR(transacted_at) = ?", year).
         where("MONTH(transacted_at) = ?", month).
