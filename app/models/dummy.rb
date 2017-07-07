@@ -1,0 +1,3 @@
+class Dummy < ApplicationRecord
+
+end

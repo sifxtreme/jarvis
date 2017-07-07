@@ -1,0 +1,6 @@
+testing_resque:
+  cron: "* * * * *"
+  class: "TestJobX"
+  queue: high
+  args:
+  description: "This job queues testing shit"
