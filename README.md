@@ -84,3 +84,10 @@ needs a [plaid](https://plaid.com/) api token and secret to sync up to plaid. us
 
 crawls southwest to see when flights are cheap. edit paths for your specific cities
 
+### resque
+
+PIDFILE=./tmp/resque-scheduler.pid BACKGROUND=yes bundle exec rake resque:scheduler
+
+QUEUE=* RAILS_ENV=development bundle exec rake resque:work
+
+resque-web config/initializers/resque.rb
