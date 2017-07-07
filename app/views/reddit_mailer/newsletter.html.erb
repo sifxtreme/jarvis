@@ -1,0 +1,11 @@
+<% @subreddits.each do |subreddit, info| %>
+  <div>
+    <h2><%= subreddit %></h2>
+    <% info.each do |i| %>
+    <p>
+      <a href='<%= i[:url] %>'><%= i[:title] %></a><br />
+      <a href='http://www.reddit.com<%= i[:comments] %>'>
+    </p>
+    <% end %>
+  </div>
+<% end %>

@@ -14,20 +14,12 @@ module Utils
     titleize(tmp.join(" "))
   end
 
-  def format_number(n)
-    ('%.2f' % n).rjust(7, ' ')
-  end
-
-  def today
-    DateTime.now
-  end
-
   def year
-    today.strftime('%Y')
+    DateTime.now.strftime('%Y')
   end
 
   def month
-    today.strftime('%m')
+    DateTime.now.strftime('%m')
   end
   
 end
