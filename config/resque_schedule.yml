@@ -1,0 +1,27 @@
+finances_email:
+  cron: "0 15 * * *"
+  class: "FinancesDailyReport"
+  queue: high
+  args:
+  description: "Email Daily Finances Report"
+
+finances_syncer:
+  cron: "0 14 * * *"
+  class: "SyncFinancesDaily"
+  queue: high
+  args:
+  description: "Sync Finances Daily"
+
+southwest_searcher:
+  cron: "30 */3 * * *"
+  class: "SouthwestRunner"
+  queue: high
+  args:
+  description: "Southwest Search"
+
+reddit_newsletter:
+  cron: "0 7 * * 6"
+  class: "RedditNewsletter"
+  queue: high
+  args:
+  description: "Weekly Reddit Newsletter"
