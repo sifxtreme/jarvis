@@ -1,0 +1,3 @@
+class Flight < ApplicationRecord
+
+end

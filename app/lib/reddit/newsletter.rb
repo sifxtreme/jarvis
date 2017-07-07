@@ -1,47 +1,12 @@
-require 'rest-client'
-require 'pry'
-require 'json'
-
-require_relative '../notifications/email'
-
 module Reddit
-
   class Newsletter
 
-    SUBREDDITS = %w(rails ruby javascript programming commandline elixir mealtimevideos losangeles)
-  
-    def email_report
-      message = ""
+    SUBREDDITS = %w(rails ruby programming commandline mealtimevideos losangeles)
 
-      SUBREDDITS.each do |s|
-        info = get_subreddit_info(s)
-        message << email_message(s, info)
-      end
-
-      emailer.email({
-        subject: "Reddit - #{DateTime.now.strftime('%m/%d/%Y')}",
-        body: message,
-        to_email: 'asifahmed2011@gmail.com'
-      })
-    end
-
-    def emailer
-      ::Notifications::Email.new
-    end
-
-    def email_message(subreddit, data)
-      message = "<div>"
-
-      message << "<h2>#{subreddit}</h2>"
-
-      data.each do |d|
-        message << "<p>"
-        message << "<a href='#{d[:url]}'>#{d[:title]}</a><br />"
-        message << "<a href='http://www.reddit.com#{d[:comments]}'>Comments</a>"
-        message << "</p>"
-      end
-
-      message
+    def email_newsletter
+      info = SUBREDDITS.map {|s| [s,get_subreddit_info(s)]}.to_h
+      reddit_email = RedditMailer.newsletter(info)
+      reddit_email.deliver_now
     end
 
     private

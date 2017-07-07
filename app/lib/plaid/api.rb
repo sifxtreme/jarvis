@@ -1,11 +1,3 @@
-require 'pry'
-require 'rest-client'
-require 'json'
-
-require_relative '../../db/models/financial_transaction'
-require_relative '../../config/settings'
-require_relative '../../log/logger'
-
 module Plaid
   class Api
 
@@ -17,8 +9,8 @@ module Plaid
 
     def initialize
       @api_url = PLAID_API_URL
-      @client_id = Settings.plaid_api['client_id']
-      @secret = Settings.plaid_api['client_secret']
+      @client_id = ENV['JARVIS_PLAID_CLIENT_ID']
+      @secret = ENV['JARVIS_PLAID_CLIENT_SECRET']
     end
 
     def sync_all
@@ -48,11 +40,11 @@ module Plaid
           f.save!
         end
 
-        JarvisLogger.logger.info "Syncing #{count} #{type} transactions from PLAID to DB"
+        Rails.logger.info "Syncing #{count} #{type} transactions from PLAID to DB"
 
       rescue StandardError => e
-        JarvisLogger.logger.error e.message
-        JarvisLogger.logger.error type
+        Rails.logger.error e.message
+        Rails.logger.error type
       end
     end
 
@@ -91,7 +83,7 @@ module Plaid
     private
 
     def access_tokens
-      Settings.plaid_access_tokens
+      JSON.parse(ENV["JARVIS_PLAID_ACCESS_TOKENS"])
     end
 
     def transaction_is_payment?(transaction)

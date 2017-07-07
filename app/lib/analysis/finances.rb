@@ -1,10 +1,3 @@
-require 'pry'
-
-require_relative '../../db/models/financial_transaction'
-require_relative '../notifications/email'
-
-require_relative '../utils'
-
 module Analysis
   class Finances
 
@@ -18,9 +11,9 @@ module Analysis
         f.save!
 
         if f.spreadsheet_name.nil? || f.category.nil?
-          JarvisLogger.logger.info puts "Transaction #{f.plaid_name} cannot be smartly named OR categorized"
+          Rails.logger.info puts "Transaction #{f.plaid_name} cannot be smartly named OR categorized"
         else
-          JarvisLogger.logger.info puts "Transaction #{f.plaid_name} analyzed with #{f.spreadsheet_name} AND #{f.category}"
+          Rails.logger.info puts "Transaction #{f.plaid_name} analyzed with #{f.spreadsheet_name} AND #{f.category}"
         end
 
       end
@@ -40,33 +33,12 @@ module Analysis
       predicted_hash.keys.first if predicted_hash && predicted_hash.count == 1
     end
 
-    # def find_problematic_predictions(names, categories)
-    #   names = Hash[names.sort]
-    #   categories = Hash[categories.sort]
+    def find_problematic_predictions(names, categories)
+      names = Hash[names.sort]
+      categories = Hash[categories.sort]
 
-    #   problematic_names = names.select {|k,v| v.size > 1}
-    #   problematic_categories = categories.select {|k,v| v.size > 1}
-    # end
-  
-    def email_report
-      message = ""
-      
-      message << "<pre><div style='font-family: monospace; font-size: 14px'>"
-
-      all_categories.each {|x| message << "<span>#{format_number(x.total)}: #{x.category || "???"}</span><br/>" }
-
-      message << "<p>Uncategorized Records<p>"
-
-      uncategorized_records.each {|x| message << "<span>#{format_number(x.amount)}: #{x.plaid_name}</span><br/>" }
-
-      message << "</div></pre>"
-
-      ::Notifications::Email.new.email({
-        subject: "Finances - #{today.strftime('%m/%d/%Y')}",
-        body: message,
-        to_email: 'asifahmed2011@gmail.com',
-        cc: 'hsayyeda@gmail.com'
-      })
+      problematic_names = names.select {|k,v| v.size > 1}
+      problematic_categories = categories.select {|k,v| v.size > 1}
     end
 
     private
