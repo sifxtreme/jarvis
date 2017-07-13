@@ -25,3 +25,10 @@ reddit_newsletter:
   queue: high
   args:
   description: "Weekly Reddit Newsletter"
+
+testing_resque:
+  cron: "* * * * *"
+  class: "TestJobX"
+  queue: high
+  args:
+  description: "This job queues testing jobs"
