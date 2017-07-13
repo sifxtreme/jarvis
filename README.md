@@ -84,10 +84,14 @@ needs a [plaid](https://plaid.com/) api token and secret to sync up to plaid. us
 
 crawls southwest to see when flights are cheap. edit paths for your specific cities
 
-### resque
+### docker
 
-PIDFILE=./tmp/resque-scheduler.pid BACKGROUND=yes bundle exec rake resque:scheduler
+```
+docker build . -t jarvis-api
 
-QUEUE=* RAILS_ENV=development bundle exec rake resque:work
+docker run --rm -p 5678:5678 -p 3000:3000 --name api --link mysql_dev:jarvis_db --link redis:redis jarvis-api
 
-resque-web config/initializers/resque.rb
+docker run --rm --name worker --link mysql_dev:jarvis_db --link redis:redis jarvis-api bundle exec rake resque:work QUEUE=* RAILS_ENV=development
+
+docker run --rm --name scheduler --link mysql_dev:jarvis_db --link redis:redis jarvis-api bundle exec rake resque:scheduler
+```

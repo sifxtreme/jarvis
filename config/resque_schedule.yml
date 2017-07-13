@@ -29,6 +29,6 @@ reddit_newsletter:
 testing_resque:
   cron: "* * * * *"
   class: "TestJobX"
-  queue: high
+  queue: test
   args:
   description: "This job queues testing jobs"

@@ -1,0 +1,37 @@
+version: '3'
+services:
+  jarvis_db:
+    image: mysql
+    ports:
+      - 3307:3306
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=jarvis
+  redis:
+    image: redis
+    ports:
+      - 6379
+  resque_web:
+    build: .
+    command: resque-web config/initializers/resque.rb
+    env_file:
+      - jarvis.env
+    volumes:
+      - .:/jarvis
+    ports:
+      - 5678:5678
+    links:
+      - redis
+    tty: true  
+  api:
+    build: .
+    command: bundle exec rails s -p 3000 -b '0.0.0.0'
+    env_file:
+      - jarvis.env
+    volumes:
+      - .:/jarvis
+    ports:
+      - 3000:3000
+    depends_on:
+      - jarvis_db
+      - redis

@@ -6,8 +6,8 @@ default: &default
   pool: 30
   username: root
   password: root
-  host: jarvis
-  port: 3307
+  host: jarvis_db
+  port: 3306
   timeout: 5000
 
 development:
