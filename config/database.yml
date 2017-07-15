@@ -6,7 +6,7 @@ default: &default
   pool: 30
   username: root
   password: root
-  host: jarvis_db
+  host: db
   port: 3306
   timeout: 5000
 

@@ -50,24 +50,24 @@ vim app/lib/config/config.yml
 
 ## app setup
 
-### mysql
+### secrets and tokens
 
-```bash
-sudo docker run -d -p 3307:3306 --name jarvis -v /var/lib/data/jarvis:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=root mysql:5.7
+create a ./jarvis.env file
+AND...
+
+mimic something like 
 ```
+QUEUE=* 
+RAILS_ENV=development
 
-### app - first time setup
-```bash
-cd app
-bundle install
-bundle exec rake db:migrate
-vim lib/config/config.yml # put necessary secrets here
-```
+JARVIS_GMAIL_EMAIL=PUT_SECRET_HERE
+JARVIS_GMAIL_PASSWORD=PUT_SECRET_HERE
 
-### how to run app
-```bash
-cd app
-bundle exec thin -R config.ru start -p 2020 -d
+JARVIS_PLAID_CLIENT_ID=PUT_SECRET_HERE
+JARVIS_PLAID_CLIENT_SECRET=PUT_SECRET_HERE
+JARVIS_PLAID_ACCESS_TOKENS={"bank_name": "plaid_token"}
+
+JARVIS_GOOGLE_DRIVE_ACCESS_TOKEN=MORE_SECRETS
 ```
 
 ## services
@@ -84,14 +84,27 @@ needs a [plaid](https://plaid.com/) api token and secret to sync up to plaid. us
 
 crawls southwest to see when flights are cheap. edit paths for your specific cities
 
+### docker-compose
+
+```
+docker build . -t jarvis-rails
+docker-compose up
+
+docker-compose run api rake db:migrate
+```
+
 ### docker
 
 ```
-docker build . -t jarvis-api
+docker build . -t jarvis-rails
 
-docker run --rm -p 5678:5678 -p 3000:3000 --name api --link mysql_dev:jarvis_db --link redis:redis jarvis-api
+sudo docker run -d -p 3306:3306 --name db -v /var/lib/data/jarvis:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=root mysql:5.7
 
-docker run --rm --name worker --link mysql_dev:jarvis_db --link redis:redis jarvis-api bundle exec rake resque:work QUEUE=* RAILS_ENV=development
+docker run -d -p 6379:6379 --name redis redis
 
-docker run --rm --name scheduler --link mysql_dev:jarvis_db --link redis:redis jarvis-api bundle exec rake resque:scheduler
+docker run --rm -p 3000:3000 --name api --link mysql_dev:db --link redis:redis jarvis-rails
+
+docker run --rm --name worker --link mysql_dev:db --link redis:redis jarvis-rails bundle exec rake resque:work QUEUE=* RAILS_ENV=development
+
+docker run --rm --name scheduler --link mysql_dev:db --link redis:redis jarvis-rails bundle exec rake resque:scheduler
 ```

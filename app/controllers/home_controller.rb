@@ -8,4 +8,5 @@ class HomeController < ApplicationController
     response = Resque.enqueue(TestJobX)
     render :json => response.to_json
   end
+  
 end
