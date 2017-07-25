@@ -1,7 +1,7 @@
 module Reddit
   class Newsletter
 
-    SUBREDDITS = %w(rails ruby programming commandline mealtimevideos losangeles)
+    SUBREDDITS = %w(rails ruby programming commandline mealtimevideos webdev losangeles)
 
     def email_newsletter
       info = SUBREDDITS.map {|s| [s,get_subreddit_info(s)]}.to_h
