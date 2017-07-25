@@ -6,49 +6,37 @@ a list of useful services for sifxtreme
 
 ```bash
 
-# install docker
 sudo apt-get update
-sudo apt-get install apt-transport-https ca-certificates
-sudo apt-key adv                --keyserver hkp://ha.pool.sks-keyservers.net:80                --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
-echo "deb https://apt.dockerproject.org/repo ubuntu-xenial main" | sudo tee /etc/apt/sources.list.d/docker.list
-sudo apt-get update
-apt-cache policy docker-engine
-sudo apt-get update
-sudo apt-get install linux-image-extra-$(uname -r) linux-image-extra-virtual
-sudo apt-get update
-sudo apt-get install docker-engine
-sudo vim /etc/hosts # add 127.0.0.1 jarvis to this file
-sudo service docker start
-sudo docker ps
+sudo true # if you get an error about hostname, you need to edit your /etc/hosts file (https://askubuntu.com/questions/59458/error-message-when-i-run-sudo-unable-to-resolve-host-none)
+sudo vim /etc/hosts
 
-# start up mysql docker container
-sudo docker run -d -p 3307:3306 --name jarvis -v /var/lib/data/jarvis:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=root mysql:5.7
+# install docker
+sudo apt-get remove docker docker-engine docker.io
+sudo apt-get update
+sudo apt-get install     linux-image-extra-$(uname -r)     linux-image-extra-virtual
+sudo apt-get update
+sudo apt-get install     apt-transport-https     ca-certificates     curl     software-properties-common
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+sudo apt-key fingerprint 0EBFCD88
+sudo add-apt-repository    "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+sudo apt-get update
+sudo apt-get install docker-ce
+docker --version
+sudo curl -L https://github.com/docker/compose/releases/download/1.14.0/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
+docker-compose --version
 
 # add github ssh key
 ssh -vT git@github.com
 ssh-agent
 ssh-keygen -t rsa -b 4096 -C 'YOUREMAIL@email.com'
 
-git clone git@github.com:sifxtreme/jarvis.git
-
-# install ruby 2.3.1
-gpg --keyserver hkp://keys.gnupg.net --recv-keys 409B6B1796C275462A1703113804BB82D39DC0E3
-\curl -sSL https://get.rvm.io | bash -s stable
-rvm list
-vim ~/.bash_profile
-source .bash_profile
-rvm install ruby 2.3.1
-gem install bundler
-
 # install app
+git clone git@github.com:sifxtreme/jarvis.git
 cd jarvis/
-sudo apt-get install libmysqlclient-dev
-gem install nokogiri
-bundle install
-vim app/lib/config/config.yml
+vim jarvis.env
+sudo docker build . -t jarvis-rails
+sudo docker-compose up -d
 ```
-
-## app setup
 
 ### secrets and tokens
 
