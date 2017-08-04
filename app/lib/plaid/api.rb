@@ -22,7 +22,7 @@ module Plaid
 
     def sync_to_database(type)
       begin
-        transactions = get_transactions_for_account(type)
+        transactions = transactions_for_account(type)
 
         count = 0
         
@@ -48,16 +48,16 @@ module Plaid
       end
     end
 
-    def get_transactions_for_account(type)
+    def transactions_for_account(type)
       time_period = (Date.today - 90)
 
       data = {
-          client_id: client_id,
-          secret: secret,
-          access_token: access_tokens[type],
-          options: {
-              gte: time_period.to_s
-          }
+        client_id: client_id,
+        secret: secret,
+        access_token: access_tokens[type],
+        options: {
+            gte: time_period.to_s
+        }
       }
 
       response = RestClient.post "#{api_url}/connect/get", data
@@ -69,15 +69,43 @@ module Plaid
         true unless transaction_is_payment?(transaction)
       end.map do |transaction|
         {
-            id: transaction['_id'],
-            date: transaction['date'],
-            name: transaction['name'],
-            amount: transaction['amount'],
-            type: type
+          id: transaction['_id'],
+          date: transaction['date'],
+          name: transaction['name'],
+          amount: transaction['amount'],
+          type: type
         }
       end
 
       transactions
+    end
+
+    def total_balance
+      total = balances.values.inject(0) {|sum, x| sum + x}
+      balances[:total] = total
+      balances
+    end
+
+    def balances
+      @balances ||= access_tokens.map {|bank,token| [bank, balance_for_account(token)]}.to_h
+    end
+
+    def balance_for_account(token)
+      begin
+        data = {
+          client_id: client_id,
+          secret: secret,
+          access_token: token,
+        }
+
+        response = RestClient.post("#{api_url}/balance", data)
+        response_json = JSON.parse(response.body)
+
+        account_balances = response_json["accounts"].map {|x| x["balance"]["current"]}
+        account_balances.inject(0) {|sum, x| sum + (x || 0)} || 0
+      rescue => e
+        puts e.message
+      end
     end
 
     private

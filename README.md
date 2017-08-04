@@ -4,6 +4,8 @@ a list of useful services for sifxtreme
 
 ## server setup
 
+you need docker and docker-compose installed on your system
+
 ```bash
 
 sudo apt-get update
@@ -43,7 +45,7 @@ sudo docker-compose up -d
 create a ./jarvis.env file
 AND...
 
-mimic something like 
+mimic something like, this is the full list of env variables required for the full Jarvis experience
 ```
 QUEUE=* 
 RAILS_ENV=development
@@ -62,11 +64,13 @@ JARVIS_GOOGLE_DRIVE_ACCESS_TOKEN=MORE_SECRETS
 
 ### [google drive](app/lib/google_drive)
 
-needs a google access token to sync up to the drive api
+needs a google access token (`JARVIS_GOOGLE_DRIVE_ACCESS_TOKEN`) to sync up to the drive api
 
-### [plaid](app/lib/plaid)
+### [plaid](docs/plaid.md)
 
-needs a [plaid](https://plaid.com/) api token and secret to sync up to plaid. use [plaid docs](https://plaid.com/docs/api/) to get access tokens for your bank accounts
+a financial api to get all your transactions from credit cards and your balances
+
+needs a [plaid](https://plaid.com/) api token and secret to sync up to plaid. use [plaid docs](https://plaid.com/docs/api/) to get access tokens for your credit cards.
 
 ### [southwest](app/lib/southwest)
 
