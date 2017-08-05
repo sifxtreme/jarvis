@@ -7,6 +7,7 @@ Rails.application.routes.draw do
   get 'plaid/transactions/raw/:id', to: 'plaid#raw_transactions'
   get 'plaid/balance/:id', to: 'plaid#balance'
   get 'plaid/transactions/:id', to: 'plaid#transactions'
+  get 'plaid/balances', to: 'plaid#balances'
 
   mount Resque::Server, :at => "/resque"
   # For details on the DSL available within this file, see http://guides.rubyonrails.org/routing.html

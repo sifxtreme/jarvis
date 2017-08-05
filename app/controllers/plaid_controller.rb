@@ -20,6 +20,11 @@ class PlaidController < ApplicationController
     render :json => x.to_json
   end
 
+  def balances
+    x = plaid_api_service.all_balances
+    render :json => x
+  end
+
   private
 
   def plaid_api_service

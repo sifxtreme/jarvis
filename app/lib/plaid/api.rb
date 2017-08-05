@@ -40,7 +40,7 @@ module Plaid
 
         Rails.logger.info "Syncing #{filtered_transactions.count} #{bank} transactions from PLAID to DB"
 
-      rescue StandardError => e
+      rescue => e
         Rails.logger.error(e.message)
         Rails.logger.error(bank)
       end
@@ -80,8 +80,8 @@ module Plaid
       JSON.parse(response.body)
     end
 
-    def total_balance
-      balances = access_tokens.map {|bank,token| [bank, balance_for_account(token)]}.to_h
+    def all_balances
+      balances = access_tokens.map {|bank,_| [bank, balance_for_account(bank)]}.to_h
       balances[:total] = balances.values.inject(0) {|sum, x| sum + x}
       balances
     end
@@ -111,7 +111,7 @@ module Plaid
     private
 
     def access_tokens
-      JSON.parse(ENV["JARVIS_PLAID_ACCESS_TOKENS"])
+      @access_tokens ||= JSON.parse(ENV["JARVIS_PLAID_ACCESS_TOKENS"])
     end
 
     def transaction_is_payment?(transaction)
