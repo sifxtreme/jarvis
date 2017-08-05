@@ -15,97 +15,97 @@ module Plaid
 
     def sync_all
       access_tokens.each do |bank, _|
-        next if bank == 'amex'
         sync_to_database(bank)
       end
     end
 
-    def sync_to_database(type)
+    def sync_to_database(bank)
       begin
-        transactions = transactions_for_account(type)
+        transactions = transactions_for_account(bank)
 
-        count = 0
+        filtered_transactions = transactions.reject do |data|
+          FinancialTransaction.where(plaid_id: data[:id]).any?
+        end
         
-        transactions.each do |data|
-          next if FinancialTransaction.where(plaid_id: data[:id]).any?
-
-          count += 1
-          
+        filtered_transactions.each do |data|
           f = FinancialTransaction.find_or_initialize_by(plaid_id: data[:id])
+
           f.transacted_at = data[:date]
           f.plaid_name = data[:name]
           f.amount = data[:amount]
-          f.source = data[:type]
+          f.source = data[:bank]
 
           f.save!
         end
 
-        Rails.logger.info "Syncing #{count} #{type} transactions from PLAID to DB"
+        Rails.logger.info "Syncing #{filtered_transactions.count} #{bank} transactions from PLAID to DB"
 
       rescue StandardError => e
-        Rails.logger.error e.message
-        Rails.logger.error type
+        Rails.logger.error(e.message)
+        Rails.logger.error(bank)
       end
     end
 
-    def transactions_for_account(type)
-      time_period = (Date.today - 90)
-
-      data = {
-        client_id: client_id,
-        secret: secret,
-        access_token: access_tokens[type],
-        options: {
-            gte: time_period.to_s
-        }
-      }
-
-      response = RestClient.post "#{api_url}/connect/get", data
-      response_json = JSON.parse response.body
+    def transactions_for_account(bank)
+      response_json = raw_transactions_for_account(bank)
 
       raw_transactions = response_json['transactions']
 
       transactions = raw_transactions.select do |transaction|
         true unless transaction_is_payment?(transaction)
-      end.map do |transaction|
+      end
+
+      transactions.map do |transaction|
         {
           id: transaction['_id'],
           date: transaction['date'],
           name: transaction['name'],
           amount: transaction['amount'],
-          type: type
+          bank: bank
         }
       end
+    end
 
-      transactions
+    def raw_transactions_for_account(bank)
+      data = {
+        client_id: client_id,
+        secret: secret,
+        access_token: access_tokens[bank],
+        options: {
+          gte: (Date.today - 90).to_s # don't go to far back in time
+        }
+      }
+
+      response = RestClient.post("#{api_url}/connect/get", data)
+      JSON.parse(response.body)
     end
 
     def total_balance
-      total = balances.values.inject(0) {|sum, x| sum + x}
-      balances[:total] = total
+      balances = access_tokens.map {|bank,token| [bank, balance_for_account(token)]}.to_h
+      balances[:total] = balances.values.inject(0) {|sum, x| sum + x}
       balances
     end
 
-    def balances
-      @balances ||= access_tokens.map {|bank,token| [bank, balance_for_account(token)]}.to_h
-    end
-
-    def balance_for_account(token)
+    def balance_for_account(bank)
       begin
-        data = {
-          client_id: client_id,
-          secret: secret,
-          access_token: token,
-        }
+        balance_response = raw_balance_for_account(bank)
 
-        response = RestClient.post("#{api_url}/balance", data)
-        response_json = JSON.parse(response.body)
-
-        account_balances = response_json["accounts"].map {|x| x["balance"]["current"]}
+        account_balances = balance_response["accounts"].map {|x| x["balance"]["current"]}
         account_balances.inject(0) {|sum, x| sum + (x || 0)} || 0
       rescue => e
         puts e.message
       end
+    end
+
+    def raw_balance_for_account(bank)
+      data = {
+        client_id: client_id,
+        secret: secret,
+        access_token: access_tokens[bank],
+      }
+
+      response = RestClient.post("#{api_url}/balance", data)
+      JSON.parse(response.body)
     end
 
     private
