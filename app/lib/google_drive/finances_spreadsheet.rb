@@ -1,11 +1,6 @@
 require 'google_drive'
 
 module GoogleDrive
-
-  class SheetNotFoundError < StandardError
-
-  end
-
   class FinancesSpreadsheet
 
     include Utils
@@ -29,20 +24,17 @@ module GoogleDrive
 
     # uploaded transactions from database to google spreadsheet
     def sync_to_drive
-      begin
-        are_all_sheets_created?
-      rescue SheetNotFoundError => e
-        Rails.logger.warn e.message
-        return
-      end
-
       transactions = FinancialTransaction.
         where(uploaded: false).
         order(:transacted_at)
       
       transactions.each do |transaction|
-        submit_transaction_to_sheet(transaction)
-        marked_transaction_as_uploaded(transaction)
+        begin
+          submit_transaction_to_sheet(transaction)
+          marked_transaction_as_uploaded(transaction)
+        rescue => e
+          Rails.logger.error e.message
+        end
       end
     end
 
@@ -121,20 +113,6 @@ module GoogleDrive
         ws.title.include?(date_of_transaction.strftime("%b")) && 
           ws.title.include?(date_of_transaction.strftime("%Y"))
       end.first
-    end
-
-    def are_all_sheets_created?
-      beginning_date = Date.parse("2015-01-01")
-      now_date = DateTime.now
-      date_to_compare = beginning_date
-      while date_to_compare < now_date
-        month_segment = date_to_compare.strftime("%b")
-        year_segment = date_to_compare.strftime("%Y")
-        if !worksheets.select {|x| x.title.include?(month_segment) && x.title.include?(year_segment)}.any?
-          raise SheetNotFoundError, "#{month_segment} #{year_segment} sheet not found. Please create one"
-        end
-        date_to_compare = date_to_compare >> 1
-      end
     end
 
   end
