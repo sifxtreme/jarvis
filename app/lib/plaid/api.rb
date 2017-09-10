@@ -93,7 +93,9 @@ module Plaid
         account_balances = balance_response["accounts"].map {|x| x["balance"]["current"]}
         account_balances.inject(0) {|sum, x| sum + (x || 0)} || 0
       rescue => e
+        puts "error in balance_for_account method"
         puts e.message
+        0
       end
     end
 
