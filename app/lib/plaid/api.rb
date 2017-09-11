@@ -82,7 +82,7 @@ module Plaid
 
     def all_balances
       balances = access_tokens.map {|bank,_| [bank, balance_for_account(bank)]}.to_h
-      balances[:total] = balances.values.inject(0) {|sum, x| sum + x}
+      balances[:total] = balances.values.inject(0) {|sum, x| sum + x[:corrected_balance]}.round(2)
       balances
     end
 
@@ -90,12 +90,26 @@ module Plaid
       begin
         balance_response = raw_balance_for_account(bank)
 
-        account_balances = balance_response["accounts"].map {|x| x["balance"]["current"]}
-        account_balances.inject(0) {|sum, x| sum + (x || 0)} || 0
+        current_balances = balance_response["accounts"].map {|x| x["balance"]["current"]}
+        current_balance = current_balances.inject(0) {|sum, x| sum + (x || 0)} || 0
+
+        available_balances = balance_response["accounts"].map {|x| x["balance"]["available"]}
+        available_balance = available_balances.inject(0) {|sum, x| sum + (x || 0)} || 0
+        
+        limits = balance_response["accounts"].map {|x| x["meta"]["limit"]}
+        limit = limits.inject(0) {|sum, x| sum + (x || 0)} || 0
+
+        {
+          current_balance: current_balance.round(2),
+          corrected_balance: (limit - available_balance).round(2),
+        }
+
       rescue => e
-        puts "error in balance_for_account method"
         puts e.message
-        0
+        {
+          current_balance: 0,
+          corrected_balance: 0,
+        }
       end
     end
 
