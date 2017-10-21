@@ -100,3 +100,14 @@ docker run --rm --name worker --link mysql_dev:db --link redis:redis jarvis-rail
 
 docker run --rm --name scheduler --link mysql_dev:db --link redis:redis jarvis-rails bundle exec rake resque:scheduler
 ```
+
+### updating on server
+
+```
+cd jarvis/
+git pull
+sudo docker build . -t jarvis-rails
+sudo service docker restart
+sudo docker network rm jarvis_default
+sudo docker-compose up -d
+```

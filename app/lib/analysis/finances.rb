@@ -19,6 +19,41 @@ module Analysis
       end
     end
 
+    ROLLING_CATEGORIES = [
+      {
+        name: "Asif",
+        date: "2017-08-01",
+        amount: -321.73,
+        monthly_budget: 100
+      },
+      {
+        name: "Hafsa",
+        date: "2017-08-01",
+        amount: -70.77,
+        monthly_budget: 100
+      }
+    ]
+
+    def current_budget_for_rolling_categories
+      ROLLING_CATEGORIES.map do |c|
+        cutoff_date = Date.parse(c[:date]) # this is the date we stopped tracking in excel
+
+        amount_spent = FinancialTransaction.select("sum(amount) as total").
+          where(hidden: 0).
+          where(category: c[:name]).
+          where("transacted_at >= ?", cutoff_date)
+
+        months = month_difference(cutoff_date, DateTime.now)
+
+        puts amount_spent.first.total
+        puts months
+
+        current_budget = c[:amount] - amount_spent.first.total + (months * c[:monthly_budget])
+
+        [c[:name], current_budget.to_f]
+      end.to_h
+    end
+
     def predicted_category(plaid_name)
       normalized_plaid_name = translate_plaid_name(plaid_name)
       predicted_hash = predictable_categories[normalized_plaid_name]
@@ -107,6 +142,14 @@ module Analysis
         where("MONTH(transacted_at) = ?", month).
           group("YEAR(transacted_at), MONTH(transacted_at), category")  
     end
-    
+
+    def month_difference(a, b)
+      difference = 0.0
+      if a.year != b.year
+        difference += 12 * (b.year - a.year)
+      end
+      difference + b.month - a.month + 1
+    end
+
   end
 end
