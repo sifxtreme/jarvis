@@ -3,11 +3,6 @@ module Notifications
 
     include Utils
 
-    def daily_report
-      finances_email = FinancesMailer.daily_report(total, all_categories, uncategorized_records)
-      finances_email.deliver_now
-    end
-
     def month_snapshot(target_month = month, target_year = year)
       {
         total: total(target_month, target_year),

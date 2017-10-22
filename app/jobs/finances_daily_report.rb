@@ -3,7 +3,8 @@ class FinancesDailyReport
   @queue = :high
 
   def self.perform
-    Notifications::Finances.new.daily_report
+    finances_email = FinancesMailer.daily_report
+    finances_email.deliver_now
   end
 
 end

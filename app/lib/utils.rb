@@ -21,5 +21,13 @@ module Utils
   def month
     DateTime.now.strftime('%m')
   end
+
+  def month_difference(a, b)
+    difference = 0.0
+    if a.year != b.year
+      difference += 12 * (b.year - a.year)
+    end
+    difference + b.month - a.month + 1
+  end
   
 end
