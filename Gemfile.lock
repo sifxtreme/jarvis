@@ -187,6 +187,8 @@ GEM
       rack (~> 2.0)
       rack-protection (= 2.0.0)
       tilt (~> 2.0)
+    skylight (1.4.3)
+      activesupport (>= 3.0.0)
     slop (3.6.0)
     sprockets (3.7.1)
       concurrent-ruby (~> 1.0)
@@ -225,7 +227,8 @@ DEPENDENCIES
   resque
   resque-scheduler
   rest-client
+  skylight
   tzinfo-data
 
 BUNDLED WITH
-   1.15.1
+   1.15.4

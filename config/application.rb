@@ -40,5 +40,7 @@ module JarvisApi
       authentication:       'plain',
       enable_starttls_auto: true  
     }
+
+    config.skylight.environments += ["development"]
   end
 end

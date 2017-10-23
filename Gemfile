@@ -32,3 +32,5 @@ gem 'google_drive'
 
 gem 'resque'
 gem 'resque-scheduler'
+
+gem "skylight"
