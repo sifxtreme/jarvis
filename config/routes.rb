@@ -11,6 +11,6 @@ Rails.application.routes.draw do
   get 'finances/transactions', to: 'finances#transactions'
   get 'finances/transactions/search', to: 'finances#search'
 
-  mount Resque::Server, :at => "/resque"
+  mount Resque::Server, :at => "resque"
   # For details on the DSL available within this file, see http://guides.rubyonrails.org/routing.html
 end

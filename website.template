@@ -10,4 +10,9 @@ server {
                 proxy_pass http://api:3000;
         }
 
+        location /resque {
+                rewrite ^/api/?(.*) /$1 break;
+                proxy_pass http://api:3000;
+        }
+
 }
