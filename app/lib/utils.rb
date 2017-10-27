@@ -5,13 +5,17 @@ module Utils
   end
 
   def translate_plaid_name(plaid_name)
-    tmp = plaid_name.
-      split(" ").
-      delete_if { |a| a.count("0-9") > 2 }
+    begin
+      tmp = plaid_name.
+        split(" ").
+        delete_if { |a| a.count("0-9") > 2 }
 
-    tmp.pop if tmp.last.count("0-9") > 0
-      
-    titleize(tmp.join(" "))
+      tmp.pop if tmp.last.count("0-9") > 0
+
+      titleize(tmp.join(" "))
+    rescue => e
+      plaid_name
+    end
   end
 
   def year
