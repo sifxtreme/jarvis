@@ -56,15 +56,9 @@ JARVIS_GMAIL_PASSWORD=PUT_SECRET_HERE
 JARVIS_PLAID_CLIENT_ID=PUT_SECRET_HERE
 JARVIS_PLAID_CLIENT_SECRET=PUT_SECRET_HERE
 JARVIS_PLAID_ACCESS_TOKENS={"bank_name": "plaid_token"}
-
-JARVIS_GOOGLE_DRIVE_ACCESS_TOKEN=MORE_SECRETS
 ```
 
 ## services
-
-### [google drive](app/lib/google_drive)
-
-needs a google access token (`JARVIS_GOOGLE_DRIVE_ACCESS_TOKEN`) to sync up to the drive api
 
 ### [plaid](docs/plaid.md)
 

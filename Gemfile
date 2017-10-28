@@ -28,7 +28,6 @@ gem 'tzinfo-data', platforms: [:mingw, :mswin, :x64_mingw, :jruby]
 gem 'rest-client'
 
 gem 'mechanize'
-gem 'google_drive'
 
 gem 'resque'
 gem 'resque-scheduler'
