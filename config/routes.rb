@@ -1,8 +1,8 @@
 Rails.application.routes.draw do
   root to: 'home#index'
 
-  get 'plaid/transactions/:id', to: 'plaid#transactions'
-  get 'plaid/balances/:id', to: 'plaid#balance'
+  get 'plaid/transactions/:bank_id', to: 'plaid#transactions'
+  get 'plaid/balances/:bank_id', to: 'plaid#balance'
   get 'plaid/balances', to: 'plaid#balances'
 
   get 'finances/rolling_budget', to: 'finances#rolling_budget'
