@@ -1,11 +1,11 @@
-module Notifications
-  class Finances
+module Finances
+  class MonthAnalysis
 
     include Utils
 
     def month_snapshot(target_month = month, target_year = year)
       {
-        total: total(target_month, target_year),
+        total: total_spent_in_month(target_month, target_year),
         all_categories: all_categories(target_month, target_year),
         uncategorized_records: uncategorized_records(target_month, target_year),
       }
@@ -13,7 +13,7 @@ module Notifications
 
     private
 
-    def total(target_month, target_year)
+    def total_spent_in_month(target_month, target_year)
       total_query = FinancialTransaction.select("sum(amount) as total").
         where(hidden: 0).
         where("YEAR(transacted_at) = ?", target_year).
@@ -37,6 +37,6 @@ module Notifications
         where("YEAR(transacted_at) = ?", target_year).
         where("MONTH(transacted_at) = ?", target_month)
     end
-    
+
   end
 end

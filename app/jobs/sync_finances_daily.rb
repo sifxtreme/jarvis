@@ -4,7 +4,7 @@ class SyncFinancesDaily
 
   def self.perform
     Plaid::Api.new.sync_all
-    Analysis::Finances.new.analyze_new_transactions
+    Finances::Predictions.new.predict_new_transactions
   end
 
 end

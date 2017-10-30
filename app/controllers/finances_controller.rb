@@ -1,7 +1,7 @@
 class FinancesController < ApplicationController
 
   def rolling_budget
-    render json: Analysis::Finances.new.current_budget_for_rolling_categories
+    render json: Finances::Budget.new.current_budget_for_rolling_categories
   end
 
   def transactions

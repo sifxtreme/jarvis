@@ -1,8 +1,31 @@
 # jarvis
 
-a list of useful services for sifxtreme
+a list of useful services for sifxtreme.
 
-## server setup
+currently jarvis supports:
+
+- syncs all financial transactions daily from credit cards to DB 
+- predicts the category of a financial transaction based on previously entered categories
+- sends an email daily with a summary of credit card balances
+- helps search through your financial transactions
+- searches southwest flights every 3 hours
+- sends a weekly digest for top 10 posts in given subreddits
+
+## services
+
+### [plaid](docs/plaid.md)
+
+a financial api to get all your transactions from credit cards and your balances
+
+needs a [plaid](https://plaid.com/) api token and secret to sync up to plaid. use [plaid docs](https://plaid.com/docs/api/) to get access tokens for your credit cards.
+
+### [southwest](app/lib/southwest)
+
+crawls southwest to see when flights are cheap. edit paths for your specific cities
+
+## Setup
+
+### server setup
 
 you need docker and docker-compose installed on your system
 
@@ -58,17 +81,6 @@ JARVIS_PLAID_CLIENT_SECRET=PUT_SECRET_HERE
 JARVIS_PLAID_ACCESS_TOKENS={"bank_name": "plaid_token"}
 ```
 
-## services
-
-### [plaid](docs/plaid.md)
-
-a financial api to get all your transactions from credit cards and your balances
-
-needs a [plaid](https://plaid.com/) api token and secret to sync up to plaid. use [plaid docs](https://plaid.com/docs/api/) to get access tokens for your credit cards.
-
-### [southwest](app/lib/southwest)
-
-crawls southwest to see when flights are cheap. edit paths for your specific cities
 
 ### docker-compose
 

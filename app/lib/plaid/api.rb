@@ -37,9 +37,6 @@ module Plaid
 
           f.save!
         end
-
-        Rails.logger.info "Syncing #{filtered_transactions.count} #{bank} transactions from PLAID to DB"
-
       rescue => e
         Rails.logger.error(e.message)
         Rails.logger.error(bank)
