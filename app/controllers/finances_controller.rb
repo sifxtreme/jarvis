@@ -12,7 +12,7 @@ class FinancesController < ApplicationController
     query = params[:query]
     db_query = db_query.where("YEAR(transacted_at) = ?", year) if year
     db_query = db_query.where("MONTH(transacted_at) = ?", month) if month
-    db_query = db_query.where("category like ? or spreadsheet_name like ? or plaid_name like ?", "%#{query}%", "%#{query}%", "%#{query}%") if query
+    db_query = db_query.where("category like ? or merchant_name like ? or plaid_name like ?", "%#{query}%", "%#{query}%", "%#{query}%") if query
     
     results = db_query.order('transacted_at DESC')
     total = results.inject(0){|sum,x| sum + x.amount }

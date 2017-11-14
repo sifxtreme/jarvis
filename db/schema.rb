@@ -10,9 +10,9 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20170707010209) do
+ActiveRecord::Schema.define(version: 20171114104806) do
 
-  create_table "dummies", force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=latin1" do |t|
+  create_table "dummies", force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=utf8" do |t|
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
   end
@@ -20,7 +20,7 @@ ActiveRecord::Schema.define(version: 20170707010209) do
   create_table "financial_transactions", id: :integer, force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=utf8" do |t|
     t.string "plaid_id"
     t.string "plaid_name"
-    t.string "spreadsheet_name"
+    t.string "merchant_name"
     t.string "category"
     t.string "source"
     t.decimal "amount", precision: 8, scale: 2
@@ -28,12 +28,11 @@ ActiveRecord::Schema.define(version: 20170707010209) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.boolean "hidden", default: false
-    t.boolean "uploaded", default: false
-    t.boolean "downloaded", default: false
+    t.boolean "reviewed", default: false
     t.index ["category"], name: "index_financial_transactions_on_category"
+    t.index ["merchant_name"], name: "index_financial_transactions_on_merchant_name"
     t.index ["plaid_id"], name: "index_financial_transactions_on_plaid_id"
     t.index ["plaid_name"], name: "index_financial_transactions_on_plaid_name"
-    t.index ["spreadsheet_name"], name: "index_financial_transactions_on_spreadsheet_name"
     t.index ["transacted_at"], name: "index_financial_transactions_on_transacted_at"
   end
 
@@ -42,12 +41,18 @@ ActiveRecord::Schema.define(version: 20170707010209) do
     t.string "destination"
     t.datetime "departure_date"
     t.datetime "arrival_date"
-    t.json "search_data"
-    t.json "flexible_data"
+    t.text "search_data"
+    t.text "flexible_data"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["destination"], name: "index_flights_on_destination"
     t.index ["origin"], name: "index_flights_on_origin"
+  end
+
+  create_table "plaid_banks", force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=utf8" do |t|
+    t.string "name", null: false
+    t.string "token", null: false
+    t.index ["name"], name: "index_plaid_banks_on_name"
   end
 
   create_table "weathers", id: :integer, force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=utf8" do |t|

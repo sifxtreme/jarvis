@@ -12,6 +12,13 @@ finances_syncer:
   args:
   description: "Sync Finances Daily"
 
+# balances_syncer:
+#   cron: "30 14 * * *"
+#   class: "SyncBalancesDaily"
+#   queue: high
+#   args:
+#   description: "Sync Balances Daily"
+
 southwest_searcher:
   cron: "30 */3 * * *"
   class: "SouthwestRunner"

@@ -36,5 +36,13 @@ https://tartan.plaid.com/connect/get \
 -H 'content-type: application/x-www-form-urlencoded' \
 -d 'client_id=CLIENT_ID&secret=CLIENT_SECRET&access_token=YOUR_ACCESS_TOKEN'```
 ```
-3. Save the token returned from the auth call in a the .env file AND/OR in a ENV variable (the current variable name is `JARVIS_PLAID_ACCESS_TOKENS`)
+3. Save the token returned from the auth call as a record in the `plaid_banks` table in your DB. You can give the name value whatever you would like to call your bank.
+
+```
+pb = PlaidBank.new
+pb.name = "Chase"
+pb.token = "AUTH_TOKEN"
+pb.save!
+```
+
 

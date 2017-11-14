@@ -4,9 +4,9 @@ module Finances
     include Utils
 
     def predict_new_transactions
-      transactions = FinancialTransaction.where(uploaded: false)
+      transactions = FinancialTransaction.where(reviewed: false, merchant_name: nil, category: nil)
       transactions.each do |f|
-        f.spreadsheet_name = predicted_name(f.plaid_name)
+        f.merchant_name = predicted_name(f.plaid_name)
         f.category = predicted_category(f.plaid_name)
         f.save!
       end
@@ -82,13 +82,13 @@ module Finances
           plaid_name = f.plaid_name
 
           if names[translate_plaid_name(plaid_name)]
-            if names[translate_plaid_name(plaid_name)][f.spreadsheet_name]
-              names[translate_plaid_name(plaid_name)][f.spreadsheet_name] += 1
+            if names[translate_plaid_name(plaid_name)][f.merchant_name]
+              names[translate_plaid_name(plaid_name)][f.merchant_name] += 1
             else
-              names[translate_plaid_name(plaid_name)][f.spreadsheet_name] = 1
+              names[translate_plaid_name(plaid_name)][f.merchant_name] = 1
             end
           else
-            names[translate_plaid_name(plaid_name)] = {"#{f.spreadsheet_name}" => 1}
+            names[translate_plaid_name(plaid_name)] = {"#{f.merchant_name}" => 1}
           end
         end
 
@@ -98,7 +98,7 @@ module Finances
 
     def finances
       @finances ||= FinancialTransaction.where(hidden: 0).
-        where("spreadsheet_name is not NULL")
+        where("merchant_name is not NULL")
     end
 
   end
