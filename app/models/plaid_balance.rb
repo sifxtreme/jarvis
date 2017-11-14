@@ -1,0 +1,3 @@
+class PlaidBalance < ApplicationRecord
+  
+end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20171114104806) do
+ActiveRecord::Schema.define(version: 20171114155813) do
 
   create_table "dummies", force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=utf8" do |t|
     t.datetime "created_at", null: false
@@ -47,6 +47,18 @@ ActiveRecord::Schema.define(version: 20171114104806) do
     t.datetime "updated_at", null: false
     t.index ["destination"], name: "index_flights_on_destination"
     t.index ["origin"], name: "index_flights_on_origin"
+  end
+
+  create_table "plaid_balances", force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=utf8" do |t|
+    t.string "bank_name", null: false
+    t.string "card_name", null: false
+    t.decimal "current_balance", precision: 8, scale: 2, null: false
+    t.decimal "pending_balance", precision: 8, scale: 2, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["bank_name"], name: "index_plaid_balances_on_bank_name"
+    t.index ["card_name"], name: "index_plaid_balances_on_card_name"
+    t.index ["created_at"], name: "index_plaid_balances_on_created_at"
   end
 
   create_table "plaid_banks", force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=utf8" do |t|

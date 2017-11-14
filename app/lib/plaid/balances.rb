@@ -1,6 +1,23 @@
 module Plaid
   module Balances
 
+    def sync_all_balances
+      balances.each do |bank_name, bank_info|
+        sync_balance_to_database(bank_name, bank_info)
+      end
+    end
+
+    def sync_balance_to_database(bank_name, bank_info)
+      bank_info.each do |card_name, card_info|
+        pb = PlaidBalance.new
+        pb.bank_name = bank_name
+        pb.card_name = card_name
+        pb.current_balance = card_info[:current_balance]
+        pb.pending_balance = card_info[:pending_balance]
+        pb.save!
+      end
+    end
+
     def balances
       banks.map {|bank| [bank.name, balance_for_account(bank)]}.to_h
     end
@@ -9,13 +26,20 @@ module Plaid
       balance_response = raw_balance_for_account(bank)
 
       balance_response["accounts"].map do |x|
+        
+        card_name = x["meta"]["name"]
+        current_balance = x["balance"]["current"]
+        card_limit = x["meta"]["limit"]
+        available_balance = x["balance"]["available"]
+
         [
-          x["meta"]["name"],
+          card_name,
           {
-            current_balance: x["balance"]["current"].round(2),
-            corrected_balance: (x["meta"]["limit"] - x["balance"]["available"]).round(2)
+            current_balance: current_balance.round(2),
+            pending_balance: (card_limit - available_balance - current_balance).round(2)
           }
         ]
+
       end.to_h
     end
 
