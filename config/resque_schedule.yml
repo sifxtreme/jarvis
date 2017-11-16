@@ -14,7 +14,7 @@ finances_syncer:
 
 balances_syncer:
   cron: "30 14 * * *"
-  class: "SyncBalancesDaily"
+  class: "SyncBalances"
   queue: high
   args:
   description: "Daily Sync Balances from Plaid"
