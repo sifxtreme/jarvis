@@ -13,6 +13,8 @@ gem 'mysql2', '~> 0.4.4'
 # Use Puma as the app server
 gem 'puma', '~> 3.7'
 
+gem 'rack-cors', :require => 'rack/cors'
+
 
 group :development, :test do
   # Call 'byebug' anywhere in the code to stop execution and get a debugger console

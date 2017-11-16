@@ -3,6 +3,7 @@ class PlaidBank < ApplicationRecord
 
   def latest_balance
     card_balances = {}
+    
     self.balances.each do |balance|
       total_balance = balance.current_balance + balance.pending_balance
       begin
