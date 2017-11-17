@@ -1,7 +1,7 @@
 class FinancesMailer < ApplicationMailer
   helper MailerHelper
 
-  def report
+  def daily_summary
     
     month_snapshot = Finances::MonthAnalysis.new.month_snapshot
     @total = month_snapshot[:total]
