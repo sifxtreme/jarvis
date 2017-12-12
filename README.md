@@ -19,7 +19,7 @@ a financial api to get all your transactions from credit cards and your balances
 
 needs a [plaid](https://plaid.com/) api token and secret to sync up to plaid. use [plaid docs](https://plaid.com/docs/api/) to get access tokens for your credit cards.
 
-### [southwest](app/lib/southwest)
+### [southwest](backend/app/lib/southwest)
 
 crawls southwest to see when flights are cheap. edit paths for your specific cities
 
@@ -84,6 +84,7 @@ JARVIS_PLAID_CLIENT_SECRET=PUT_SECRET_HERE
 ### docker-compose
 
 ```
+cd backend
 docker build . -t jarvis-rails
 docker-compose up
 

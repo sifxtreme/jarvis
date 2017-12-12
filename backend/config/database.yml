@@ -23,5 +23,5 @@ test:
 production:
   <<: *default
   database: jarvis
-  username: <%= ENV['JARVIS_DATABASE_PASSWORD'] %>
+  username: <%= ENV['JARVIS_DATABASE_USERNAME'] %>
   password: <%= ENV['JARVIS_DATABASE_PASSWORD'] %>
