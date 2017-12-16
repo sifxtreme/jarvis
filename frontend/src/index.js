@@ -106,9 +106,9 @@ class FinancesTable extends React.Component {
       if(month.toString() !== "0") {
         show = (date.getUTCMonth() + 1) === parseInt(month, 10)
       }
-      else if(year.toString() !== "0") {
+      if(year.toString() !== "0") {
         // change this
-        show = date.getUTCFullYear() === parseInt(year + 2015, 10)
+        show = show && date.getUTCFullYear() === parseInt(year + 2015, 10)
       }
 
       return show      

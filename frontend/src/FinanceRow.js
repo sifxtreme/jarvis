@@ -56,7 +56,9 @@ export default class FinanceRow extends React.Component {
     let d = new Date(Date.parse(dateTimeString))
     let date = d.getUTCDate()
     if(date < 10) date = "0" + date
-    const dateString = `${d.getUTCFullYear()}-${d.getUTCMonth() + 1}-${date}`
+    let month = d.getUTCMonth() + 1
+    if(month < 10) month = "0" + month
+    const dateString = `${d.getUTCFullYear()}-${month}-${date}`
     return dateString
   }
 
@@ -103,7 +105,7 @@ export default class FinanceRow extends React.Component {
   }
 
   cancel = () => {
-    if(this.props.data.id.includes("RANDOM")) {
+    if(this.props.data.id.toString().includes("RANDOM")) {
       let data = this.props.data
       this.props.handleDelete(data)
     }
