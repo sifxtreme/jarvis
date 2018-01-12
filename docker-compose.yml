@@ -33,12 +33,7 @@ services:
     depends_on:
       - db
       - redis
-    deploy:
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 10
-        window: 120s
+    restart: on-failure:5 
 
   api:
     image: jarvis-rails
