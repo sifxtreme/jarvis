@@ -117,12 +117,13 @@ export default class FinanceRow extends React.Component {
   }
 
   handleChange = (event) => {
+    let formState = this.state.form
+
     let value = event.target.value
     if(event.target.type === "checkbox"){
-      value = (event.target.value === "on" ? true : false)
+      value = !formState[event.target.name]
     }
-
-    let formState = this.state.form
+    
     formState[event.target.name] = value
 
     this.setState({

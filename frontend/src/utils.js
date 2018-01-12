@@ -14,7 +14,15 @@ export function sortByKey(array, key) {
     y = y.toLowerCase();
     if(!Number.isNaN(filterFloat(x))) x = parseFloat(x)
     if(!Number.isNaN(filterFloat(y))) y = parseFloat(y)
-    return ((x < y) ? -1 : ((x > y) ? 1 : 0));
+    if(x < y){
+      return -1
+    }
+    else if(x > y){
+      return 1
+    }
+    else {
+      return ((a.id < b.id) ? -1 : ((a.id > b.id) ? 1 : 0));
+    }
   });
 }
 
