@@ -4,15 +4,28 @@ const RAILS_PASSWORD_KEY = 'JARVIS_RAILS_PASS'
 
 const URL_ROOT = process.env.REACT_APP_ENV === 'development' ? DEV_URL : PROD_URL
 
+function getParameterByName(name, url) {
+    if (!url) url = window.location.href;
+    name = name.replace(/\[\]]/g, "\\$&");
+    var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+        results = regex.exec(url);
+    if (!results) return null;
+    if (!results[2]) return '';
+    return decodeURIComponent(results[2].replace(/\+/g, " "));
+}
+
 function headers() {
   var myHeaders = new Headers();
-  var authorizationKey = localStorage.getItem(RAILS_PASSWORD_KEY)
+  if(getParameterByName('p')){
+    localStorage.setItem(RAILS_PASSWORD_KEY, getParameterByName('p'))
+  }
+  const authorizationKey = localStorage.getItem(RAILS_PASSWORD_KEY)
   myHeaders.append("Authorization", authorizationKey);
   return myHeaders
 }
 
 export async function getFinancialTransactions() {
-  let url = `${URL_ROOT}/financial_transactions`;
+  const url = `${URL_ROOT}/financial_transactions`;
 
   const response = await fetch(url, {
           method: 'GET',
@@ -23,7 +36,7 @@ export async function getFinancialTransactions() {
 }
 
 export async function createFinancialTransaction(data) {
-  let url = `${URL_ROOT}/financial_transactions`;
+  const url = `${URL_ROOT}/financial_transactions`;
 
   const response = await fetch(url, {
           method: 'POST',
@@ -35,7 +48,7 @@ export async function createFinancialTransaction(data) {
 }
 
 export async function updateFinancialTransaction(data) {
-  let url = `${URL_ROOT}/financial_transactions/${data.id}`;
+  const url = `${URL_ROOT}/financial_transactions/${data.id}`;
 
   const response = await fetch(url, {
           method: 'PUT',

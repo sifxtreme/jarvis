@@ -33,47 +33,62 @@ export default class Controls extends React.Component {
 
   render() {
     return (
-      <Paper className="searchBar">
-        <Grid container spacing={24}>
-          <Grid item xs={2}>
-            <FormLabel>TOTAL</FormLabel>
-            <TextField type="disabled" value={this.getTotal()}></TextField>
+      <div>
+        <Paper className="searchBar mobile-hidden">
+          <Grid container spacing={24}>
+            <Grid item xs={2}>
+              <FormLabel>TOTAL</FormLabel>
+              <TextField type="disabled" value={this.getTotal()}></TextField>
+            </Grid>
+            <Grid item xs={2}>
+              <FormLabel>SEARCH</FormLabel>
+              <TextField onChange={this.props.handleSearchBarChange}/>
+            </Grid> 
+            <Grid item xs={2}>
+              <FormLabel>DATE</FormLabel>
+              <Select
+                value={this.props.month}
+                onChange={this.props.handleMonthChange}
+                input={<Input name="month" id="month" />}
+              >
+                {this.state.months.map((month, index) => <MenuItem key={index} value={index}>{month}</MenuItem>)}
+              </Select>
+              <Select
+                value={this.props.year}
+                onChange={this.props.handleYearChange}
+                input={<Input name="month" id="month" />}
+              >
+                {this.state.years.map((year, index) => <MenuItem key={year} value={index}>{year}</MenuItem>)}
+              </Select>
+              
+            </Grid> 
+            <Grid item xs={2}>
+              <FormLabel>SHOW HIDDEN?</FormLabel>
+              <Switch onChange={this.props.handleHiddenChange}/>
+            </Grid> 
+            <Grid item xs={2}>
+              <FormLabel>NEEDS REVIEW?</FormLabel>
+              <Switch onChange={this.props.handleReviewChange}/>
+            </Grid>
+            <Grid item xs={2}>
+              <Button fab color="primary" onClick={this.props.addItem}><Add/></Button>
+            </Grid> 
           </Grid>
-          <Grid item xs={2}>
-            <FormLabel>SEARCH</FormLabel>
-            <TextField onChange={this.props.handleSearchBarChange}/>
-          </Grid> 
-          <Grid item xs={2}>
-            <FormLabel>DATE</FormLabel>
-            <Select
-              value={this.props.month}
-              onChange={this.props.handleMonthChange}
-              input={<Input name="month" id="month" />}
-            >
-              {this.state.months.map((month, index) => <MenuItem key={index} value={index}>{month}</MenuItem>)}
-            </Select>
-            <Select
-              value={this.props.year}
-              onChange={this.props.handleYearChange}
-              input={<Input name="month" id="month" />}
-            >
-              {this.state.years.map((year, index) => <MenuItem key={year} value={index}>{year}</MenuItem>)}
-            </Select>
-            
-          </Grid> 
-          <Grid item xs={2}>
-            <FormLabel>SHOW HIDDEN?</FormLabel>
-            <Switch onChange={this.props.handleHiddenChange}/>
-          </Grid> 
-          <Grid item xs={2}>
-            <FormLabel>NEEDS REVIEW?</FormLabel>
-            <Switch onChange={this.props.handleReviewChange}/>
+        </Paper>
+
+        <Paper className="searchBar mobile-show">
+          <Grid container spacing={24}>
+            <Grid item xs={12}>
+              <FormLabel>TOTAL</FormLabel>
+              <TextField type="disabled" value={this.getTotal()}></TextField>
+            </Grid>
+            <Grid item xs={12}>
+              <FormLabel>SEARCH</FormLabel>
+              <TextField onChange={this.props.handleSearchBarChange}/>
+            </Grid> 
           </Grid>
-          <Grid item xs={2}>
-            <Button fab color="primary" onClick={this.props.addItem}><Add/></Button>
-          </Grid> 
-        </Grid>
-      </Paper>
+        </Paper>
+      </div>
     )
   }
 }
