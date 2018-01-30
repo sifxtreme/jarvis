@@ -54,6 +54,13 @@ table tr td:nth-child(9) { width: 5%; }
   .mobile-show {
     display: none;
   }
+
+  table tr th {
+    padding: 10px 20px !important
+  }
+  table tr td {
+    padding: 10px 20px !important
+  }
 }
 
 @media (max-width:992px) {
