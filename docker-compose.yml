@@ -24,6 +24,7 @@ services:
     depends_on:
       - db
       - redis
+    restart: on-failure:5
 
   scheduler:
     image: jarvis-rails
