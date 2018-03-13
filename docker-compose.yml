@@ -24,6 +24,7 @@ services:
     depends_on:
       - db
       - redis
+    restart: always
 
   scheduler:
     image: jarvis-rails
@@ -33,7 +34,7 @@ services:
     depends_on:
       - db
       - redis
-    restart: on-failure:5 
+    restart: always
 
   api:
     image: jarvis-rails
@@ -45,6 +46,7 @@ services:
     depends_on:
       - db
       - redis
+    restart: always
 
   # proxy:
   #   image: nginx
