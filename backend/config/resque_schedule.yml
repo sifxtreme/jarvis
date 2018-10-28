@@ -19,13 +19,6 @@ balances_syncer:
   args:
   description: "Daily Sync Balances from Plaid"
 
-southwest_searcher:
-  cron: "30 */3 * * *"
-  class: "SouthwestRunner"
-  queue: high
-  args:
-  description: "Southwest Search"
-
 reddit_newsletter:
   cron: "0 14 * * 0"
   class: "RedditNewsletter"
@@ -34,7 +27,7 @@ reddit_newsletter:
   description: "Weekly Reddit Newsletter"
 
 testing_resque:
-  cron: "*/15 * * * *"
+  cron: "0 * * * *"
   class: "TestJobX"
   queue: test
   args:
