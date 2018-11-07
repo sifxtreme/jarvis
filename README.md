@@ -19,10 +19,6 @@ a financial api to get all your transactions from credit cards and your balances
 
 needs a [plaid](https://plaid.com/) api token and secret to sync up to plaid. use [plaid docs](https://plaid.com/docs/api/) to get access tokens for your credit cards.
 
-### [southwest](backend/app/lib/southwest)
-
-crawls southwest to see when flights are cheap. edit paths for your specific cities
-
 ## Setup
 
 ### server setup
@@ -47,13 +43,14 @@ sudo add-apt-repository    "deb [arch=amd64] https://download.docker.com/linux/u
 sudo apt-get update
 sudo apt-get install docker-ce
 docker --version
-sudo curl -L https://github.com/docker/compose/releases/download/1.14.0/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
+sudo curl -L "https://github.com/docker/compose/releases/download/1.23.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
 docker-compose --version
 
 # add github ssh key
 ssh -vT git@github.com
 ssh-agent
-ssh-keygen -t rsa -b 4096 -C 'YOUREMAIL@email.com'
+ssh-keygen -t rsa -b 4096 -C 'asifahmed2011@gmail.com'
 
 # install app
 git clone git@github.com:sifxtreme/jarvis.git
