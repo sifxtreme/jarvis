@@ -24,7 +24,7 @@ function headers() {
   return myHeaders
 }
 
-export async function getFinancialTransactions() {
+export getFinancialTransactions = async function getFinancialTransactions() {
   const url = `${URL_ROOT}/financial_transactions`;
 
   const response = await fetch(url, {

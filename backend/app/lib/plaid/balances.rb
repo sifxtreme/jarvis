@@ -52,7 +52,6 @@ module Plaid
       }
 
       Rails.logger.info "Starting balance API call for #{bank.name}"
-      puts data.to_json
       response = RestClient.post("#{plaid_api_url}/balance", data)
       Rails.logger.info "Finished balance API call for #{bank.name}"
 

@@ -9,7 +9,7 @@ class FinancialTransactionsController < ApplicationController
     db_query = db_query.where("YEAR(transacted_at) = ?", year) if year
     db_query = db_query.where("MONTH(transacted_at) = ?", month) if month
     db_query = db_query.where("category like ? or merchant_name like ? or plaid_name like ?", "%#{query}%", "%#{query}%", "%#{query}%") if query
-    # db_query = db_query.limit(10)
+    db_query = db_query.limit(10)
     results = db_query.order('transacted_at DESC')
     
     render json: {results: results.map}
@@ -17,6 +17,7 @@ class FinancialTransactionsController < ApplicationController
 
   def create
     f = FinancialTransaction.new
+
     data = JSON.parse(request.body.read)
     f.plaid_id = data["plaid_id"]
     f.plaid_name = data["merchant_name"]
@@ -35,6 +36,7 @@ class FinancialTransactionsController < ApplicationController
 
   def update
     f = FinancialTransaction.find(params[:id])
+
     data = JSON.parse(request.body.read)
     f.merchant_name = data["merchant_name"]
     f.category = data["category"]
@@ -47,6 +49,10 @@ class FinancialTransactionsController < ApplicationController
     f.save!
 
     render json: f
+  end
+
+  def categories
+    # FinancialTransaction.all.group(:category).where(hidden: false, reviewed: true).order('count(*) desc').pluck(:category)
   end
   
 end
