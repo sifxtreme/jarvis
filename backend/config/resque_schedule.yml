@@ -27,7 +27,7 @@ reddit_newsletter:
   description: "Weekly Reddit Newsletter"
 
 testing_resque:
-  cron: "0 * * * *"
+  cron: "* * * * *"
   class: "TestJobX"
   queue: test
   args:

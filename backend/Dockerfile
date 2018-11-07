@@ -1,5 +1,5 @@
-FROM ruby:2.4.1
-RUN apt-get update -qq && apt-get install -y build-essential libpq-dev nodejs vim
+FROM ruby:2.5.3
+RUN apt-get update -qq && apt-get install -y build-essential libpq-dev vim
 RUN mkdir /jarvis
 WORKDIR /jarvis
 ADD Gemfile /jarvis/Gemfile

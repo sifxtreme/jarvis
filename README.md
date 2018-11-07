@@ -33,9 +33,6 @@ sudo vim /etc/hosts
 
 # install docker
 sudo apt-get remove docker docker-engine docker.io
-sudo apt-get update
-sudo apt-get install     linux-image-extra-$(uname -r)     linux-image-extra-virtual
-sudo apt-get update
 sudo apt-get install     apt-transport-https     ca-certificates     curl     software-properties-common
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
 sudo apt-key fingerprint 0EBFCD88
@@ -48,7 +45,6 @@ sudo chmod +x /usr/local/bin/docker-compose
 docker-compose --version
 
 # add github ssh key
-ssh -vT git@github.com
 ssh-agent
 ssh-keygen -t rsa -b 4096 -C 'asifahmed2011@gmail.com'
 
@@ -56,6 +52,7 @@ ssh-keygen -t rsa -b 4096 -C 'asifahmed2011@gmail.com'
 git clone git@github.com:sifxtreme/jarvis.git
 cd jarvis/
 vim jarvis.env
+cd backend
 sudo docker build . -t jarvis-rails
 sudo docker-compose up -d
 ```
