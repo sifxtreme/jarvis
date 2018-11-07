@@ -52,14 +52,14 @@ module Plaid
     def raw_transactions_for_account(bank)
       data = {
         client_id: client_id,
-        secret: secret,
+        secret: client_secret,
         access_token: bank.token,
         options: {
           gte: (Date.today - 90).to_s # don't go to far back in time
         }
       }
 
-      response = RestClient.post("#{api_url}/connect/get", data)
+      response = RestClient.post("#{plaid_api_url}/connect/get", data)
       JSON.parse(response.body)
     end
 

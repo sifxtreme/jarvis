@@ -54,7 +54,15 @@ cd jarvis/
 vim jarvis.env
 cd backend
 sudo docker build . -t jarvis-rails
+cd ..
 sudo docker-compose up -d
+```
+
+### nginx htaccess
+```
+sudo sh -c "echo -n 'USERNAME:' >> /etc/nginx/.htpasswd"
+
+sudo sh -c "openssl passwd -apr1 >> /etc/nginx/.htpasswd"
 ```
 
 ### secrets and tokens

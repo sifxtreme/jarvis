@@ -4,19 +4,22 @@ module Plaid
     include Transactions
     include Balances
 
-    PLAID_API_URL = 'https://tartan.plaid.com'
-
-    attr_accessor :api_url
-    attr_accessor :client_id
-    attr_accessor :secret
-    attr_accessor :banks
-
-    def initialize
-      @api_url = PLAID_API_URL
-      @client_id = ENV['JARVIS_PLAID_CLIENT_ID']
-      @secret = ENV['JARVIS_PLAID_CLIENT_SECRET']
-      @banks = PlaidBank.all
+    def banks
+      @banks ||= PlaidBank.all
     end
+
+    def client_id
+      @client_id ||= ENV['JARVIS_PLAID_CLIENT_ID']
+    end
+
+    def client_secret
+      @client_secret ||= ENV['JARVIS_PLAID_CLIENT_SECRET']
+    end
+
+    def plaid_api_url
+      'https://tartan.plaid.com'
+    end
+
 
   end
 end
