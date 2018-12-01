@@ -1,4 +1,4 @@
-module Plaid
+module PlaidService
   module Transactions
 
     def sync_all_transactions

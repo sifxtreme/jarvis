@@ -35,3 +35,5 @@ gem 'resque-scheduler'
 
 # apm
 gem "skylight"
+
+gem 'plaid'
