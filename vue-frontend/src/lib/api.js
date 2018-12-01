@@ -6,10 +6,8 @@ const URL_ROOT = DEV_URL
 // const URL_ROOT = PROD_URL
 
 
-export async function getFinancialTransactions() {
-  const url = `${URL_ROOT}/financial_transactions`;
-
-  console.log(headers());
+export async function getFinancialTransactions(year, month) {
+  const url = `${URL_ROOT}/financial_transactions?month=${month}&year=${year}`;
 
   const response = await fetch(url, 
     {

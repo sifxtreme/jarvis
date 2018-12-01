@@ -18,11 +18,17 @@ export default {
     return {
       transactions: [],
       categories: [],
+      selectedYear: 2018,
+      selectedMonth: 11,
     }
   },
   created: async function() {
+    const today = new Date();
+    this.selectedYear = today.getFullYear();
+    this.selectedMonth = today.getMonth() + 1;
+
     const [transactions] = await Promise.all([
-      getFinancialTransactions(),
+      getFinancialTransactions(this.selectedYear, this.selectedMonth),
     ]);
 
     this.transactions = transactions['results']
