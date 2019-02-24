@@ -3,7 +3,7 @@ class SyncBalances
   @queue = :high
 
   def self.perform
-    PlaidService::Api.new.sync_all_balances
+    PlaidService::API.new.sync_all_balances(true)
   end
 
 end

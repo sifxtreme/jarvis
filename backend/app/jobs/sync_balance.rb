@@ -4,7 +4,7 @@ class SyncBalance
 
   def self.perform(bank_id)
     bank = ::PlaidBank.find(bank_id)
-    PlaidService::Api.new.sync_balance_for_bank(bank)
+    PlaidService::API.new.sync_balance_for_bank(bank)
   end
 
 end

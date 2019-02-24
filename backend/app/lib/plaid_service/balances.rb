@@ -1,19 +1,24 @@
 # get balance info from plaid api
 module PlaidService
   module Balances
-    def sync_all_balances
+
+    def sync_all_balances(async = false)
       banks.each do |bank|
-        Resque.enqueue(SyncBalance, bank.id)
+        if async
+          Resque.enqueue(SyncBalance, bank.id)
+        else
+          sync_balance_for_bank(bank)
+        end
       end
     end
 
     def sync_balance_for_bank(bank)
+      Rails.logger.info("SYNC BALANCE BANK: #{bank.name}")
       account_balances = balance_for_account(bank)
       sync_balance_to_database(bank.name, account_balances)
     end
 
     def sync_balance_to_database(bank_name, account_balances)
-      puts account_balances
       account_balances.each do |card_name, card_info|
         PlaidBalance.create!(
           bank_name: bank_name,
@@ -25,9 +30,7 @@ module PlaidService
     end
 
     def balance_for_account(bank)
-      balance_response = @client.accounts.balance.get(bank.token)
-
-      balance_response.accounts.map do |x|
+      raw_balance_for_bank(bank.token).accounts.map do |x|
         card_name = x.official_name || x.name
         current_balance = x.balances.current
         card_limit = x.balances.limit
@@ -43,5 +46,15 @@ module PlaidService
         ]
       end.to_h
     end
+
+    def raw_balance_for_bank(token)
+      retries ||= 0
+      client.accounts.balance.get(token)
+    rescue StandardError => e
+      Rails.logger.error("ERROR SYNC BALANCE BANK: #{bank.name}")
+      Rails.logger.error(e.message)
+      retry if (retries += 1) < 3
+    end
+
   end
 end
