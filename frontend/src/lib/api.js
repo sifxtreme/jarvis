@@ -1,9 +1,6 @@
-const DEV_URL = "http://localhost:3000";
-const PROD_URL = "https://sifxtre.me/api";
 const RAILS_PASSWORD_KEY = "JARVIS_RAILS_PASS";
 
-// const URL_ROOT = DEV_URL;
-const URL_ROOT = PROD_URL;
+const URL_ROOT = process.env.VUE_APP_API_URL || "http://localhost:3000";
 
 export async function getFinancialTransactions(query_params) {
   const query_params_string = Object.keys(query_params).reduce((acc, curr) => {

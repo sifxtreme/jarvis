@@ -36,13 +36,7 @@
       </el-aside>
 
       <el-container>
-        <el-header style="text-align: right; font-size: 12px">
-          <el-dropdown>
-            <i class="el-icon-setting" style="margin-right: 15px"></i>
-            <el-dropdown-menu slot="dropdown">
-              <el-dropdown-item>Add</el-dropdown-item>
-            </el-dropdown-menu>
-          </el-dropdown>
+        <el-header style="text-align: right">
           <span>Finances</span>
         </el-header>
 
@@ -50,18 +44,27 @@
           <el-table
             border
             stripe
-            show-summary
             :data="transactions"
             :row-class-name="tableRowClassName"
+            :cell-class-name="cellClassName"
           >
             <el-table-column sortable prop="plaid_name" label="Plaid Name"></el-table-column>
             <el-table-column sortable prop="merchant_name" label="Merchant Name"></el-table-column>
             <el-table-column sortable prop="category" label="Category"></el-table-column>
-            <el-table-column sortable prop="amount" label="Amount"></el-table-column>
-            <el-table-column sortable prop="transacted_at" label="Date"></el-table-column>
+            <el-table-column sortable prop="amount" label="Amount">
+              <template slot-scope="scope">{{Number(scope.row.amount).toFixed(2)}}</template>
+            </el-table-column>
+            <el-table-column sortable prop="transacted_at" label="Date">
+              <template slot-scope="scope">{{scope.row.transacted_at.split("T")[0]}}</template>
+            </el-table-column>
             <el-table-column sortable prop="source" label="Source"></el-table-column>
-            <!-- <el-table-column prop="hidden" label="Hidden"></el-table-column> -->
-            <!-- <el-table-column prop="reviewed" label="Reviewed"></el-table-column> -->
+            <el-table-column label="Metadata">
+              <template slot-scope="scope">
+                Hidden: {{scope.row.hidden}}
+                <br>
+                Reviewed: {{scope.row.reviewed}}
+              </template>
+            </el-table-column>
           </el-table>
         </el-main>
       </el-container>
@@ -71,6 +74,7 @@
 
 <script>
 import { getFinancialTransactions } from "../lib/api.js";
+import { Loading } from "element-ui";
 
 export default {
   data: function() {
@@ -97,7 +101,8 @@ export default {
         { value: 12, name: "Dec (12)" }
       ],
       selectedYear: 2019,
-      selectedMonth: 2
+      selectedMonth: 2,
+      loading: true
     };
   },
   created: async function() {
@@ -117,6 +122,8 @@ export default {
   },
   methods: {
     async searchAPI() {
+      let loadingInstance = Loading.service({ fullscreen: true });
+
       const data = {
         year: this.selectedYear,
         month: this.selectedMonth,
@@ -130,28 +137,36 @@ export default {
       ]);
 
       this.transactions = transactions["results"];
+
+      loadingInstance.close();
     },
     tableRowClassName({ row, rowIndex }) {
-      if (rowIndex === 1) {
-        console.log(row);
-      }
+      return "";
+    },
+    cellClassName({ row, column, rowIndex, columnIndex }) {
+      if (columnIndex == "3") return "right-align";
       return "";
     }
   }
 };
 </script>
 
-<style lang="scss" scoped>
+<style lang="scss">
 .el-header {
   background-color: #b3c0d1;
   color: #333;
-  line-height: 60px;
 }
 
 .el-aside {
   color: #333;
 }
+
 .el-menu {
-  padding: 10px;
+  padding: 5px;
+  padding-left: 5px !important;
+}
+
+.right-align {
+  text-align: right !important;
 }
 </style>
