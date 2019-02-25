@@ -3,8 +3,10 @@ module PlaidService
   module Balances
 
     def sync_all_balances(async = false)
+      Rails.logger.info('PlaidService::Balances sync_all_balances')
       banks.each do |bank|
         if async
+          Rails.logger.info('Enqueuing SyncBalancesForBank')
           Resque.enqueue(SyncBalancesForBank, bank.id)
         else
           sync_balances_for_bank(bank)
