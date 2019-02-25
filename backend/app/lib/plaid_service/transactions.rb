@@ -1,17 +1,30 @@
 module PlaidService
   module Transactions
 
-    def sync_all_transactions
+    def sync_all_transactions(async = false)
       banks.each do |bank|
-        sync_transactions_to_database(bank)
+        if async
+          Resque.enqueue(SyncTransactionsForBank, bank.id)
+        else
+          sync_transactions_for_bank(bank)
+        end
       end
     end
 
-    def sync_transactions_to_database(bank)
-      transactions = transactions_for_account(bank)
+    def sync_transactions_for_bank(bank)
+      Rails.logger.info("SYNC TRANSACTION BANK: #{bank.name}")
+      account_transactions = transactions_for_account(bank)
 
-      filtered_transactions = transactions.reject do |data|
-        FinancialTransaction.where(plaid_id: data[:id]).any?
+      sync_transactions_to_database(bank, account_transactions)
+    end
+
+    def sync_transactions_to_database(bank, account_transactions)
+      filtered_transactions = account_transactions.reject do |data|
+        FinancialTransaction.where(plaid_id: data[:id]).any? ||
+          FinancialTransaction.where(
+            plaid_name: data[:name],
+            transacted_at: data[:date]
+          ).any?
       end
 
       filtered_transactions.each do |data|
@@ -25,20 +38,23 @@ module PlaidService
         f.save!
       end
     rescue StandardError => e
+      Rails.logger.error("ERROR SYNC TRANSACTIONS: #{bank.name}")
       Rails.logger.error(e.message)
-      Rails.logger.error(bank.name)
     end
 
     def transactions_for_account(bank)
-      response_json = raw_transactions_for_account(bank)
+      response_json = raw_transactions_for_account(bank.token)
 
       raw_transactions = response_json['transactions']
 
-      transactions = raw_transactions.reject { |trx| transaction_is_payment?(trx) }
+      # reject payments and pending transactions
+      transactions = raw_transactions.reject do |trx|
+        transaction_is_payment?(trx) || trx['pending']
+      end
 
       transactions.map do |transaction|
         {
-          id: transaction['_id'],
+          id: transaction['transaction_id'],
           date: transaction['date'],
           name: transaction['name'],
           amount: transaction['amount'],
@@ -47,9 +63,15 @@ module PlaidService
       end
     end
 
-    def raw_transactions_for_account(_bank)
-      response = RestClient.post("#{plaid_api_url}/connect/get", data)
-      JSON.parse(response.body)
+    private
+
+    def raw_transactions_for_account(token)
+      retries ||= 0
+      client.transactions.get(token, 1.month.ago.strftime('%Y-%m-%d'), Date.today.strftime('%Y-%m-%d'))
+    rescue StandardError => e
+      Rails.logger.error("ERROR SYNC TRANSACTIONS BANK: #{bank.name}")
+      Rails.logger.error(e.message)
+      retry if (retries += 1) < 3
     end
 
     def transaction_is_payment?(transaction)

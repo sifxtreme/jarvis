@@ -5,14 +5,14 @@ module PlaidService
     def sync_all_balances(async = false)
       banks.each do |bank|
         if async
-          Resque.enqueue(SyncBalance, bank.id)
+          Resque.enqueue(SyncBalancesForBank, bank.id)
         else
-          sync_balance_for_bank(bank)
+          sync_balances_for_bank(bank)
         end
       end
     end
 
-    def sync_balance_for_bank(bank)
+    def sync_balances_for_bank(bank)
       Rails.logger.info("SYNC BALANCE BANK: #{bank.name}")
       account_balances = balance_for_account(bank)
       sync_balance_to_database(bank.name, account_balances)
@@ -46,6 +46,8 @@ module PlaidService
         ]
       end.to_h
     end
+
+    private
 
     def raw_balance_for_bank(token)
       retries ||= 0

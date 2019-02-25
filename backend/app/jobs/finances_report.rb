@@ -1,4 +1,4 @@
-class FinancesReport
+class FinancesReport < ApplicationJob
 
   @queue = :high
 
