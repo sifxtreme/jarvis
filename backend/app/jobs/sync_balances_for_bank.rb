@@ -1,4 +1,4 @@
-class SyncBalancesForBank < ApplicationJob
+class SyncBalancesForBank
 
   @queue = :high
 

@@ -1,4 +1,4 @@
-class AnalyzeTransactions < ApplicationJob
+class AnalyzeTransactions
 
   @queue = :high
 
