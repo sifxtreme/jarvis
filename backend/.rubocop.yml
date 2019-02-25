@@ -1,7 +1,9 @@
 AllCops:   
   Exclude:
+    - 'bin/**/*'
     - 'config/**/*'
-    - 'db/**/*'     
+    - 'db/**/*'
+    - 'lib/tasks/resque.rake'
     - 'spec/**/*'     
     - 'script/**/*'
 

@@ -1,7 +1,7 @@
 source 'https://rubygems.org'
 
 git_source(:github) do |repo_name|
-  repo_name = "#{repo_name}/#{repo_name}" unless repo_name.include?("/")
+  repo_name = "#{repo_name}/#{repo_name}" unless repo_name.include?('/')
   "https://github.com/#{repo_name}.git"
 end
 
@@ -12,22 +12,17 @@ gem 'mysql2', '~> 0.4.4'
 # Use Puma as the app server
 gem 'puma', '~> 3.7'
 
-gem 'rack-cors', :require => 'rack/cors'
+gem 'rack-cors', require: 'rack/cors'
 
 group :development, :test do
   gem 'pry'
 end
-
-# Windows does not include zoneinfo files, so bundle the tzinfo-data gem
-gem 'tzinfo-data', platforms: [:mingw, :mswin, :x64_mingw, :jruby]
 
 # background jobs
 gem 'resque'
 gem 'resque-scheduler'
 
 # app specific gems
+gem 'paper_trail' # keep track of versioning
 gem 'plaid' # communicate with plaid api
 gem 'skylight' # apm
-gem 'paper_trail' # keep track of versioning
-
-
