@@ -18,8 +18,8 @@ export default {
     return {
       transactions: [],
       categories: [],
-      selectedYear: 2018,
-      selectedMonth: 11,
+      selectedYear: 2019,
+      selectedMonth: 2,
     }
   },
   created: async function() {

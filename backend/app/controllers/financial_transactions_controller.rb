@@ -9,7 +9,6 @@ class FinancialTransactionsController < ApplicationController
     db_query = db_query.where('YEAR(transacted_at) = ?', year) if year
     db_query = db_query.where('MONTH(transacted_at) = ?', month) if month
     db_query = db_query.where('category like ? or merchant_name like ? or plaid_name like ?', "%#{query}%", "%#{query}%", "%#{query}%") if query
-    db_query = db_query.limit(10)
     results = db_query.order('transacted_at DESC')
 
     render json: { results: results.map }
