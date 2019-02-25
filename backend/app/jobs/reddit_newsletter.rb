@@ -1,4 +1,4 @@
-class RedditNewsletter
+class RedditNewsletter < ApplicationJob
 
   @queue = :high
 
