@@ -1,6 +1,6 @@
 class SyncTransactionsForBank
 
-  @queue = :high
+  @queue = :plaid
 
   def self.perform(bank_id)
     bank = ::PlaidBank.find(bank_id)

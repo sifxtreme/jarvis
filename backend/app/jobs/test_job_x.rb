@@ -1,6 +1,6 @@
 class TestJobX
 
-  @queue = :test
+  @queue = :dummy
 
   def self.perform
     Dummy.create!

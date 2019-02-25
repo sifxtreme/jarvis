@@ -1,6 +1,6 @@
 class SyncBalancesForBank
 
-  @queue = :high
+  @queue = :plaid
 
   def self.perform(bank_id)
     Rails.logger.info('Resque Starting SyncBalancesForBank')
