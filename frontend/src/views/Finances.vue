@@ -140,10 +140,12 @@ export default {
 
       loadingInstance.close();
     },
-    tableRowClassName({ row, rowIndex }) {
+    tableRowClassName({ row }) {
+      if (!row.category) return "row-no-category";
+      if (!row.reviewed) return "row-not-reviewed";
       return "";
     },
-    cellClassName({ row, column, rowIndex, columnIndex }) {
+    cellClassName({ columnIndex }) {
       if (columnIndex == "3") return "right-align";
       return "";
     }
