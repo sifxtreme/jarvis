@@ -1,8 +1,5 @@
 Rails.application.routes.draw do
   root to: 'home#index'
-
-  get 'plaid/balances', to: 'plaid#balances'
-  get 'plaid/transactions/:bank_id', to: 'plaid#transactions'
   
   resources :financial_transactions, only: [:index, :create, :update]
   

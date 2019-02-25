@@ -10,14 +10,29 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20171114155813) do
+ActiveRecord::Schema.define(version: 2019_02_24_223458) do
 
-  create_table "dummies", force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=utf8" do |t|
+  create_table "delayed_jobs", options: "ENGINE=InnoDB DEFAULT CHARSET=utf8", force: :cascade do |t|
+    t.integer "priority", default: 0, null: false
+    t.integer "attempts", default: 0, null: false
+    t.text "handler", null: false
+    t.text "last_error"
+    t.datetime "run_at"
+    t.datetime "locked_at"
+    t.datetime "failed_at"
+    t.string "locked_by"
+    t.string "queue"
+    t.datetime "created_at"
+    t.datetime "updated_at"
+    t.index ["priority", "run_at"], name: "delayed_jobs_priority"
+  end
+
+  create_table "dummies", options: "ENGINE=InnoDB DEFAULT CHARSET=latin1", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
   end
 
-  create_table "financial_transactions", id: :integer, force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=utf8" do |t|
+  create_table "financial_transactions", id: :integer, options: "ENGINE=InnoDB DEFAULT CHARSET=utf8", force: :cascade do |t|
     t.string "plaid_id"
     t.string "plaid_name"
     t.string "merchant_name"
@@ -36,20 +51,7 @@ ActiveRecord::Schema.define(version: 20171114155813) do
     t.index ["transacted_at"], name: "index_financial_transactions_on_transacted_at"
   end
 
-  create_table "flights", id: :integer, force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=utf8" do |t|
-    t.string "origin"
-    t.string "destination"
-    t.datetime "departure_date"
-    t.datetime "arrival_date"
-    t.text "search_data"
-    t.text "flexible_data"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["destination"], name: "index_flights_on_destination"
-    t.index ["origin"], name: "index_flights_on_origin"
-  end
-
-  create_table "plaid_balances", force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=utf8" do |t|
+  create_table "plaid_balances", options: "ENGINE=InnoDB DEFAULT CHARSET=latin1", force: :cascade do |t|
     t.string "bank_name", null: false
     t.string "card_name", null: false
     t.decimal "current_balance", precision: 8, scale: 2, null: false
@@ -61,17 +63,21 @@ ActiveRecord::Schema.define(version: 20171114155813) do
     t.index ["created_at"], name: "index_plaid_balances_on_created_at"
   end
 
-  create_table "plaid_banks", force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=utf8" do |t|
+  create_table "plaid_banks", options: "ENGINE=InnoDB DEFAULT CHARSET=utf8", force: :cascade do |t|
     t.string "name", null: false
     t.string "token", null: false
     t.index ["name"], name: "index_plaid_banks_on_name"
   end
 
-  create_table "weathers", id: :integer, force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=utf8" do |t|
-    t.string "city"
-    t.datetime "date"
-    t.text "search_data"
-    t.index ["city"], name: "index_weathers_on_city"
+  create_table "versions", options: "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4", force: :cascade do |t|
+    t.string "item_type", limit: 191, null: false
+    t.integer "item_id", null: false
+    t.string "event", null: false
+    t.string "whodunnit"
+    t.text "object", limit: 4294967295
+    t.datetime "created_at"
+    t.text "object_changes", limit: 4294967295
+    t.index ["item_type", "item_id"], name: "index_versions_on_item_type_and_item_id"
   end
 
 end

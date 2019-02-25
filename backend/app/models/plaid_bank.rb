@@ -1,19 +1,19 @@
 class PlaidBank < ApplicationRecord
-  has_many :balances, class_name: "PlaidBalance", foreign_key: "bank_name", primary_key: "name"
+  has_many :balances, class_name: 'PlaidBalance', foreign_key: 'bank_name', primary_key: 'name'
 
   def latest_balance
     card_balances = {}
-    
-    self.balances.each do |balance|
+
+    balances.each do |balance|
       total_balance = balance.current_balance + balance.pending_balance
       begin
         card_balances[balance.card_name] << total_balance
-      rescue => e
+      rescue StandardError => e
         card_balances[balance.card_name] = [total_balance]
       end
     end
 
-    card_balances.values.inject(0){|sum, x| sum + x.last }
+    card_balances.values.inject(0) { |sum, x| sum + x.last }
   end
-  
+
 end

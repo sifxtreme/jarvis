@@ -1,6 +1,6 @@
 class FinancesReport
 
-  @queue = :high
+  @queue = :emailer
 
   def self.perform
     finances_email = FinancesMailer.daily_summary

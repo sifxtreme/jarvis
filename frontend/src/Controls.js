@@ -17,7 +17,7 @@ export default class Controls extends React.Component {
     super(props);
 
     this.state = {
-      years: ["--", 2016, 2017, 2018],
+      years: ["--", 2016, 2017, 2018, 2019, 2020],
       months: ["--", "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"]
     }

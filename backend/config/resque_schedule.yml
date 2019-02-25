@@ -1,23 +1,30 @@
+transactions_syncer:
+  cron: "0 14 * * *"
+  class: "SyncTransactionsForBanks"
+  queue: high
+  args:
+  description: "Sync Transactions from Plaid"
+
+transactions_analyzer:
+  cron: "15 14 * * *"
+  class: "AnalyzeTransactions"
+  queue: high
+  args:
+  description: "Analyze Transactions and Self Categorize"
+
+balances_syncer:
+  cron: "30 14 * * *"
+  class: "SyncBalancesForBanks"
+  queue: high
+  args:
+  description: "Sync Balances from Plaid"
+
 finances_email:
   cron: "0 15 * * *"
   class: "FinancesReport"
   queue: high
   args:
   description: "Daily Email Finances Report"
-
-finances_syncer:
-  cron: "0 14 * * *"
-  class: "SyncFinances"
-  queue: high
-  args:
-  description: "Daily Sync Finances from Plaid and Analyze"
-
-balances_syncer:
-  cron: "30 14 * * *"
-  class: "SyncBalances"
-  queue: high
-  args:
-  description: "Daily Sync Balances from Plaid"
 
 reddit_newsletter:
   cron: "0 14 * * 0"

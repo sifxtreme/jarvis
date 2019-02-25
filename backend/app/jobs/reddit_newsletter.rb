@@ -1,6 +1,6 @@
 class RedditNewsletter
 
-  @queue = :high
+  @queue = :emailer
 
   def self.perform
     Reddit::Newsletter.new.email_newsletter

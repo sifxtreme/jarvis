@@ -34,20 +34,20 @@ module Finances
 
     def predictable_categories
       @predictable_categories ||= begin
-        category_groupings.select do |k,v| 
+        category_groupings.select do |_k, v|
           v.count == 1
-        end.map do |k,v| 
-          [k,v.keys.first]
+        end.map do |k, v|
+          [k, v.keys.first]
         end.to_h
       end
     end
 
     def predictable_names
       @predictable_names ||= begin
-        name_groupings.select do |k,v| 
+        name_groupings.select do |_k, v|
           v.count == 1
-        end.map do |k,v| 
-          [k,v.keys.first]
+        end.map do |k, v|
+          [k, v.keys.first]
         end.to_h
       end
     end
@@ -66,7 +66,7 @@ module Finances
               categories[translate_plaid_name(plaid_name)][f.category] = 1
             end
           else
-            categories[translate_plaid_name(plaid_name)] = {"#{f.category}" => 1}
+            categories[translate_plaid_name(plaid_name)] = { f.category.to_s => 1 }
           end
         end
 
@@ -88,7 +88,7 @@ module Finances
               names[translate_plaid_name(plaid_name)][f.merchant_name] = 1
             end
           else
-            names[translate_plaid_name(plaid_name)] = {"#{f.merchant_name}" => 1}
+            names[translate_plaid_name(plaid_name)] = { f.merchant_name.to_s => 1 }
           end
         end
 
@@ -97,8 +97,8 @@ module Finances
     end
 
     def finances
-      @finances ||= FinancialTransaction.where(hidden: 0).
-        where("merchant_name is not NULL")
+      @finances ||= FinancialTransaction.where(hidden: 0)
+                                        .where('merchant_name is not NULL')
     end
 
   end
