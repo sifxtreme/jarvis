@@ -55,7 +55,7 @@ module PlaidService
       retries ||= 0
       client.accounts.balance.get(token)
     rescue StandardError => e
-      Rails.logger.error("ERROR SYNC BALANCE BANK: #{bank.name}")
+      Rails.logger.error("ERROR SYNC BALANCE BANK: #{token}")
       Rails.logger.error(e.message)
       retry if (retries += 1) < 3
     end
