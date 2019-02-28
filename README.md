@@ -92,6 +92,7 @@ docker-compose up
 docker-compose run api rake db:migrate
 ```
 
+
 ### docker
 
 ```
