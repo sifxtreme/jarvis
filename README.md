@@ -8,7 +8,6 @@ currently jarvis supports:
 - predicts the category of a financial transaction based on previously entered categories
 - sends an email daily with a summary of credit card balances
 - helps search through your financial transactions
-- searches southwest flights every 3 hours
 - sends a weekly digest for top 10 posts in given subreddits
 
 ## services
