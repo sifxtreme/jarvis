@@ -1,5 +1,5 @@
 module MailerHelper
-  def format_number(n)
-    ('%.2f' % n).rjust(7, ' ')
+  def format_number(num)
+    format('%.2f', num).rjust(7, ' ')
   end
 end

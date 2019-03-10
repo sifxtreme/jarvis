@@ -8,7 +8,7 @@ class PlaidBank < ApplicationRecord
       total_balance = balance.current_balance + balance.pending_balance
       begin
         card_balances[balance.card_name] << total_balance
-      rescue StandardError => e
+      rescue StandardError => _
         card_balances[balance.card_name] = [total_balance]
       end
     end

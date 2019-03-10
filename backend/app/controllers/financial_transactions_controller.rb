@@ -12,9 +12,9 @@ class FinancialTransactionsController < ApplicationController
     db_query = db_query.where('YEAR(transacted_at) = ?', year) if year && year != 'null'
     db_query = db_query.where('MONTH(transacted_at) = ?', month) if month && month != 'null'
     db_query = db_query.where('category like ? or merchant_name like ? or plaid_name like ?', "%#{query}%", "%#{query}%", "%#{query}%") if query
-    db_query = db_query.where('hidden=1') if (show_hidden == 'true')
-    db_query = db_query.where('hidden=0') if (show_hidden == 'false')
-    db_query = db_query.where('reviewed=0') if (show_needs_review == 'true')
+    db_query = db_query.where('hidden=1') if show_hidden == 'true'
+    db_query = db_query.where('hidden=0') if show_hidden == 'false'
+    db_query = db_query.where('reviewed=0') if show_needs_review == 'true'
 
     results = db_query.order('transacted_at DESC')
 
@@ -23,7 +23,7 @@ class FinancialTransactionsController < ApplicationController
 
   def create
     data = JSON.parse(request.body.read)
-    
+
     f = FinancialTransaction.new
     f.plaid_id = data['plaid_id']
     f.plaid_name = data['merchant_name']
@@ -64,5 +64,5 @@ class FinancialTransactionsController < ApplicationController
 
     render json: f
   end
-  
+
 end

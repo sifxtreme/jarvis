@@ -12,7 +12,7 @@ gem 'mysql2', '~> 0.4.4'
 # Use Puma as the app server
 gem 'puma', '~> 3.7'
 
-gem 'rack-cors', require: 'rack/cors'
+gem 'rack-cors', require: 'rack/cors' # allow cors requests (good for local development against production server)
 
 group :development, :test do
   gem 'pry'
@@ -25,4 +25,5 @@ gem 'resque-scheduler'
 # app specific gems
 gem 'paper_trail' # keep track of versioning
 gem 'plaid' # communicate with plaid api
+gem 'rest-client' # make http requests
 gem 'skylight' # apm
