@@ -1,7 +1,7 @@
 <template>
   <div>
     <el-container style="border: 1px solid #eee">
-      <el-aside width="200px" style="background-color: rgb(238, 241, 246)">
+      <el-aside width="160px" style="background-color: rgb(238, 241, 246)">
         <el-menu :default-openeds="['1']">
           <form @submit.prevent="searchAPI">
             <el-submenu index="1">
@@ -26,25 +26,27 @@
               </el-menu-item-group>
               <el-menu-item-group>
                 <el-switch v-model="showHidden" inactive-text="SHOW HIDDEN?"></el-switch>
+                <br>
+                <br>
                 <el-switch v-model="showNeedsReview" inactive-text="NEEDS REVIEW?"></el-switch>
               </el-menu-item-group>
               <el-menu-item-group>
                 <button style="display:none;" type="submit">Submit</button>
                 <el-button type="submit" @click="searchAPI">Search</el-button>
               </el-menu-item-group>
-              <el-menu-item-group>${{total.toLocaleString()}}</el-menu-item-group>
             </el-submenu>
           </form>
         </el-menu>
       </el-aside>
 
       <el-container>
-        <el-header style="text-align: right">
-          <span>Finances</span>
-        </el-header>
+        <el-header></el-header>
 
         <el-main>
-          <h2>Transactions</h2>
+          <h2>
+            Transactions
+            <span>(${{total.toLocaleString()}})</span>
+          </h2>
           <el-table
             border
             stripe
@@ -128,15 +130,9 @@
           </el-table>
 
           <h2>Categories Summary</h2>
-          <el-table
-            border
-            stripe
-            :data="categorySums"
-            :row-class-name="tableRowClassName"
-            :cell-class-name="cellClassName"
-          >
-            <el-table-column sortable prop="name" label="Name"></el-table-column>
-            <el-table-column sortable prop="amount" label="Amount">
+          <el-table border stripe :data="categorySums">
+            <el-table-column width="150" sortable prop="name" label="Name"></el-table-column>
+            <el-table-column width="150" sortable prop="amount" label="Amount">
               <template slot-scope="scope">{{scope.row.amount.toFixed(2)}}</template>
             </el-table-column>
           </el-table>
@@ -199,10 +195,15 @@ export default {
     },
     categorySums() {
       const sums = this.transactions.reduce((acc, curr) => {
+        if (curr.hidden == 1) {
+          return acc;
+        }
         const sum = (acc[curr.category] || 0) + (parseFloat(curr.amount) || 0);
         acc[curr.category] = sum;
         return acc;
       }, {});
+
+      delete sums[""];
 
       return Object.keys(sums)
         .map(key => {
@@ -256,7 +257,6 @@ export default {
       loadingInstance.close();
     },
     tableRowClassName({ row }) {
-      if (!row.id) return "";
       if (!row.category) return "row-no-category";
       if (!row.reviewed) return "row-not-reviewed";
       return "";
@@ -283,13 +283,17 @@ export default {
 
 <style lang="scss">
 .el-header {
-  background-color: #b3c0d1;
+  background-color: teal;
   color: #333;
   line-height: 60px;
 }
 
 .el-aside {
   color: #333;
+
+  .el-button {
+    margin-top: 10px;
+  }
 }
 
 .el-menu {
@@ -303,10 +307,10 @@ export default {
 
 .row-no-category,
 .row-not-reviewed {
-  background-color: #bcf1ed !important;
+  background-color: #b3f0d1 !important;
 
   td {
-    background-color: #bcf1ed !important;
+    background-color: #b3f0d1 !important;
   }
 }
 </style>
