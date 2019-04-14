@@ -1,5 +1,4 @@
 module Utils
-
   def titleize(str)
     str.split.each(&:capitalize!).join(' ').to_s
   end
@@ -15,5 +14,4 @@ module Utils
   def month
     DateTime.now.strftime('%m')
   end
-
 end

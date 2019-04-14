@@ -24,5 +24,4 @@ module Reddit
     end
 
   end
-
 end

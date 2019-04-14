@@ -1,6 +1,7 @@
 # service to get data via plaid api
 module PlaidService
   class API
+
     include Balances
     include Transactions
 

@@ -1,7 +1,6 @@
 # get balance info from plaid api
 module PlaidService
   module Balances
-
     def sync_all_balances(async = false)
       Rails.logger.info('PlaidService::Balances sync_all_balances')
       banks.each do |bank|
@@ -59,6 +58,5 @@ module PlaidService
       Rails.logger.error(e.message)
       retry if (retries += 1) < 3
     end
-
   end
 end

@@ -1,17 +1,18 @@
-AllCops:   
+AllCops:
   Exclude:
-    - 'bin/**/*'
-    - 'config/**/*'
-    - 'db/**/*'
-    - 'lib/tasks/resque.rake'
-    - 'spec/**/*'     
-    - 'script/**/*'
+    - "bin/**/*"
+    - "config/**/*"
+    - "db/**/*"
+    - "lib/tasks/resque.rake"
+    - "spec/**/*"
+    - "script/**/*"
+    - "test/**/*"
 
 Layout/EmptyLinesAroundClassBody:
-  Enabled: false
+  EnforcedStyle: empty_lines
 
-Layout/EmptyLinesAroundModuleBody:
-  Enabled: false
+Metrics/AbcSize:
+  Max: 25
 
 Metrics/LineLength:
   Max: 150
@@ -21,10 +22,12 @@ Metrics/MethodLength:
 
 Style/DateTime:
   Enabled: false
-  
+
 Style/Documentation:
   Enabled: false
 
 Style/FrozenStringLiteralComment:
   Enabled: false
 
+Style/ClassAndModuleChildren:
+  EnforcedStyle: compact

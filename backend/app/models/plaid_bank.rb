@@ -1,4 +1,5 @@
 class PlaidBank < ApplicationRecord
+
   has_many :balances, class_name: 'PlaidBalance', foreign_key: 'bank_name', primary_key: 'name'
 
   def latest_balance

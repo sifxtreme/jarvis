@@ -1,4 +1,5 @@
 class FinancesMailer < ApplicationMailer
+
   helper MailerHelper
 
   def daily_summary

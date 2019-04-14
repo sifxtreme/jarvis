@@ -1,6 +1,5 @@
 module PlaidService
   module Transactions
-
     def sync_all_transactions(async = false)
       banks.each do |bank|
         if async
@@ -78,6 +77,5 @@ module PlaidService
       name = transaction['name'].downcase
       name.include?('payment') || name.include?('pymt')
     end
-
   end
 end
