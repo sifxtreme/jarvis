@@ -7,7 +7,6 @@
 <script>
 import Finances from './views/Finances.vue'
 
-
 export default {
   name: 'app',
   components: {
