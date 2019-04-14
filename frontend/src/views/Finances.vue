@@ -45,7 +45,7 @@
         <el-main>
           <h2>
             Transactions
-            <span>(${{ total.toLocaleString({ minimumFractionDigits: 2 }) }})</span>
+            <span>(${{ total.toLocaleString('en-US', { minimumFractionDigits: 2 }) }})</span>
           </h2>
           <el-table
             border
@@ -84,9 +84,9 @@
 
             <el-table-column sortable prop="transacted_at" label="Date">
               <template slot-scope="scope">
-                <span v-if="!scope.row.editMode">
-                  {{ new Date(scope.row.transacted_at).toISOString().substring(0, 10) }}
-                </span>
+                <span v-if="!scope.row.editMode">{{
+                  new Date(scope.row.transacted_at).toISOString().substring(0, 10)
+                }}</span>
                 <el-input v-if="scope.row.editMode" v-model="scope.row.transacted_at" type="date" />
               </template>
             </el-table-column>
@@ -121,9 +121,9 @@
                   @click="editItem(scope.row.id)"
                   >{{ scope.row.id ? 'Edit' : 'Add' }}</el-button
                 >
-                <el-button v-if="scope.row.editMode" type="primary" @click="saveItem(scope.row)">
-                  {{ scope.row.id ? 'Save' : 'Add' }}
-                </el-button>
+                <el-button v-if="scope.row.editMode" type="primary" @click="saveItem(scope.row)">{{
+                  scope.row.id ? 'Save' : 'Add'
+                }}</el-button>
               </template>
             </el-table-column>
           </el-table>
