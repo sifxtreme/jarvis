@@ -9,7 +9,9 @@ class PlaidBank < ApplicationRecord
       total_balance = balance.current_balance + balance.pending_balance
       begin
         card_balances[balance.card_name] << total_balance
-      rescue StandardError => _
+      rescue StandardError => e
+        Rails.logger.error("PlaidBank latest_balance #{e}")
+
         card_balances[balance.card_name] = [total_balance]
       end
     end

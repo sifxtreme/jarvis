@@ -11,6 +11,9 @@ AllCops:
 Layout/EmptyLinesAroundClassBody:
   EnforcedStyle: empty_lines
 
+Layout/EmptyLinesAroundModuleBody:
+  EnforcedStyle: empty_lines
+
 Metrics/AbcSize:
   Max: 25
 
@@ -27,7 +30,7 @@ Style/Documentation:
   Enabled: false
 
 Style/FrozenStringLiteralComment:
-  Enabled: false
+  EnforcedStyle: never
 
 Style/ClassAndModuleChildren:
   EnforcedStyle: compact
