@@ -71,9 +71,8 @@ module PlaidService::Transactions
     retries ||= 0
     client.transactions.get(token, 1.month.ago.strftime('%Y-%m-%d'), Date.today.strftime('%Y-%m-%d'))
   rescue StandardError => e
-    Rails.logger.error("ERROR SYNC TRANSACTIONS BANK: #{token}")
-    Rails.logger.error(e.message)
     retry if (retries += 1) < 3
+    raise StandardError, "ERROR SYNC TRANSACTIONS for #{PlaidBank.find_by_token(token).name}: #{e.message}"
   end
 
   def transaction_is_payment?(transaction)
