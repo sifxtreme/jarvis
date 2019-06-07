@@ -22,11 +22,7 @@ module PlaidService::Transactions
 
   def sync_transactions_to_database(bank, account_transactions)
     filtered_transactions = account_transactions.reject do |data|
-      FinancialTransaction.where(plaid_id: data[:id]).any? ||
-        FinancialTransaction.where(
-          plaid_name: data[:name],
-          transacted_at: data[:date]
-        ).any?
+      FinancialTransaction.where(plaid_id: data[:id]).any?
     end
 
     filtered_transactions.each do |data|
