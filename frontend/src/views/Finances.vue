@@ -155,7 +155,7 @@ export default {
       transactions: [],
       balances: [],
       query: '',
-      years: [null, 2016, 2017, 2018, 2019, 2020],
+      years: [null, 2016, 2017, 2018, 2019, 2020, 2021],
       showNeedsReview: false,
       showHidden: false,
       months: [
@@ -174,7 +174,7 @@ export default {
         { value: 12, name: 'Dec (12)' }
       ],
       selectedYear: 2019,
-      selectedMonth: 3,
+      selectedMonth: 12,
       loading: true
     }
   },

@@ -1,17 +1,12 @@
 <template>
   <div id="app">
-    <Finances />
+    <router-view />
   </div>
 </template>
 
 <script>
-import Finances from './views/Finances.vue'
-
 export default {
-  name: 'app',
-  components: {
-    Finances
-  }
+  name: 'app'
 }
 </script>
 

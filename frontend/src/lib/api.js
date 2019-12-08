@@ -2,6 +2,21 @@ const RAILS_PASSWORD_KEY = 'JARVIS_RAILS_PASS'
 
 const URL_ROOT = process.env.VUE_APP_API_URL || 'http://localhost:3000'
 
+export function isAuthenticated() {
+  const authorizationKey = localStorage.getItem(RAILS_PASSWORD_KEY)
+  return authorizationKey
+}
+
+export async function getBalances() {
+  const url = `${URL_ROOT}/balances`
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: headers()
+  })
+
+  return response.json()
+}
+
 export async function getFinancialTransactions(query_params) {
   const query_params_string = Object.keys(query_params).reduce((acc, curr) => {
     acc += `&${curr}=${query_params[curr]}`
