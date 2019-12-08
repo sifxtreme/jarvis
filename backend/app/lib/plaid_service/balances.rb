@@ -2,7 +2,7 @@
 module PlaidService::Balances
 
   def sync_all_balances(async = false)
-    Rails.logger.error('PlaidService::Balances sync_all_balances')
+    Rails.logger.info('PlaidService::Balances sync_all_balances')
 
     banks.each do |bank|
       if async
@@ -15,7 +15,7 @@ module PlaidService::Balances
   end
 
   def sync_balances_for_bank(bank)
-    Rails.logger.error("SYNC BALANCE BANK: #{bank.name}")
+    Rails.logger.info("SYNC BALANCE BANK: #{bank.name}")
 
     account_balances = balance_for_account(bank)
     sync_balance_to_database(bank.name, account_balances)
@@ -37,7 +37,7 @@ module PlaidService::Balances
       card_name = x.official_name || x.name
       current_balance = x.balances.current
       card_limit = x.balances.limit
-      available_balance = x.balances.available
+      available_balance = x.balances.available || (card_limit - current_balance) # in case available_balance is not returned by Plaid
       pending_balance = card_limit - available_balance - current_balance
 
       [
@@ -53,6 +53,7 @@ module PlaidService::Balances
   private
 
   def raw_balance_for_bank(token)
+    Rails.logger.info('PlaidService::Balances raw_balance_for_bank')
     retries ||= 0
     client.accounts.balance.get(token)
   rescue StandardError => e

@@ -5,10 +5,12 @@ class PlaidService::API
   include Transactions
 
   def client
-    @client = Plaid::Client.new(env: :development,
-                                client_id: ENV['JARVIS_PLAID_CLIENT_ID'],
-                                secret: ENV['JARVIS_PLAID_CLIENT_SECRET'],
-                                public_key: ENV['JARVIS_PLAID_PUBLIC_KEY'])
+    @client = Plaid::Client.new(
+      env: :development,
+      client_id: ENV['JARVIS_PLAID_CLIENT_ID'],
+      secret: ENV['JARVIS_PLAID_CLIENT_SECRET'],
+      public_key: ENV['JARVIS_PLAID_PUBLIC_KEY']
+    )
   end
 
   def banks

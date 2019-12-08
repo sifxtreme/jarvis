@@ -1,6 +1,6 @@
 class Reddit::Newsletter
 
-  SUBREDDITS = %w[rails ruby programming commandline mealtimevideos webdev losangeles].freeze
+  SUBREDDITS = %w[rails ruby programming commandline mealtimevideos webdev javascript freefolk].freeze
 
   def email_newsletter
     info = SUBREDDITS.map { |s| [s, get_subreddit_info(s)] }.to_h
