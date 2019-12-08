@@ -6,4 +6,13 @@ class Finances::Balances
     end
   end
 
+  def latest_balances
+    PlaidBank.all.map do |x|
+      {
+        name: x.name,
+        balance: x.latest_balance.round(2)
+      }
+    end
+  end
+
 end

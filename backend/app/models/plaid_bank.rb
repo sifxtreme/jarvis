@@ -7,13 +7,8 @@ class PlaidBank < ApplicationRecord
 
     balances.each do |balance|
       total_balance = balance.current_balance + balance.pending_balance
-      begin
-        card_balances[balance.card_name] << total_balance
-      rescue StandardError => e
-        Rails.logger.error("PlaidBank latest_balance #{e}")
-
-        card_balances[balance.card_name] = [total_balance]
-      end
+      card_balances[balance.card_name] ||= []
+      card_balances[balance.card_name] << total_balance
     end
 
     card_balances.values.inject(0) { |sum, x| sum + x.last }

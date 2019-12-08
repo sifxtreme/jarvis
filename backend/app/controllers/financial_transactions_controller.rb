@@ -1,5 +1,5 @@
 class FinancialTransactionsController < ApplicationController
-  
+
   def index
     year = params[:year]
     month = params[:month]
