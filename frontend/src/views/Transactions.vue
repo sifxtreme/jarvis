@@ -34,7 +34,7 @@
         <v-layout row wrap align-center>
           <v-data-table :headers="headers" :items="transactions" :loading="loading" disable-pagination>
             <template v-slot:item.review="props">
-              <v-icon v-if="!props.item.review" color="green">mdi-eye</v-icon>
+              <v-icon v-if="props.item.reviewed" color="green">mdi-eye</v-icon>
             </template>
             <template v-slot:item.amount="props">{{ props.item.amount.toFixed(2) }}</template>
 
