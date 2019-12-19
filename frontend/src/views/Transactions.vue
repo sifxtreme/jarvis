@@ -1,5 +1,23 @@
 <template>
   <v-app id="inspire">
+    <v-navigation-drawer :clipped="$vuetify.breakpoint.lgAndUp" app right>
+      <template>
+        <v-row align="center">
+          <v-col>
+            <v-data-table
+              class="summary-table"
+              :headers="summaryHeaders"
+              :items="categorySums"
+              disable-pagination
+              dense
+            >
+              <template v-slot:item.amount="props">${{ props.item.amount.toFixed(2) }}</template>
+            </v-data-table>
+          </v-col>
+        </v-row>
+      </template>
+    </v-navigation-drawer>
+
     <v-navigation-drawer v-model="drawer" :clipped="$vuetify.breakpoint.lgAndUp" app>
       <v-list dense>
         <template>
@@ -22,16 +40,22 @@
       </v-list>
     </v-navigation-drawer>
 
-    <v-app-bar :clipped-left="$vuetify.breakpoint.lgAndUp" app color="green darken-3" dark>
+    <v-app-bar
+      :clipped-left="$vuetify.breakpoint.lgAndUp"
+      :clipped-right="$vuetify.breakpoint.lgAndUp"
+      app
+      color="green darken-3"
+      dark
+    >
       <v-app-bar-nav-icon @click.stop="drawer = !drawer" />
       <v-toolbar-title style="width: 300px" class="ml-0 pl-4">
-        <span>Jarvis Finances (${{ total }})</span>
+        <span>Jarvis Finances (${{ total.toFixed(2) }})</span>
       </v-toolbar-title>
     </v-app-bar>
 
     <v-content>
       <v-container class="fill-height" fluid>
-        <v-layout row wrap align-center>
+        <v-layout row wrap>
           <v-data-table :headers="headers" :items="transactions" :loading="loading" disable-pagination>
             <template v-slot:item.review="props">
               <v-icon v-if="props.item.reviewed" color="green">mdi-eye</v-icon>
@@ -43,10 +67,6 @@
             <template v-slot:item.actions="props">
               <v-icon color="green" @click="editItem(props.item)">mdi-pencil</v-icon>
             </template>
-          </v-data-table>
-
-          <v-data-table class="summary-table" :headers="summaryHeaders" :items="categorySums" disable-pagination>
-            <template v-slot:item.amount="props">${{ props.item.amount.toFixed(2) }}</template>
           </v-data-table>
         </v-layout>
       </v-container>
@@ -108,12 +128,10 @@ export default {
   },
   computed: {
     total() {
-      return this.transactions
-        .reduce((acc, curr) => {
-          acc += parseFloat(curr.amount) || 0
-          return acc
-        }, 0)
-        .toFixed(2)
+      return this.transactions.reduce((acc, curr) => {
+        acc += parseFloat(curr.amount) || 0
+        return acc
+      }, 0)
     },
     categorySums() {
       const sums = this.transactions.reduce((acc, curr) => {
@@ -127,18 +145,18 @@ export default {
 
       delete sums['']
 
-      return Object.keys(sums)
-        .map(key => {
-          let name = key
-          if (name === 'null') name = 'Uncategorized'
-          return {
-            name: name,
-            amount: sums[key]
-          }
-        })
-        .sort(function(a, b) {
-          return a.amount > b.amount ? -1 : 1
-        })
+      const sumOfCategories = Object.keys(sums).map(key => {
+        let name = key
+        if (name === 'null') name = 'Uncategorized'
+        return {
+          name: name,
+          amount: sums[key]
+        }
+      })
+
+      return sumOfCategories.sort(function(a, b) {
+        return a.amount > b.amount ? -1 : 1
+      })
     }
   },
   methods: {
@@ -216,8 +234,8 @@ export default {
     drawer: true,
 
     summaryHeaders: [
-      { text: 'Name', value: 'name' },
-      { text: 'Amount', value: 'amount', align: 'right' }
+      { text: 'Amount', value: 'amount', align: 'right' },
+      { text: 'Name', value: 'name' }
     ],
 
     headers: [
