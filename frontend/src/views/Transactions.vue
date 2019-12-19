@@ -36,7 +36,7 @@
             <template v-slot:item.review="props">
               <v-icon v-if="props.item.reviewed" color="green">mdi-eye</v-icon>
             </template>
-            <template v-slot:item.amount="props">{{ props.item.amount.toFixed(2) }}</template>
+            <template v-slot:item.amount="props">${{ props.item.amount.toFixed(2) }}</template>
 
             <template v-slot:item.transacted_at="props">{{ props.item.transacted_at.split('T')[0] }}</template>
 
@@ -46,7 +46,7 @@
           </v-data-table>
 
           <v-data-table class="summary-table" :headers="summaryHeaders" :items="categorySums" disable-pagination>
-            <template v-slot:item.amount="props">{{ props.item.amount.toFixed(2) }}</template>
+            <template v-slot:item.amount="props">${{ props.item.amount.toFixed(2) }}</template>
           </v-data-table>
         </v-layout>
       </v-container>
