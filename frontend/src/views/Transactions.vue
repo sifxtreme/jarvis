@@ -69,7 +69,7 @@
                   <v-text-field v-model="editedItem.category" label="Category"></v-text-field>
                 </v-col>
                 <v-col cols="12" sm="6" md="6">
-                  <v-text-field type="number" v-model="editedItem.amount" label="Amount"></v-text-field>
+                  <v-text-field type="number" step="0.01" v-model="editedItem.amount" label="Amount"></v-text-field>
                 </v-col>
                 <v-col cols="12" sm="6" md="6">
                   <v-text-field type="date" v-model="editedItem.transacted_at" label="Date"></v-text-field>
