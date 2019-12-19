@@ -12,7 +12,7 @@
                     <v-text-field type="query" v-model="query" label="Search Query"></v-text-field>
                     <v-switch v-model="showHidden" label="Show Hidden?"></v-switch>
                     <v-switch v-model="showNeedsReview" label="Needs Review?"></v-switch>
-                    <v-btn type="submit" color="success" @click="searchAPI">Search</v-btn>
+                    <v-btn type="submit" color="success">Search</v-btn>
                   </v-list-item-content>
                 </v-list-item>
               </v-col>
@@ -87,7 +87,7 @@
           <v-card-actions>
             <v-spacer></v-spacer>
             <v-btn text @click="closeDialog">Cancel</v-btn>
-            <v-btn color="success" text type="submit" @click="saveItem">Save</v-btn>
+            <v-btn color="success" text type="submit">Save</v-btn>
           </v-card-actions>
         </v-card>
       </form>
