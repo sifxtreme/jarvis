@@ -108,10 +108,12 @@ export default {
   },
   computed: {
     total() {
-      return this.transactions.reduce((acc, curr) => {
-        acc += parseFloat(curr.amount) || 0
-        return acc
-      }, 0)
+      return this.transactions
+        .reduce((acc, curr) => {
+          acc += parseFloat(curr.amount) || 0
+          return acc
+        }, 0)
+        .toFixed(2)
     },
     categorySums() {
       const sums = this.transactions.reduce((acc, curr) => {
