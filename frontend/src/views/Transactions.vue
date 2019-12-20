@@ -127,6 +127,14 @@ export default {
     this.searchAPI()
   },
   computed: {
+    month() {
+      if (!this.monthYear) return null
+      return this.monthYear.split('-')[1]
+    },
+    year() {
+      if (!this.monthYear) return null
+      return this.monthYear.split('-')[0]
+    },
     total() {
       return this.transactions.reduce((acc, curr) => {
         acc += parseFloat(curr.amount) || 0
@@ -183,8 +191,8 @@ export default {
       this.loading = true
 
       const data = {
-        year: this.monthYear.split('-')[0],
-        month: this.monthYear.split('-')[1],
+        year: this.year,
+        month: this.month,
         show_hidden: this.showHidden,
         show_needs_review: this.showNeedsReview,
         query: this.query
