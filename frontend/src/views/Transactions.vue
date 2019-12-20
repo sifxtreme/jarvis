@@ -162,7 +162,7 @@ export default {
         }
       })
 
-      return sumOfCategories.sort(function(a, b) {
+      return sumOfCategories.sort((a, b) => {
         return a.amount > b.amount ? -1 : 1
       })
     }
