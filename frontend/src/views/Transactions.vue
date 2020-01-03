@@ -122,7 +122,7 @@ export default {
   created() {
     // this.$vuetify.theme.dark = true;
     const today = new Date()
-    this.monthYear = `${today.getFullYear()}-${today.getMonth() + 1}`
+    this.monthYear = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`
 
     this.searchAPI()
   },
