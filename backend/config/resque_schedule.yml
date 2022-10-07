@@ -12,27 +12,6 @@ transactions_analyzer:
   args:
   description: "Analyze Transactions and Self Categorize"
 
-balances_syncer:
-  cron: "30 14 * * *"
-  class: "SyncBalancesForBanks"
-  queue: high
-  args:
-  description: "Sync Balances from Plaid"
-
-finances_email:
-  cron: "0 15 * * *"
-  class: "FinancesReport"
-  queue: high
-  args:
-  description: "Daily Email Finances Report"
-
-reddit_newsletter:
-  cron: "0 14 * * 0"
-  class: "RedditNewsletter"
-  queue: high
-  args:
-  description: "Weekly Reddit Newsletter"
-
 testing_resque:
   cron: "*/5 * * * *"
   class: "TestJobX"
