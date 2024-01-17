@@ -1,4 +1,5 @@
 AllCops:
+  NewCops: enable # Automatically enable new cops
   Exclude:
     - "bin/**/*"
     - "config/**/*"
@@ -15,9 +16,15 @@ Layout/EmptyLinesAroundModuleBody:
   EnforcedStyle: empty_lines
 
 Metrics/AbcSize:
-  Max: 25
+  Enabled: false
 
-Metrics/LineLength:
+Metrics/CyclomaticComplexity:
+  Enabled: false
+
+Metrics/PerceivedComplexity:
+  Enabled: false
+
+Layout/LineLength:
   Max: 150
 
 Metrics/MethodLength:
@@ -30,7 +37,7 @@ Style/Documentation:
   Enabled: false
 
 Style/FrozenStringLiteralComment:
-  EnforcedStyle: never
+  Enabled: false #
 
 Style/ClassAndModuleChildren:
   EnforcedStyle: compact

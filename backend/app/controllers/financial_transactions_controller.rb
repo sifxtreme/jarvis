@@ -7,13 +7,13 @@ class FinancialTransactionsController < ApplicationController
     show_hidden = params[:show_hidden]
     show_needs_review = params[:show_needs_review]
 
-    db_query = FinancialTransaction.all
-    db_query = db_query.where('YEAR(transacted_at) = ?', year) if year && year != 'null'
-    db_query = db_query.where('MONTH(transacted_at) = ?', month) if month && month != 'null'
+    db_query = FinancialTransaction.select(:id, :plaid_name, :merchant_name, :category, :source, :amount, :transacted_at, :hidden, :reviewed).all
+    db_query = db_query.where('extract(year from transacted_at) = ?', year) if year && year != 'null'
+    db_query = db_query.where('extract(month from transacted_at) = ?', month) if month && month != 'null'
     db_query = db_query.where('category like ? or merchant_name like ? or plaid_name like ?', "%#{query}%", "%#{query}%", "%#{query}%") if query
-    db_query = db_query.where('hidden=1') if show_hidden == 'true'
-    db_query = db_query.where('hidden=0') if show_hidden == 'false'
-    db_query = db_query.where('reviewed=0') if show_needs_review == 'true'
+    db_query = db_query.where('hidden is true') if show_hidden == 'true'
+    db_query = db_query.where('hidden is false') if show_hidden == 'false'
+    db_query = db_query.where('reviewed is false') if show_needs_review == 'true'
     db_query = db_query.order('transacted_at DESC')
 
     render json: { results: db_query.map }
@@ -28,12 +28,7 @@ class FinancialTransactionsController < ApplicationController
     f.merchant_name = data['merchant_name']
     f.category = data['category']
     f.amount = data['amount']
-    date = begin
-             Date.parse(data['transacted_at'])
-           rescue StandardError
-             Date.today
-           end
-    f.transacted_at = date
+    f.transacted_at = get_date(data['transacted_at'])
     f.source = data['source']
     f.hidden = data['hidden'] || false
     f.reviewed = true
@@ -49,18 +44,21 @@ class FinancialTransactionsController < ApplicationController
     f.merchant_name = data['merchant_name']
     f.category = data['category']
     f.amount = data['amount']
-    date = begin
-             Date.parse(data['transacted_at'])
-           rescue StandardError
-             Date.today
-           end
-    f.transacted_at = date
+    f.transacted_at = get_date(data['transacted_at'])
     f.source = data['source']
     f.hidden = data['hidden'] || false
     f.reviewed = true
     f.save!
 
     render json: f
+  end
+
+  private
+
+  def get_date(date_param)
+    Date.parse(date_param)
+  rescue StandardError
+    Date.today
   end
 
 end

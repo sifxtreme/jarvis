@@ -1,5 +1,5 @@
-FROM ruby:2.6.2
-RUN apt-get update -qq && apt-get install -y build-essential libpq-dev vim
+FROM ruby:2.7.8
+
 RUN mkdir /jarvis
 WORKDIR /jarvis
 ADD Gemfile /jarvis/Gemfile

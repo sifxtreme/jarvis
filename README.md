@@ -4,7 +4,7 @@ a list of useful services for sifxtreme.
 
 currently jarvis supports:
 
-- syncs all financial transactions daily from credit cards to DB 
+- syncs all financial transactions daily from credit cards to DB
 - predicts the category of a financial transaction based on previously entered categories
 - sends an email daily with a summary of credit card balances
 - helps search through your financial transactions
@@ -58,6 +58,7 @@ sudo docker-compose up -d
 ```
 
 ### nginx htaccess
+
 ```
 sudo sh -c "echo -n 'USERNAME:' >> /etc/nginx/.htpasswd"
 
@@ -70,8 +71,9 @@ create a ./jarvis.env file
 AND...
 
 mimic something like, this is the full list of env variables required for the full Jarvis experience
+
 ```
-QUEUE=* 
+QUEUE=*
 RAILS_ENV=development
 
 JARVIS_GMAIL_EMAIL=PUT_SECRET_HERE
@@ -81,18 +83,17 @@ JARVIS_PLAID_CLIENT_ID=PUT_SECRET_HERE
 JARVIS_PLAID_CLIENT_SECRET=PUT_SECRET_HERE
 ```
 
-
 ### docker-compose
 
 ```
 cd backend
-docker build . -t jarvis-rails
+docker buildx build --platform linux/amd64 -t jarvis-rails .
 docker-compose up
 
 docker-compose run api rake db:migrate
 ```
 
-### docker
+### docker (DEPRECATED)
 
 ```
 docker build . -t jarvis-rails
