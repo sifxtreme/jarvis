@@ -1,13 +1,13 @@
 default: &default
-  adapter: mysql2
+  adapter: postgresql
   encoding: utf8
   reconnect: false
   database: jarvis
   pool: 30
-  username: root
-  password: root
+  username: jarvis
+  password: jarvis
   host: db
-  port: 3306
+  port: 5432
   timeout: 5000
 
 development:

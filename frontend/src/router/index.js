@@ -12,22 +12,10 @@ const routes = [
   }
 ]
 
-import { isAuthenticated } from '@/lib/api'
-
 const router = new VueRouter({
   mode: 'history',
   base: process.env.BASE_URL,
   routes
 })
-
-// before hooks
-const authenticateUser = (to, from, next) => {
-  if (!isAuthenticated()) {
-    alert('You need to log in first!')
-  }
-  next()
-}
-
-router.beforeEach(authenticateUser)
 
 export default router

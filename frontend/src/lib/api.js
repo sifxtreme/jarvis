@@ -68,11 +68,12 @@ function getParameterByName(name, url) {
 }
 
 function headers() {
-  var myHeaders = new Headers()
+  const myHeaders = new Headers()
   if (getParameterByName('p')) {
     localStorage.setItem(RAILS_PASSWORD_KEY, getParameterByName('p'))
   }
   const authorizationKey = localStorage.getItem(RAILS_PASSWORD_KEY)
-  myHeaders.append('Authorization', authorizationKey)
+  if (authorizationKey) myHeaders.append('Authorization', authorizationKey)
+
   return myHeaders
 }
