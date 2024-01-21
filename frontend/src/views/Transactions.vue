@@ -149,8 +149,6 @@ export default {
     },
     categorySums() {
       const sums = this.transactions.reduce((acc, curr) => {
-        console.log(curr.hidden)
-
         if (curr.hidden == 1) {
           return acc
         }
