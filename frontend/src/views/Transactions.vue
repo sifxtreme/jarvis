@@ -120,7 +120,6 @@ import { getFinancialTransactions, createFinancialTransaction, updateFinancialTr
 
 export default {
   created() {
-    // this.$vuetify.theme.dark = true;
     const today = new Date()
     this.monthYear = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`
 
@@ -137,12 +136,21 @@ export default {
     },
     total() {
       return this.transactions.reduce((acc, curr) => {
-        acc += parseFloat(curr.amount) || 0
+        const amount = curr.amount
+
+        if (curr && curr.category && curr.category.includes('Income')) {
+          acc += 0
+        } else {
+          acc += parseFloat(amount) || 0
+        }
+
         return acc
       }, 0)
     },
     categorySums() {
       const sums = this.transactions.reduce((acc, curr) => {
+        console.log(curr.hidden)
+
         if (curr.hidden == 1) {
           return acc
         }
@@ -198,7 +206,7 @@ export default {
         query: this.query
       }
 
-      let { results } = await getFinancialTransactions(data)
+      const { results } = await getFinancialTransactions(data)
       this.loading = false
 
       this.transactions = results

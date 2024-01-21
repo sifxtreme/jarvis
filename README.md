@@ -93,12 +93,18 @@ docker-compose up
 docker-compose run api rake db:migrate
 ```
 
+```
+docker build -t jarvis-rails .
+```
+
 ### docker (DEPRECATED)
 
 ```
 docker build . -t jarvis-rails
 
 sudo docker run -d -p 3306:3306 --name db -v /var/lib/data/jarvis:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=root mysql:5.7
+
+sudo docker run -d -p 5432:5432 --name db -v /var/lib/data/jarvis:/var/lib/postgresql/data -e POSTGRES_USER=jarvis -e POSTGRES_DB=jarvis -e POSTGRES_PASSWORD=jarvis postgres:14.10
 
 docker run -d -p 6379:6379 --name redis redis
 
