@@ -1,16 +1,9 @@
 transactions_syncer:
-  cron: "0 14 * * *"
+  cron: "0 */3 * * *"
   class: "SyncTransactionsForBanks"
   queue: high
   args:
   description: "Sync Transactions from Plaid"
-
-transactions_analyzer:
-  cron: "15 14 * * *"
-  class: "AnalyzeTransactions"
-  queue: high
-  args:
-  description: "Analyze Transactions and Self Categorize"
 
 testing_resque:
   cron: "*/5 * * * *"
