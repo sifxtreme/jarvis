@@ -14,7 +14,7 @@ class FinancialTransactionsController < ApplicationController
     db_query = db_query.where('hidden is true') if show_hidden == 'true'
     db_query = db_query.where('hidden is false') if show_hidden == 'false'
     db_query = db_query.where('reviewed is false') if show_needs_review == 'true'
-    db_query = db_query.order('transacted_at DESC')
+    db_query = db_query.order('transacted_at DESC, id DESC')
 
     render json: { results: db_query.map }
   end
