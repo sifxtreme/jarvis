@@ -16,3 +16,6 @@
 .byebug_history
 
 jarvis.env
+
+certificate.pem
+private_key.pem
