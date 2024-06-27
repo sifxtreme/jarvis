@@ -18,7 +18,7 @@ class Teller::API
     @auth_token = 'token_rcfttbdxrcnqpyd3vx6a57mutm'
   end
 
-  def save_transactions
+  def sync_all_transactions
     hardcoded_date_limit = Date.parse('2024-06-15')
 
     filtered_transactions = transactions.filter do |trx|
