@@ -10,7 +10,7 @@ class FinancialTransactionsController < ApplicationController
                                            :updated_at, :hidden, :reviewed).all
     db_query = db_query.where('extract(year from transacted_at) = ?', year) if year && year != 'null'
     db_query = db_query.where('extract(month from transacted_at) = ?', month) if month && month != 'null'
-    db_query = db_query.where('category like ? or merchant_name like ? or plaid_name like ?', "%#{query}%", "%#{query}%", "%#{query}%") if query
+    db_query = db_query.where('category ilike ? or merchant_name ilike ? or plaid_name ilike ?', "%#{query}%", "%#{query}%", "%#{query}%") if query
     db_query = db_query.where('hidden is true') if show_hidden == 'true'
     db_query = db_query.where('hidden is false') if show_hidden == 'false'
     db_query = db_query.where('reviewed is false') if show_needs_review == 'true'
