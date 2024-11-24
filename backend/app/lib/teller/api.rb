@@ -33,7 +33,7 @@ class Teller::API
       f = FinancialTransaction.find_or_initialize_by(plaid_id: trx['id'])
 
       f.transacted_at = trx['date']
-      f.plaid_name = trx.try(:[], 'details').try(:[], 'counterparty').try(:[], 'name') || trx.try(:[], 'description')
+      f.plaid_name = trx.try(:[], 'description') || trx.try(:[], 'details').try(:[], 'counterparty').try(:[], 'name')
       f.amount = trx['amount'].to_f
       f.source = 'amex' # only amex transactions are synced for now
       f.raw_data = trx
