@@ -4,8 +4,8 @@ default: &default
   reconnect: false
   database: jarvis
   pool: 30
-  username: jarvis
-  password: jarvis
+  username: asifahmed
+  password:
   host: db
   port: 5432
   timeout: 5000
