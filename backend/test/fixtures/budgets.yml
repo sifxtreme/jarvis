@@ -1,0 +1,15 @@
+# Read about fixtures at http://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  name: MyText
+  valid_starting_at: 2024-12-25 12:58:15
+  valid_ending_at: 2024-12-25 12:58:15
+  amount: 9.99
+  expense_type: MyString
+
+two:
+  name: MyText
+  valid_starting_at: 2024-12-25 12:58:15
+  valid_ending_at: 2024-12-25 12:58:15
+  amount: 9.99
+  expense_type: MyString
