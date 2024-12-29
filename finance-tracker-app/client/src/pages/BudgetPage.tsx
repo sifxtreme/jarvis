@@ -5,11 +5,12 @@ import { useState } from "react";
 import FilterControls from "@/components/FilterControls";
 
 export default function BudgetPage() {
-  const [searchParams, setSearchParams] = useState<BudgetFilters & TransactionFilters>({
+  const [searchParams, setSearchParams] = useState<TransactionFilters>({
     year: new Date().getFullYear(),
     month: new Date().getMonth() + 1,
     show_hidden: false,
     show_needs_review: false,
+    query: ''
   });
 
   const { data: transactions = [], isLoading: isLoadingTransactions } = useQuery({
@@ -26,8 +27,11 @@ export default function BudgetPage() {
     retryDelay: 1000,
   });
 
-  const handleSearch = (newFilters: TransactionFilters) => {
-    setSearchParams(newFilters);
+  const handleSearch = (newFilters: Partial<TransactionFilters>) => {
+    setSearchParams(current => ({
+      ...current,
+      ...newFilters
+    }));
   };
 
   const isLoading = isLoadingTransactions || isLoadingBudgets;
@@ -38,15 +42,15 @@ export default function BudgetPage() {
         <div className="p-4">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold">Budget Overview</h1>
-            <FilterControls 
-              onSearch={handleSearch} 
+            <FilterControls
+              onSearch={handleSearch}
               initialFilters={searchParams}
               className="w-auto flex-shrink-0 bg-transparent shadow-none p-0"
             />
           </div>
 
-          <BudgetComparison 
-            transactions={transactions} 
+          <BudgetComparison
+            transactions={transactions}
             budgets={budgets}
             isLoading={isLoading}
           />

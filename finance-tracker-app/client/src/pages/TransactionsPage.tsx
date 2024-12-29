@@ -16,7 +16,7 @@ export default function TransactionsPage() {
     month: new Date().getMonth() + 1,
     show_hidden: false,
     show_needs_review: false,
-    query: '',
+    query: ''
   });
 
   const { data: transactions = [], isLoading, error, refetch } = useQuery({
@@ -26,8 +26,11 @@ export default function TransactionsPage() {
     retryDelay: 1000,
   });
 
-  const handleSearch = (newFilters: TransactionFilters) => {
-    setSearchParams(newFilters);
+  const handleSearch = (newFilters: Partial<TransactionFilters>) => {
+    setSearchParams(current => ({
+      ...current,
+      ...newFilters
+    }));
   };
 
   return (
