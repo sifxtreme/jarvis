@@ -19,7 +19,7 @@ export default function TransactionsPage() {
     query: '',
   });
 
-  const { data: transactions = [], isLoading, error } = useQuery({
+  const { data: transactions = [], isLoading, error, refetch } = useQuery({
     queryKey: ['transactions', searchParams],
     queryFn: () => getTransactions(searchParams),
     retry: 2,
@@ -50,6 +50,7 @@ export default function TransactionsPage() {
               <TransactionTable
                 transactions={transactions}
                 isLoading={isLoading}
+                onUpdate={() => refetch()}
               />
 
               {error && (
