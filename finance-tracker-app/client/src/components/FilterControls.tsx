@@ -80,6 +80,24 @@ export default function FilterControls({ onSearch, initialFilters, className }: 
         value={filters.query ?? ''}
         onChange={(e) => handleFilterChange({ query: e.target.value })}
       />
+
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={filters.show_hidden}
+            onCheckedChange={(checked) => handleFilterChange({ show_hidden: checked })}
+          />
+          <Label className="text-sm">Hidden</Label>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={filters.show_needs_review}
+            onCheckedChange={(checked) => handleFilterChange({ show_needs_review: checked })}
+          />
+          <Label className="text-sm">Needs Review</Label>
+        </div>
+      </div>
     </div>
   );
 }
