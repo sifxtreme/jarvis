@@ -9,8 +9,13 @@ import {
   PanelResizeHandle as ResizeHandle,
 } from "react-resizable-panels";
 import FilterControls from "@/components/FilterControls";
+import SheetFilterControls from "@/components/SheetFilterControls";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { FilterIcon } from "lucide-react";
 
 export default function TransactionsPage() {
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [searchParams, setSearchParams] = useState<TransactionFilters>({
     year: new Date().getFullYear(),
     month: new Date().getMonth() + 1,
@@ -31,6 +36,7 @@ export default function TransactionsPage() {
       ...current,
       ...newFilters
     }));
+    setIsFilterOpen(false);
   };
 
   return (
@@ -41,11 +47,37 @@ export default function TransactionsPage() {
             <div className="p-4 flex-shrink-0">
               <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-bold">Financial Transactions</h1>
-                <FilterControls
-                  onSearch={handleSearch}
-                  initialFilters={searchParams}
-                  className="w-auto flex-shrink-0 bg-transparent shadow-none p-0"
-                />
+
+                {/* Desktop inline filters */}
+                <div className="hidden md:block">
+                  <FilterControls
+                    onSearch={handleSearch}
+                    initialFilters={searchParams}
+                    className="w-auto flex-shrink-0 bg-transparent shadow-none p-0"
+                  />
+                </div>
+
+                {/* Mobile sheet filters */}
+                <div className="md:hidden">
+                  <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+                    <SheetTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <FilterIcon className="h-4 w-4 mr-2" />
+                        Filters
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+                      <div className="h-full py-6">
+                        <h3 className="text-lg font-semibold mb-4">Filter Transactions</h3>
+                        <SheetFilterControls
+                          onSearch={handleSearch}
+                          initialFilters={searchParams}
+                          className="w-full bg-transparent shadow-none"
+                        />
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+                </div>
               </div>
             </div>
 
