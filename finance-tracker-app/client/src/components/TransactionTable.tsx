@@ -206,7 +206,7 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
           <div className="flex items-center gap-2">
             <button
               onClick={() => setEditingId(transaction.id)}
-              className="p-2 hover:bg-muted rounded-full"
+              className="p-2 hover:bg-muted rounded-full hidden md:block"
             >
               <PencilIcon className="h-4 w-4 text-blue-500" />
             </button>
@@ -246,7 +246,7 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
           <TableHeader>
             <TableRow>
               <TableHead
-                className="cursor-pointer hover:bg-muted/50"
+                className="cursor-pointer hover:bg-muted/50 w-[120px]"
                 onClick={() => {
                   if (sortField === 'transacted_at') {
                     setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -264,7 +264,7 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                 </div>
               </TableHead>
               <TableHead
-                className="cursor-pointer hover:bg-muted/50"
+                className="cursor-pointer hover:bg-muted/50 w-[180px]"
                 onClick={() => {
                   if (sortField === 'plaid_name') {
                     setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -282,7 +282,7 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                 </div>
               </TableHead>
               <TableHead
-                className="cursor-pointer hover:bg-muted/50"
+                className="cursor-pointer hover:bg-muted/50 w-[180px]"
                 onClick={() => {
                   if (sortField === 'merchant_name') {
                     setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -300,7 +300,7 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                 </div>
               </TableHead>
               <TableHead
-                className="cursor-pointer hover:bg-muted/50"
+                className="cursor-pointer hover:bg-muted/50 w-[150px]"
                 onClick={() => {
                   if (sortField === 'category') {
                     setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -317,9 +317,9 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                   )}
                 </div>
               </TableHead>
-              <TableHead>Source</TableHead>
+              <TableHead className="w-[120px]">Source</TableHead>
               <TableHead
-                className="text-right cursor-pointer hover:bg-muted/50"
+                className="text-right cursor-pointer hover:bg-muted/50 w-[120px]"
                 onClick={() => {
                   if (sortField === 'amount') {
                     setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -336,7 +336,7 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                   )}
                 </div>
               </TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead className="w-[120px]">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -400,7 +400,7 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                     />
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1">
                       <button type="submit" form="create-transaction-form" className="p-1 text-green-600 hover:text-green-800">
                         <span className="text-lg font-semibold">✓</span>
                       </button>
