@@ -192,7 +192,7 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
           </div>
           <div className="text-right">
             <div className="font-mono font-medium">{formatCurrency(transaction.amount)}</div>
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <div className="flex items-center justify-end gap-1 text-sm text-muted-foreground mt-2">
               {getSourceIcon(transaction.source)}
               <span>{transaction.source}</span>
             </div>

@@ -46,7 +46,7 @@ export default function TransactionsPage() {
           <div className="h-full flex flex-col">
             <div className="p-4 flex-shrink-0">
               <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold">Financial Transactions</h1>
+                <h1 className="text-3xl font-bold">Finances</h1>
 
                 {/* Desktop inline filters */}
                 <div className="hidden md:block">
