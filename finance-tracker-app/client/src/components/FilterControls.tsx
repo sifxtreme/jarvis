@@ -1,6 +1,5 @@
-import { useState } from 'react';
+import { TransactionFilters } from '../lib/api';
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -10,7 +9,6 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { TransactionFilters } from '../lib/api';
 import { cn } from "@/lib/utils";
 
 interface FilterControlsProps {
@@ -19,29 +17,15 @@ interface FilterControlsProps {
   className?: string;
 }
 
+// This is the original inline desktop version
 export default function FilterControls({ onSearch, initialFilters, className }: FilterControlsProps) {
   const currentYear = new Date().getFullYear();
-  const [filters, setFilters] = useState<TransactionFilters>({
-    year: initialFilters?.year ?? currentYear,
-    month: initialFilters?.month ?? new Date().getMonth() + 1,
-    show_hidden: initialFilters?.show_hidden ?? false,
-    show_needs_review: initialFilters?.show_needs_review ?? false,
-    query: initialFilters?.query ?? ''
-  });
-
-  const handleFilterChange = (newFilters: Partial<TransactionFilters>) => {
-    const updatedFilters = { ...filters, ...newFilters };
-    setFilters(updatedFilters);
-    onSearch(updatedFilters);
-  };
 
   return (
-    <div className={cn("flex gap-4 items-center p-4 bg-card shadow rounded-lg", className)}>
+    <div className={cn("flex gap-4 items-center p-4 bg-card rounded-lg", className)}>
       <Select
-        value={filters.year.toString()}
-        onValueChange={(value) => handleFilterChange({
-          year: parseInt(value)
-        })}
+        value={initialFilters?.year?.toString() ?? currentYear.toString()}
+        onValueChange={(value) => onSearch({ year: parseInt(value) })}
       >
         <SelectTrigger className="w-24">
           <SelectValue placeholder="Year" />
@@ -56,10 +40,8 @@ export default function FilterControls({ onSearch, initialFilters, className }: 
       </Select>
 
       <Select
-        value={filters.month.toString()}
-        onValueChange={(value) => handleFilterChange({
-          month: parseInt(value)
-        })}
+        value={initialFilters?.month?.toString()}
+        onValueChange={(value) => onSearch({ month: parseInt(value) })}
       >
         <SelectTrigger className="w-32">
           <SelectValue placeholder="Month" />
@@ -77,23 +59,23 @@ export default function FilterControls({ onSearch, initialFilters, className }: 
         type="search"
         placeholder="Search transactions..."
         className="w-64"
-        value={filters.query ?? ''}
-        onChange={(e) => handleFilterChange({ query: e.target.value })}
+        value={initialFilters?.query ?? ''}
+        onChange={(e) => onSearch({ query: e.target.value })}
       />
 
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
           <Switch
-            checked={filters.show_hidden}
-            onCheckedChange={(checked) => handleFilterChange({ show_hidden: checked })}
+            checked={initialFilters?.show_hidden ?? false}
+            onCheckedChange={(checked) => onSearch({ show_hidden: checked })}
           />
           <Label className="text-sm">Hidden</Label>
         </div>
 
         <div className="flex items-center gap-2">
           <Switch
-            checked={filters.show_needs_review}
-            onCheckedChange={(checked) => handleFilterChange({ show_needs_review: checked })}
+            checked={initialFilters?.show_needs_review ?? false}
+            onCheckedChange={(checked) => onSearch({ show_needs_review: checked })}
           />
           <Label className="text-sm">Needs Review</Label>
         </div>
