@@ -16,7 +16,8 @@ export function formatCurrency(amount: number): string {
 export function formatDate(dateString: string): string {
   try {
     const date = parseISO(dateString);
-    const formattedDate = format(date, 'MMM d, yyyy');
+    const utcDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
+    const formattedDate = format(utcDate, 'MMM d, yyyy');
     return formattedDate;
   } catch (error) {
     console.error('[Date Formatting] Error formatting date:', error);

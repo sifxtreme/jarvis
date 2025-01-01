@@ -10,6 +10,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { ChevronLeft } from "lucide-react";
 
 interface FilterControlsProps {
   onSearch: (filters: Partial<TransactionFilters>) => void;
@@ -20,6 +22,21 @@ interface FilterControlsProps {
 // This is the original inline desktop version
 export default function FilterControls({ onSearch, initialFilters, className }: FilterControlsProps) {
   const currentYear = new Date().getFullYear();
+
+  const handlePreviousMonth = () => {
+    const currentMonth = initialFilters?.month ?? new Date().getMonth() + 1;
+    const currentYear = initialFilters?.year ?? new Date().getFullYear();
+
+    let prevMonth = currentMonth - 1;
+    let prevYear = currentYear;
+
+    if (prevMonth === 0) {
+      prevMonth = 12;
+      prevYear = currentYear - 1;
+    }
+
+    onSearch({ month: prevMonth, year: prevYear });
+  };
 
   return (
     <div className={cn("flex gap-4 items-center p-4 bg-card rounded-lg", className)}>
@@ -38,6 +55,15 @@ export default function FilterControls({ onSearch, initialFilters, className }: 
           ))}
         </SelectContent>
       </Select>
+
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={handlePreviousMonth}
+        title="Previous Month"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
 
       <Select
         value={initialFilters?.month?.toString()}
