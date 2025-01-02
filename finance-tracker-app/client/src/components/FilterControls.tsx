@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface FilterControlsProps {
   onSearch: (filters: Partial<TransactionFilters>) => void;
@@ -36,6 +36,21 @@ export default function FilterControls({ onSearch, initialFilters, className }: 
     }
 
     onSearch({ month: prevMonth, year: prevYear });
+  };
+
+  const handleNextMonth = () => {
+    const currentMonth = initialFilters?.month ?? new Date().getMonth() + 1;
+    const currentYear = initialFilters?.year ?? new Date().getFullYear();
+
+    let nextMonth = currentMonth + 1;
+    let nextYear = currentYear;
+
+    if (nextMonth === 13) {
+      nextMonth = 1;
+      nextYear = currentYear + 1;
+    }
+
+    onSearch({ month: nextMonth, year: nextYear });
   };
 
   return (
@@ -81,10 +96,19 @@ export default function FilterControls({ onSearch, initialFilters, className }: 
         </SelectContent>
       </Select>
 
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={handleNextMonth}
+        title="Next Month"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+
       <Input
         type="search"
         placeholder="Search transactions..."
-        className="w-64"
+        className="w-48"
         value={initialFilters?.query ?? ''}
         onChange={(e) => onSearch({ query: e.target.value })}
       />
