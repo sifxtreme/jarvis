@@ -32,6 +32,8 @@ class Teller::API
     filtered_transactions.each do |trx|
       f = FinancialTransaction.find_or_initialize_by(plaid_id: trx['id'])
 
+      next if f.reviewed?
+
       f.transacted_at = trx['date']
       f.plaid_name = trx.try(:[], 'description') || trx.try(:[], 'details').try(:[], 'counterparty').try(:[], 'name')
       f.amount = trx['amount'].to_f
