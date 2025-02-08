@@ -26,6 +26,13 @@ ActiveRecord::Schema.define(version: 2024_12_25_211107) do
     t.integer "display_order", default: 0, null: false
   end
 
+  create_table "chat", id: :serial, force: :cascade do |t|
+    t.integer "user_id", null: false
+    t.string "title", limit: 100
+    t.datetime "created_at"
+    t.boolean "is_auto_titled"
+  end
+
   create_table "dummies", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -58,10 +65,51 @@ ActiveRecord::Schema.define(version: 2024_12_25_211107) do
     t.index ["transacted_at"], name: "index_financial_transactions_on_transacted_at"
   end
 
+  create_table "message", id: :serial, force: :cascade do |t|
+    t.integer "chat_id", null: false
+    t.string "role", limit: 20, null: false
+    t.text "content", null: false
+    t.datetime "timestamp"
+  end
+
+  create_table "migrations", id: :serial, force: :cascade do |t|
+    t.text "migration_name", null: false
+    t.datetime "applied_at", default: -> { "CURRENT_TIMESTAMP" }
+  end
+
   create_table "plaid_banks", force: :cascade do |t|
     t.string "name", limit: 255, null: false
     t.string "token", limit: 255, null: false
     t.boolean "is_active", default: false
+  end
+
+  create_table "subtitle_sets", id: :serial, force: :cascade do |t|
+    t.string "original_filename", limit: 255, null: false
+    t.datetime "created_at", default: -> { "CURRENT_TIMESTAMP" }
+  end
+
+  create_table "subtitles", id: :serial, force: :cascade do |t|
+    t.integer "set_id"
+    t.integer "index", null: false
+    t.string "timestamp", limit: 255, null: false
+    t.text "text", null: false
+    t.text "translated_text"
+    t.datetime "created_at", default: -> { "CURRENT_TIMESTAMP" }
+  end
+
+  create_table "user", id: :serial, force: :cascade do |t|
+    t.string "username", limit: 64, null: false
+    t.string "email", limit: 120, null: false
+    t.string "password_hash", limit: 256
+    t.index ["email"], name: "user_email_key", unique: true
+    t.index ["username"], name: "user_username_key", unique: true
+  end
+
+  create_table "users", id: :serial, force: :cascade do |t|
+    t.string "email", limit: 255, null: false
+    t.string "password_hash", limit: 255, null: false
+    t.datetime "created_at", default: -> { "CURRENT_TIMESTAMP" }
+    t.index ["email"], name: "users_email_key", unique: true
   end
 
   create_table "versions", force: :cascade do |t|
@@ -75,4 +123,7 @@ ActiveRecord::Schema.define(version: 2024_12_25_211107) do
     t.index ["item_type", "item_id"], name: "index_versions_on_item_type_and_item_id"
   end
 
+  add_foreign_key "chat", "\"user\"", column: "user_id", name: "chat_user_id_fkey"
+  add_foreign_key "message", "chat", name: "message_chat_id_fkey"
+  add_foreign_key "subtitles", "subtitle_sets", column: "set_id", name: "subtitles_set_id_fkey"
 end

@@ -1,9 +1,8 @@
 class BudgetsController < ApplicationController
 
   def index
-    b = Budget.all
-
-    render json: b
+    budgets = Budget.all
+    render json: budgets
   end
 
   private
