@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getTransactions, type TransactionFilters } from "../lib/api";
+import { getTransactions, getBudgets, type TransactionFilters } from "../lib/api";
 import TransactionTable from "../components/TransactionTable";
 import TransactionStats from "../components/TransactionStats";
 import { useState } from "react";
@@ -30,6 +30,12 @@ export default function TransactionsPage() {
     retry: 2,
     retryDelay: 1000,
   });
+
+  const { data: budgets = [], refetch: refetchBudgets } = useQuery({
+    queryKey: ['budgets', searchParams],
+    queryFn: () => getBudgets(searchParams),
+  });
+
 
   const handleSearch = (newFilters: Partial<TransactionFilters>) => {
     setSearchParams(current => ({
@@ -115,6 +121,7 @@ export default function TransactionsPage() {
         <ResizablePanel defaultSize={30} minSize={20} className="hidden md:block">
           <TransactionStats
             transactions={transactions}
+            budgets={budgets}
             isLoading={isLoading}
           />
         </ResizablePanel>

@@ -8,7 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrency } from "../lib/utils";
-import { Transaction } from "../lib/api";
+import { Transaction, Budget } from "../lib/api";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 
 interface TransactionStatsProps {
   transactions: Transaction[];
+  budgets: Budget[];
   isLoading: boolean;
 }
 
@@ -30,7 +31,7 @@ const COLORS = [
   'hsl(212, 50%, 15%)',
 ];
 
-export default function TransactionStats({ transactions, isLoading }: TransactionStatsProps) {
+export default function TransactionStats({ transactions, budgets, isLoading }: TransactionStatsProps) {
   if (isLoading) {
     return (
       <div className="space-y-4 p-4">

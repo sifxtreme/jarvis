@@ -53,12 +53,10 @@ export interface Transaction {
 
 export interface Budget {
   id: number;
-  category: string;
+  name: string;
   amount: number;
-  year: number;
-  month: number;
-  created_at: string;
-  updated_at: string;
+  expense_type: "income" | "expense";
+  display_order: number;
 }
 
 export interface TransactionFilters {
@@ -160,28 +158,22 @@ export const getBudgets = async (filters: BudgetFilters): Promise<Budget[]> => {
   if (filters.year) params.append('year', filters.year.toString());
   if (filters.month) params.append('month', filters.month.toString());
 
-  const url = `${API_BASE_URL}/budgets?${params.toString()}`;
-  console.log('[API] Fetching budgets:', url);
+  console.log('[API] Using budget filters:', filters);
 
   try {
-    const response = await axiosInstance.get<APIResponse<Budget>>(url);
+    const response = await axiosInstance.get<APIResponse<Budget>>('/budgets', { params });
+    console.log('[API] Raw budget response:', response.data);
 
     if (!response.data) {
+      console.error('[API] No data in budget response');
       throw new Error('No data received from server');
     }
 
     const { results, error } = response.data;
 
-    if (error) {
-      throw new Error(error);
-    }
-
-    if (!Array.isArray(results)) {
-      throw new Error('Invalid response format: results is not an array');
-    }
-
     return results;
   } catch (error: any) {
+    console.error('[API] Budget error details:', error);
     const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch budgets';
     throw new Error(`Failed to fetch budgets: ${errorMessage}`);
   }
