@@ -8,15 +8,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrency, formatCurrencyDollars } from "../lib/utils";
-import { Transaction, Budget } from "../lib/api";
+import { Transaction, Budget, TransactionFilters } from "../lib/api";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 import { useState } from "react";
+import { DateRange } from "react-date-range";
 
 interface TransactionStatsProps {
   transactions: Transaction[];
   budgets: Budget[];
   isLoading: boolean;
+  filters: TransactionFilters;
+  onFilterChange: (filters: TransactionFilters) => void;
 }
 
 type SortField = 'category' | 'amount' | 'budgetAmount' | 'difference' | 'percentage' | 'display_order';
@@ -36,7 +39,7 @@ const COLORS = [
   'hsl(0, 75%, 15%)',
 ];
 
-export default function TransactionStats({ transactions, budgets, isLoading }: TransactionStatsProps) {
+export default function TransactionStats({ transactions, budgets, isLoading, filters, onFilterChange }: TransactionStatsProps) {
   const [sortField, setSortField] = useState<SortField>('display_order');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
@@ -47,6 +50,27 @@ export default function TransactionStats({ transactions, budgets, isLoading }: T
       setSortField(field);
       setSortDirection('asc');
     }
+  };
+
+  const handleMonthChange = (month: number) => {
+    onFilterChange({
+      ...filters,
+      month
+    });
+  };
+
+  const handleYearChange = (year: number) => {
+    onFilterChange({
+      ...filters,
+      year
+    });
+  };
+
+  const handleSearchChange = (query: string) => {
+    onFilterChange({
+      ...filters,
+      query
+    });
   };
 
   if (isLoading) {

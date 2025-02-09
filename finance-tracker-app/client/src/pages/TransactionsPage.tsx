@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getTransactions, getBudgets, type TransactionFilters } from "../lib/api";
 import TransactionTable from "../components/TransactionTable";
 import TransactionStats from "../components/TransactionStats";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Panel as ResizablePanel,
   PanelGroup as ResizablePanelGroup,
@@ -13,32 +13,63 @@ import SheetFilterControls from "@/components/SheetFilterControls";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { FilterIcon } from "lucide-react";
+import { useSearchParams } from 'react-router-dom'
+import { startOfMonth, endOfMonth } from 'date-fns'
 
 export default function TransactionsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [searchParams, setSearchParams] = useState<TransactionFilters>({
-    year: new Date().getFullYear(),
-    month: new Date().getMonth() + 1,
-    show_hidden: false,
-    show_needs_review: false,
-    query: ''
-  });
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Initialize filters from URL or defaults
+  const [filters, setFilters] = useState<TransactionFilters>(() => {
+    const now = new Date();
+    return {
+      year: parseInt(searchParams.get('year') || now.getFullYear().toString()),
+      month: parseInt(searchParams.get('month') || (now.getMonth() + 1).toString()),
+      query: searchParams.get('query') || '',
+      show_hidden: searchParams.get('show_hidden') === 'true',
+      show_needs_review: searchParams.get('show_needs_review') === 'true'
+    }
+  })
+
+  // Update URL when filters change
+  useEffect(() => {
+    const params: Record<string, string> = {
+      year: filters.year.toString(),
+      month: filters.month.toString()
+    }
+
+    if (filters.query) {
+      params.query = filters.query
+    }
+    if (filters.show_hidden) {
+      params.show_hidden = 'true'
+    }
+    if (filters.show_needs_review) {
+      params.show_needs_review = 'true'
+    }
+
+    setSearchParams(params, { replace: true })
+  }, [filters, setSearchParams])
+
+  const handleFilterChange = (newFilters: typeof filters) => {
+    setFilters(newFilters)
+  }
 
   const { data: transactions = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['transactions', searchParams],
-    queryFn: () => getTransactions(searchParams),
+    queryKey: ['transactions', filters],
+    queryFn: () => getTransactions(filters),
     retry: 2,
     retryDelay: 1000,
   });
 
   const { data: budgets = [], refetch: refetchBudgets } = useQuery({
-    queryKey: ['budgets', searchParams],
-    queryFn: () => getBudgets(searchParams),
+    queryKey: ['budgets', filters],
+    queryFn: () => getBudgets(filters),
   });
 
-
   const handleSearch = (newFilters: Partial<TransactionFilters>) => {
-    setSearchParams(current => ({
+    setFilters(current => ({
       ...current,
       ...newFilters
     }));
@@ -58,7 +89,7 @@ export default function TransactionsPage() {
                 <div className="hidden md:block">
                   <FilterControls
                     onSearch={handleSearch}
-                    initialFilters={searchParams}
+                    initialFilters={filters}
                     className="w-auto flex-shrink-0 bg-transparent shadow-none p-0"
                   />
                 </div>
@@ -77,7 +108,7 @@ export default function TransactionsPage() {
                         <h3 className="text-lg font-semibold mb-4">Filter Transactions</h3>
                         <SheetFilterControls
                           onSearch={handleSearch}
-                          initialFilters={searchParams}
+                          initialFilters={filters}
                           className="w-full bg-transparent shadow-none"
                         />
                       </div>

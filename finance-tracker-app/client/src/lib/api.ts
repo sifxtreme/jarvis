@@ -64,7 +64,7 @@ export interface TransactionFilters {
   month: number;
   show_hidden: boolean;
   show_needs_review: boolean;
-  query?: string;
+  query: string;
 }
 
 export interface BudgetFilters {
