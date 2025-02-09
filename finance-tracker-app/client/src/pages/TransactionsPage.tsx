@@ -105,7 +105,6 @@ export default function TransactionsPage() {
                     </SheetTrigger>
                     <SheetContent side="right" className="w-[300px] sm:w-[400px]">
                       <div className="h-full py-6">
-                        <h3 className="text-lg font-semibold mb-4">Filter Transactions</h3>
                         <SheetFilterControls
                           onSearch={handleSearch}
                           initialFilters={filters}

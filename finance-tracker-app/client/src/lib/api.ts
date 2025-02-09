@@ -101,11 +101,8 @@ export const getTransactions = async (filters: TransactionFilters): Promise<Tran
   if (filters.show_needs_review !== undefined) params.append('show_needs_review', filters.show_needs_review.toString());
   if (filters.query) params.append('query', filters.query);
 
-  console.log('[API] Using filters:', filters);
-
   try {
     const response = await axiosInstance.get<APIResponse<Transaction>>('/financial_transactions', { params });
-    console.log('[API] Raw response:', response.data);
 
     if (!response.data) {
       console.error('[API] No data in response');
@@ -137,13 +134,6 @@ export const getTransactions = async (filters: TransactionFilters): Promise<Tran
       return isValid;
     });
 
-    console.log('[API] Successfully fetched:', {
-      status: response.status,
-      totalCount: results.length,
-      validCount: validTransactions.length,
-      sampleDates: validTransactions.slice(0, 3).map(t => t.transacted_at)
-    });
-
     return validTransactions;
   } catch (error: any) {
     console.error('[API] Error details:', error);
@@ -158,11 +148,9 @@ export const getBudgets = async (filters: BudgetFilters): Promise<Budget[]> => {
   if (filters.year) params.append('year', filters.year.toString());
   if (filters.month) params.append('month', filters.month.toString());
 
-  console.log('[API] Using budget filters:', filters);
 
   try {
     const response = await axiosInstance.get<Budget[]>('/budgets', { params });
-    console.log('[API] Raw budget response:', response.data);
 
     return response.data;
   } catch (error: any) {

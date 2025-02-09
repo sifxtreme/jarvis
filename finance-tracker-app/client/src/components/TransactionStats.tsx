@@ -131,6 +131,7 @@ export default function TransactionStats({ transactions, budgets, isLoading, fil
       percentage: Math.round(((categoryTotals[category] || 0) / budget.amount) * 100),
       display_order: budget.display_order
     }))
+    .filter(c => c.amount !== 0)
     .sort((a, b) => {
       const multiplier = sortDirection === 'asc' ? 1 : -1;
 

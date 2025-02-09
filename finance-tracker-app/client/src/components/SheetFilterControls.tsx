@@ -1,17 +1,11 @@
 import { useState } from 'react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { TransactionFilters } from '../lib/api';
 import { cn } from "@/lib/utils";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface SheetFilterControlsProps {
   onSearch: (filters: Partial<TransactionFilters>) => void;
@@ -43,7 +37,6 @@ export default function SheetFilterControls({ onSearch, initialFilters, classNam
   return (
     <div className={cn("space-y-6", className)}>
       <div className="space-y-2">
-        <Label>Search</Label>
         <Input
           type="search"
           placeholder="Search transactions..."
@@ -55,50 +48,63 @@ export default function SheetFilterControls({ onSearch, initialFilters, classNam
 
       <div className="grid gap-4">
         <div className="space-y-2">
-          <Label>Year</Label>
-          <Select
-            value={filters.year.toString()}
-            onValueChange={(value) => handleFilterChange({
-              year: parseInt(value)
-            })}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select year" />
-            </SelectTrigger>
-            <SelectContent>
-              {[currentYear, currentYear - 1, currentYear - 2].map((year) => (
-                <SelectItem key={year} value={year.toString()}>
-                  {year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => handleFilterChange({
+                year: filters.year - 1
+              })}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+
+            <div className="flex-1 text-center font-medium">
+              {filters.year}
+            </div>
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => handleFilterChange({
+                year: filters.year + 1
+              })}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         <div className="space-y-2">
-          <Label>Month</Label>
-          <Select
-            value={filters.month.toString()}
-            onValueChange={(value) => handleFilterChange({
-              month: parseInt(value)
-            })}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select month" />
-            </SelectTrigger>
-            <SelectContent>
-              {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
-                <SelectItem key={month} value={month.toString()}>
-                  {new Date(2000, month - 1).toLocaleString('default', { month: 'long' })}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => handleFilterChange({
+                month: filters.month === 1 ? 12 : filters.month - 1
+              })}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+
+            <div className="flex-1 text-center font-medium">
+              {new Date(2000, filters.month - 1).toLocaleString('default', { month: 'long' })}
+            </div>
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => handleFilterChange({
+                month: filters.month === 12 ? 1 : filters.month + 1
+              })}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
       <div className="space-y-4">
-        <Label className="block mb-3">Additional Filters</Label>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <Label className="cursor-pointer">Show Hidden Transactions</Label>
