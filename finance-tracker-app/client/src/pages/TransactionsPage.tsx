@@ -52,10 +52,6 @@ export default function TransactionsPage() {
     setSearchParams(params, { replace: true })
   }, [filters, setSearchParams])
 
-  const handleFilterChange = (newFilters: typeof filters) => {
-    setFilters(newFilters)
-  }
-
   const { data: transactions = [], isLoading, error, refetch } = useQuery({
     queryKey: ['transactions', filters],
     queryFn: () => getTransactions(filters),
@@ -63,7 +59,7 @@ export default function TransactionsPage() {
     retryDelay: 1000,
   });
 
-  const { data: budgets = [], refetch: refetchBudgets } = useQuery({
+  const { data: budgets = [] } = useQuery({
     queryKey: ['budgets', filters],
     queryFn: () => getBudgets(filters),
   });

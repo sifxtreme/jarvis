@@ -148,7 +148,6 @@ export const getBudgets = async (filters: BudgetFilters): Promise<Budget[]> => {
   if (filters.year) params.append('year', filters.year.toString());
   if (filters.month) params.append('month', filters.month.toString());
 
-
   try {
     const response = await axiosInstance.get<Budget[]>('/budgets', { params });
 
