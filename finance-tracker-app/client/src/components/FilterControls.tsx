@@ -53,16 +53,25 @@ export default function FilterControls({ onSearch, initialFilters, className }: 
     onSearch({ month: nextMonth, year: nextYear });
   };
 
+  const handleYearChange = (value: string) => {
+    onSearch({ year: value === "all" ? undefined : parseInt(value) });
+  };
+
+  const handleMonthChange = (value: string) => {
+    onSearch({ month: value === "all" ? undefined : parseInt(value) });
+  };
+
   return (
     <div className={cn("flex gap-4 items-center p-4 bg-card rounded-lg", className)}>
       <Select
-        value={initialFilters?.year?.toString() ?? currentYear.toString()}
-        onValueChange={(value) => onSearch({ year: parseInt(value) })}
+        value={initialFilters?.year?.toString() ?? "all"}
+        onValueChange={handleYearChange}
       >
         <SelectTrigger className="w-24">
           <SelectValue placeholder="Year" />
         </SelectTrigger>
         <SelectContent>
+          <SelectItem value="all">All Years</SelectItem>
           {[currentYear, currentYear - 1, currentYear - 2].map((year) => (
             <SelectItem key={year} value={year.toString()}>
               {year}
@@ -81,13 +90,14 @@ export default function FilterControls({ onSearch, initialFilters, className }: 
       </Button>
 
       <Select
-        value={initialFilters?.month?.toString()}
-        onValueChange={(value) => onSearch({ month: parseInt(value) })}
+        value={initialFilters?.month?.toString() ?? "all"}
+        onValueChange={handleMonthChange}
       >
         <SelectTrigger className="w-32">
           <SelectValue placeholder="Month" />
         </SelectTrigger>
         <SelectContent>
+          <SelectItem value="all">All Months</SelectItem>
           {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
             <SelectItem key={month} value={month.toString()}>
               {new Date(2000, month - 1).toLocaleString('default', { month: 'long' })}

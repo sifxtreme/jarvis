@@ -12,13 +12,13 @@ import FilterControls from "@/components/FilterControls";
 import SheetFilterControls from "@/components/SheetFilterControls";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { FilterIcon } from "lucide-react";
+import { FilterIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { useSearchParams } from 'react-router-dom'
-import { startOfMonth, endOfMonth } from 'date-fns'
 
 export default function TransactionsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams()
+  const [isStatsVisible, setIsStatsVisible] = useState(true);
 
   // Initialize filters from URL or defaults
   const [filters, setFilters] = useState<TransactionFilters>(() => {
@@ -35,8 +35,8 @@ export default function TransactionsPage() {
   // Update URL when filters change
   useEffect(() => {
     const params: Record<string, string> = {
-      year: filters.year.toString(),
-      month: filters.month.toString()
+      year: filters.year?.toString(),
+      month: filters.month?.toString()
     }
 
     if (filters.query) {
@@ -146,15 +146,34 @@ export default function TransactionsPage() {
           </div>
         </ResizablePanel>
 
-        <ResizeHandle className="bg-border w-2 hover:bg-primary/10 transition-colors" />
-
-        <ResizablePanel defaultSize={30} minSize={20} className="hidden md:block">
-          <TransactionStats
-            transactions={transactions}
-            budgets={budgets}
-            isLoading={isLoading}
-          />
-        </ResizablePanel>
+        {!!filters?.year && !!filters?.month && (
+          <>
+            <ResizeHandle
+              className="bg-border w-2 hover:bg-primary/10 transition-colors relative group cursor-pointer"
+              onClick={() => setIsStatsVisible(!isStatsVisible)}
+            >
+              <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-1/2 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                {!isStatsVisible ? (
+                  <ChevronLeft className="h-12 w-4" />
+                ) : (
+                  <ChevronRight className="h-12 w-4" />
+                )}
+              </div>
+            </ResizeHandle>
+            <ResizablePanel
+              defaultSize={30}
+              minSize={20}
+              className={`hidden md:block ${!isStatsVisible ? 'w-0 !min-w-0' : ''}`}
+              style={{ display: !isStatsVisible ? 'none' : undefined }}
+            >
+              <TransactionStats
+                transactions={transactions}
+                budgets={budgets}
+                isLoading={isLoading}
+              />
+            </ResizablePanel>
+          </>
+        )}
       </ResizablePanelGroup>
     </div>
   );
