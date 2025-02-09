@@ -17,13 +17,15 @@ interface TransactionStatsProps {
   transactions: Transaction[];
   budgets: Budget[];
   isLoading: boolean;
+  setQuery: (query: string) => void;
+  query: string;
 }
 
 type SortField = 'category' | 'amount' | 'budgetAmount' | 'difference' | 'percentage' | 'display_order';
 type SortDirection = 'asc' | 'desc';
 
 
-export default function TransactionStats({ transactions, budgets, isLoading }: TransactionStatsProps) {
+export default function TransactionStats({ transactions, budgets, isLoading, setQuery, query }: TransactionStatsProps) {
   const [sortField, setSortField] = useState<SortField>('display_order');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
@@ -76,6 +78,9 @@ export default function TransactionStats({ transactions, budgets, isLoading }: T
   });
 
   const totalEarned = incomes.reduce((sum, t) => sum + t.amount, 0);
+  const totalBudgeted = budgets.filter(b => b.expense_type === 'expense')
+    .filter(b => transactions.map(t => t.category).includes(b.name))
+    .reduce((sum, b) => sum + b.amount, 0);
   const totalSpent = expenses.reduce((sum, t) => sum + t.amount, 0);
 
   const categoryTotals = expenses.reduce((acc, t) => {
@@ -117,7 +122,6 @@ export default function TransactionStats({ transactions, budgets, isLoading }: T
   return (
     <ScrollArea className="h-full">
       <div className="space-y-4 p-4">
-        {/* Total Spent Card */}
         <Card>
           <CardHeader className="py-2 px-3">
             <div className="grid grid-cols-3 gap-4">
@@ -129,20 +133,28 @@ export default function TransactionStats({ transactions, budgets, isLoading }: T
                   {formatCurrency(totalSpent)}
                 </div>
               </div>
-              <div>
+              {!query && <div>
                 <CardTitle className="text-xs text-green-700">
                   Total Earned
                 </CardTitle>
                 <div className="text-lg font-bold text-green-800">
                   {formatCurrency(totalEarned)}
                 </div>
-              </div>
+              </div>}
+              {query && <div>
+                <CardTitle className="text-xs text-green-700">
+                  Total Budgeted
+                </CardTitle>
+                <div className="text-lg font-bold text-green-800">
+                  {formatCurrency(totalBudgeted)}
+                </div>
+              </div>}
               <div>
                 <CardTitle className={`text-xs ${totalEarned - totalSpent >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                   Difference
                 </CardTitle>
                 <div className={`text-lg font-bold ${totalEarned - totalSpent >= 0 ? 'text-green-800' : 'text-red-800'}`}>
-                  {formatCurrency(totalEarned - totalSpent)}
+                  {formatCurrency(query ? totalBudgeted - totalSpent : totalEarned - totalSpent)}
                 </div>
               </div>
             </div>
@@ -183,7 +195,11 @@ export default function TransactionStats({ transactions, budgets, isLoading }: T
                       : 'text-green-700';
 
                   return (
-                    <TableRow key={category} className={`${rowClassName} hover:bg-transparent`}>
+                    <TableRow
+                      key={category}
+                      className={`${rowClassName} cursor-pointer hover:bg-gray-50`}
+                      onClick={() => setQuery(category)}
+                    >
                       <TableCell className="py-1 text-sm font-medium">{category}</TableCell>
                       <TableCell className="py-1 text-sm text-right font-mono">
                         {formatCurrencyDollars(amount)}
