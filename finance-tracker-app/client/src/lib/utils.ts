@@ -13,6 +13,10 @@ export function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+export function formatCurrencyDollars(amount: number): string {
+  return Math.round(amount).toString();
+}
+
 export function formatDate(dateString: string): string {
   try {
     const date = parseISO(dateString);

@@ -75,7 +75,6 @@ export interface BudgetFilters {
 }
 
 interface APIResponse<T> {
-  results: T[];
   total?: number;
   error?: string;
 }
@@ -161,17 +160,10 @@ export const getBudgets = async (filters: BudgetFilters): Promise<Budget[]> => {
   console.log('[API] Using budget filters:', filters);
 
   try {
-    const response = await axiosInstance.get<APIResponse<Budget>>('/budgets', { params });
+    const response = await axiosInstance.get<Budget[]>('/budgets', { params });
     console.log('[API] Raw budget response:', response.data);
 
-    if (!response.data) {
-      console.error('[API] No data in budget response');
-      throw new Error('No data received from server');
-    }
-
-    const { results, error } = response.data;
-
-    return results;
+    return response.data;
   } catch (error: any) {
     console.error('[API] Budget error details:', error);
     const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch budgets';

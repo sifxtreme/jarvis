@@ -85,8 +85,8 @@ export default function BudgetComparison({ budgets, transactions, isLoading }: B
                   <div className="px-3 py-2">Budget</div>
                 </TableHead>
                 {MOCK_DATA.months.map((month) => (
-                  <TableHead 
-                    key={`${month.year}-${month.month}`} 
+                  <TableHead
+                    key={`${month.year}-${month.month}`}
                     className="text-right border border-border bg-muted font-semibold w-[150px] min-w-[150px] p-2"
                   >
                     <div className="px-3 py-2">{month.label}</div>
@@ -100,7 +100,7 @@ export default function BudgetComparison({ budgets, transactions, isLoading }: B
                 const isLastRow = rowIndex === MOCK_DATA.categories.length - 1;
 
                 return (
-                  <TableRow 
+                  <TableRow
                     key={category.name}
                     className={`
                       hover:bg-muted/50 transition-colors
@@ -115,17 +115,17 @@ export default function BudgetComparison({ budgets, transactions, isLoading }: B
                     </TableCell>
                     {MOCK_DATA.months.map((month) => {
                       const actual = MOCK_DATA.actuals[month.label]?.[category.name] || 0;
-                      const variance = isIncome 
-                        ? actual - category.budget 
+                      const variance = isIncome
+                        ? actual - category.budget
                         : category.budget - actual;
                       const isPositive = isIncome ? variance >= 0 : variance >= 0;
 
                       return (
-                        <TableCell 
-                          key={`${category.name}-${month.label}`} 
+                        <TableCell
+                          key={`${category.name}-${month.label}`}
                           className="text-right font-mono border border-border p-0"
                         >
-                          <div 
+                          <div
                             className={`px-3 py-2 ${
                               isPositive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
                             }`}

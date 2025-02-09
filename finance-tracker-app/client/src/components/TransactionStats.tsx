@@ -7,12 +7,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatCurrency } from "../lib/utils";
+import { formatCurrency, formatCurrencyDollars } from "../lib/utils";
 import { Transaction, Budget } from "../lib/api";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Progress } from "@/components/ui/progress";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { cn } from "@/lib/utils";
+
+import { useState } from "react";
 
 interface TransactionStatsProps {
   transactions: Transaction[];
@@ -20,18 +19,36 @@ interface TransactionStatsProps {
   isLoading: boolean;
 }
 
+type SortField = 'category' | 'amount' | 'budgetAmount' | 'difference' | 'percentage' | 'display_order';
+type SortDirection = 'asc' | 'desc';
+
+const GREEN_COLOR = 'hsl(120, 75%, 40%)';
+const RED_COLOR = 'hsl(0, 75%, 50%)';
+
 const COLORS = [
-  'hsl(212, 72%, 45%)',
-  'hsl(212, 72%, 35%)',
-  'hsl(212, 72%, 25%)',
-  'hsl(212, 72%, 15%)',
-  'hsl(212, 50%, 45%)',
-  'hsl(212, 50%, 35%)',
-  'hsl(212, 50%, 25%)',
-  'hsl(212, 50%, 15%)',
+  'hsl(120, 75%, 45%)', // Green shades
+  'hsl(120, 75%, 35%)',
+  'hsl(120, 75%, 25%)',
+  'hsl(120, 75%, 15%)',
+  'hsl(0, 75%, 45%)',    // Red shades
+  'hsl(0, 75%, 35%)',
+  'hsl(0, 75%, 25%)',
+  'hsl(0, 75%, 15%)',
 ];
 
 export default function TransactionStats({ transactions, budgets, isLoading }: TransactionStatsProps) {
+  const [sortField, setSortField] = useState<SortField>('display_order');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  const handleSort = (field: SortField) => {
+    if (field === sortField) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4 p-4">
@@ -58,112 +75,145 @@ export default function TransactionStats({ transactions, budgets, isLoading }: T
     );
   }
 
-  const totalSpent = transactions
-    .filter(t => !String(t.category || 'uncategorized').toLowerCase().includes('income'))
-    .reduce((sum, t) => sum + t.amount, 0);
+  const budgetedExpenses = budgets.filter(b => b.expense_type === 'expense').reduce((acc: Record<string, Budget>, curr) => {
+    acc[curr.name] = curr;
+    return acc;
+  }, {} as Record<string, Budget>);
 
-  // Group transactions by category and calculate total per category
-  const categoryTotals = transactions.reduce((acc, t) => {
-    // Skip if category contains 'Income'
-    const category = t.category || 'Uncategorized';
-    if (category.toLowerCase().includes('income')) return acc;
+  const incomes = transactions.filter(t => t.category?.toLowerCase()?.includes('income'))
+  const expenses = transactions.filter(t => !String(t.category || 'uncategorized').toLowerCase().includes('income')).map(t => {
+    if (!budgetedExpenses[t.category]) {
+      return { ...t, category: 'Other' };
+    }
+    return t;
+  });
 
-    acc[category] = (acc[category] || 0) + t.amount;
+  const totalEarned = incomes.reduce((sum, t) => sum + t.amount, 0);
+  const totalSpent = expenses.reduce((sum, t) => sum + t.amount, 0);
+
+  const categoryTotals = expenses.reduce((acc, t) => {
+    if (t.category?.toLowerCase()?.includes('income')) return acc;
+
+    acc[t.category] = (acc[t.category] || 0) + t?.amount;
     return acc;
   }, {} as Record<string, number>);
 
-  // Sort categories by amount and calculate percentages
-  const sortedCategories = Object.entries(categoryTotals)
-    .sort(([, a], [, b]) => b - a)
-    .map(([category, amount]) => ({
+  const sortedCategories = Object.entries(budgetedExpenses)
+    .map(([category, budget]) => ({
       category,
-      amount,
-      percentage: (amount / totalSpent) * 100
-    }));
+      amount: categoryTotals[category] || 0,
+      budgetAmount: budget.amount || 0,
+      difference: budget.amount - (categoryTotals[category] || 0),
+      percentage: Math.round(((categoryTotals[category] || 0) / budget.amount) * 100),
+      display_order: budget.display_order
+    }))
+    .sort((a, b) => {
+      const multiplier = sortDirection === 'asc' ? 1 : -1;
 
-  // Prepare data for pie chart
-  const pieData = sortedCategories.slice(0, 8).map((item, index) => ({
-    name: item.category,
-    value: item.amount,
-    color: COLORS[index % COLORS.length]
-  }));
+      if (sortField === 'category') {
+        return multiplier * a.category.localeCompare(b.category);
+      }
+
+      if (sortField === 'display_order') {
+        return multiplier * (a.display_order - b.display_order);
+      }
+
+      const aValue = a[sortField];
+      const bValue = b[sortField];
+
+      if (aValue < bValue) return -1 * multiplier;
+      if (aValue > bValue) return 1 * multiplier;
+      return 0;
+    });
 
   return (
     <ScrollArea className="h-full">
       <div className="space-y-4 p-4">
         {/* Total Spent Card */}
-        <Card className="bg-primary/5">
+        <Card>
           <CardHeader className="py-2 px-3">
-            <CardTitle className="text-xs text-gray-500">
-              Total Spent
-            </CardTitle>
-            <div className="text-lg font-bold text-primary">
-              {formatCurrency(totalSpent)}
-            </div>
-          </CardHeader>
-        </Card>
-
-        {/* Spending Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Spending Breakdown</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[200px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Category Breakdown with Progress Bars */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Category Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {sortedCategories.map(({ category, amount, percentage }, index) => (
-              <div key={category} className="space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium">{category}</span>
-                  <span className="font-mono">{formatCurrency(amount)}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Progress
-                    value={percentage}
-                    className={cn(
-                      "h-2",
-                      index < COLORS.length ? `bg-primary/20` : "bg-gray-100"
-                    )}
-                    // Apply color directly to the indicator through the class name
-                    style={{
-                      "--progress-color": index < COLORS.length ? COLORS[index] : "rgb(209 213 219)"
-                    } as React.CSSProperties}
-                  />
-                  <span className="text-xs text-gray-500 w-12">
-                    {percentage.toFixed(1)}%
-                  </span>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <CardTitle className="text-xs text-green-700">
+                  Total Spent
+                </CardTitle>
+                <div className="text-lg font-bold text-green-800">
+                  {formatCurrency(totalSpent)}
                 </div>
               </div>
-            ))}
+              <div>
+                <CardTitle className="text-xs text-green-700">
+                  Total Earned
+                </CardTitle>
+                <div className="text-lg font-bold text-green-800">
+                  {formatCurrency(totalEarned)}
+                </div>
+              </div>
+              <div>
+                <CardTitle className={`text-xs ${totalEarned - totalSpent >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                  Difference
+                </CardTitle>
+                <div className={`text-lg font-bold ${totalEarned - totalSpent >= 0 ? 'text-green-800' : 'text-red-800'}`}>
+                  {formatCurrency(totalEarned - totalSpent)}
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+
+        {/* Category Details Table */}
+        <Card>
+          <CardContent className="py-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="py-2 text-xs cursor-pointer hover:bg-gray-50" onClick={() => handleSort('category')}>
+                    Category {sortField === 'category' && <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>}
+                  </TableHead>
+                  <TableHead className="py-2 text-xs text-right cursor-pointer hover:bg-gray-50" onClick={() => handleSort('amount')}>
+                    Spent {sortField === 'amount' && <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>}
+                  </TableHead>
+                  <TableHead className="py-2 text-xs text-right cursor-pointer hover:bg-gray-50" onClick={() => handleSort('budgetAmount')}>
+                    Budget {sortField === 'budgetAmount' && <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>}
+                  </TableHead>
+                  <TableHead className="py-2 text-xs text-right cursor-pointer hover:bg-gray-50" onClick={() => handleSort('difference')}>
+                    Diff {sortField === 'difference' && <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>}
+                  </TableHead>
+                  <TableHead className="py-2 text-xs text-right cursor-pointer hover:bg-gray-50" onClick={() => handleSort('percentage')}>
+                    % {sortField === 'percentage' && <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>}
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedCategories.map(({ category, amount, budgetAmount, difference, percentage }) => {
+                  const hasExpenses = amount > 0;
+                  const isOverBudget = percentage > 100;
+                  const rowClassName = !hasExpenses
+                    ? 'text-gray-400'
+                    : isOverBudget
+                      ? 'text-red-700'
+                      : 'text-green-700';
+
+                  return (
+                    <TableRow key={category} className={`${rowClassName} hover:bg-transparent`}>
+                      <TableCell className="py-1 text-sm font-medium">{category}</TableCell>
+                      <TableCell className="py-1 text-sm text-right font-mono">
+                        {formatCurrencyDollars(amount)}
+                      </TableCell>
+                      <TableCell className="py-1 text-sm text-right font-mono">
+                        {formatCurrencyDollars(budgetAmount)}
+                      </TableCell>
+                      <TableCell className="py-1 text-sm text-right font-mono">
+                        {formatCurrencyDollars(difference)}
+                      </TableCell>
+                      <TableCell className="py-1 text-sm text-right">
+                        {percentage.toFixed(0)}%
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       </div>
