@@ -77,6 +77,7 @@ export interface BudgetFilters {
 interface APIResponse<T> {
   total?: number;
   error?: string;
+  results?: T[];
 }
 
 export const api = {
