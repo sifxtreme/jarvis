@@ -28,7 +28,7 @@ type SortDirection = 'asc' | 'desc';
 export default function TransactionStats({ transactions, budgets, isLoading, query }: TransactionStatsProps) {
   const [sortField, setSortField] = useState<SortField>('display_order');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
-  const [selectedTransactions, setSelectedTransactions] = useState<Transaction[]>([]);
+  const [selectedTransactions, setSelectedTransactions] = useState<(Transaction & { original_category?: string })[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleSort = (field: SortField) => {
@@ -74,7 +74,7 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
   const incomes = transactions.filter(t => t.category?.toLowerCase()?.includes('income'))
   const expenses = transactions.filter(t => !String(t.category || 'uncategorized').toLowerCase().includes('income')).map(t => {
     if (!budgetedExpenses[t.category]) {
-      return { ...t, category: 'Other' };
+      return { ...t, category: 'Other', original_category: t.category };
     }
     return t;
   });
@@ -100,7 +100,7 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
       budgetAmount: budget.amount || 0,
       difference: budget.amount - (categoryTotals[category] || 0),
       percentage: Math.round(((categoryTotals[category] || 0) / budget.amount) * 100),
-      display_order: budget.display_order
+      display_order: budget.display_order,
     }))
     .filter(c => c.amount !== 0)
     .sort((a, b) => {
@@ -236,7 +236,9 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Merchant</TableHead>
+                  {selectedTransactions[0]?.category === 'Other' && <TableHead>Category</TableHead>}
                   <TableHead className="text-right">Amount</TableHead>
+
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -244,6 +246,7 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
                   <TableRow key={transaction.id}>
                     <TableCell>{formatDate(transaction.transacted_at)}</TableCell>
                     <TableCell>{transaction.merchant_name || transaction.plaid_name}</TableCell>
+                    {transaction.category === 'Other' && <TableCell>{transaction.original_category}</TableCell>}
                     <TableCell className="text-right font-mono">
                       {formatCurrency(transaction.amount)}
                     </TableCell>
