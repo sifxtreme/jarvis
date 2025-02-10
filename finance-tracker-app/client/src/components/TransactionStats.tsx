@@ -7,9 +7,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatCurrency, formatCurrencyDollars } from "../lib/utils";
+import { formatCurrency, formatCurrencyDollars, formatDate } from "../lib/utils";
 import { Transaction, Budget } from "../lib/api";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 import { useState } from "react";
 
@@ -17,7 +18,6 @@ interface TransactionStatsProps {
   transactions: Transaction[];
   budgets: Budget[];
   isLoading: boolean;
-  setQuery: (query: string) => void;
   query: string;
 }
 
@@ -25,9 +25,11 @@ type SortField = 'category' | 'amount' | 'budgetAmount' | 'difference' | 'percen
 type SortDirection = 'asc' | 'desc';
 
 
-export default function TransactionStats({ transactions, budgets, isLoading, setQuery, query }: TransactionStatsProps) {
+export default function TransactionStats({ transactions, budgets, isLoading, query }: TransactionStatsProps) {
   const [sortField, setSortField] = useState<SortField>('display_order');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [selectedTransactions, setSelectedTransactions] = useState<Transaction[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleSort = (field: SortField) => {
     if (field === sortField) {
@@ -93,6 +95,7 @@ export default function TransactionStats({ transactions, budgets, isLoading, set
   const sortedCategories = Object.entries(budgetedExpenses)
     .map(([category, budget]) => ({
       category,
+      transactions: expenses.filter(t => t.category === category),
       amount: categoryTotals[category] || 0,
       budgetAmount: budget.amount || 0,
       difference: budget.amount - (categoryTotals[category] || 0),
@@ -185,7 +188,7 @@ export default function TransactionStats({ transactions, budgets, isLoading, set
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedCategories.map(({ category, amount, budgetAmount, difference, percentage }) => {
+                {sortedCategories.map(({ category, amount, budgetAmount, difference, percentage, transactions }) => {
                   const hasExpenses = amount > 0;
                   const isOverBudget = percentage > 100;
                   const rowClassName = !hasExpenses
@@ -198,7 +201,10 @@ export default function TransactionStats({ transactions, budgets, isLoading, set
                     <TableRow
                       key={category}
                       className={`${rowClassName} cursor-pointer hover:bg-gray-50`}
-                      onClick={() => setQuery(category)}
+                      onClick={() => {
+                        setSelectedTransactions(transactions);
+                        setIsModalOpen(true);
+                      }}
                     >
                       <TableCell className="py-1 text-sm font-medium">{category}</TableCell>
                       <TableCell className="py-1 text-sm text-right font-mono">
@@ -210,7 +216,7 @@ export default function TransactionStats({ transactions, budgets, isLoading, set
                       <TableCell className="py-1 text-sm text-right font-mono">
                         {formatCurrencyDollars(difference)}
                       </TableCell>
-                      <TableCell className="py-1 text-sm text-right">
+                      <TableCell className="py-1 text-sm text-right font-mono">
                         {percentage.toFixed(0)}%
                       </TableCell>
                     </TableRow>
@@ -221,6 +227,33 @@ export default function TransactionStats({ transactions, budgets, isLoading, set
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-xl">
+          <div className="max-h-[60vh] overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Merchant</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {selectedTransactions.map((transaction) => (
+                  <TableRow key={transaction.id}>
+                    <TableCell>{formatDate(transaction.transacted_at)}</TableCell>
+                    <TableCell>{transaction.merchant_name || transaction.plaid_name}</TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatCurrency(transaction.amount)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
     </ScrollArea>
   );
 }

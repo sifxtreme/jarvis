@@ -14,7 +14,7 @@ export function formatCurrency(amount: number): string {
 }
 
 export function formatCurrencyDollars(amount: number): string {
-  return Math.round(amount).toString();
+  return Math.round(amount).toLocaleString();
 }
 
 export function formatDate(dateString: string): string {
