@@ -64,13 +64,6 @@ export default function TransactionsPage() {
     queryFn: () => getBudgets(filters),
   });
 
-  const setQuery = (query: string) => {
-    setFilters(current => ({
-      ...current,
-      query
-    }));
-  };
-
   const handleSearch = (newFilters: Partial<TransactionFilters>) => {
     setFilters(current => ({
       ...current,
@@ -173,7 +166,6 @@ export default function TransactionsPage() {
                 transactions={transactions}
                 budgets={budgets}
                 isLoading={isLoading}
-                setQuery={setQuery}
                 query={filters?.query}
               />
             </ResizablePanel>
