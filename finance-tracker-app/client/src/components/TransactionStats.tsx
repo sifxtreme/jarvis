@@ -102,7 +102,6 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
       percentage: Math.round(((categoryTotals[category] || 0) / budget.amount) * 100),
       display_order: budget.display_order,
     }))
-    .filter(c => c.amount !== 0)
     .sort((a, b) => {
       const multiplier = sortDirection === 'asc' ? 1 : -1;
 
@@ -123,40 +122,40 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
     });
 
   return (
-    <ScrollArea className="h-full">
-      <div className="space-y-4 p-4">
+    <ScrollArea className="h-full text-sm">
+      <div className="space-y-4 p-2">
         <Card>
           <CardHeader className="py-2 px-3">
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <CardTitle className="text-xs text-green-700">
+                <CardTitle className="text-[10px] text-green-700">
                   Total Spent
                 </CardTitle>
-                <div className="text-lg font-bold text-green-800">
+                <div className="text-base font-bold text-green-800">
                   {formatCurrency(totalSpent)}
                 </div>
               </div>
               {!query && <div>
-                <CardTitle className="text-xs text-green-700">
+                <CardTitle className="text-[10px] text-green-700">
                   Total Earned
                 </CardTitle>
-                <div className="text-lg font-bold text-green-800">
+                <div className="text-base font-bold text-green-800">
                   {formatCurrency(totalEarned)}
                 </div>
               </div>}
               {query && <div>
-                <CardTitle className="text-xs text-green-700">
+                <CardTitle className="text-[10px] text-green-700">
                   Total Budgeted
                 </CardTitle>
-                <div className="text-lg font-bold text-green-800">
+                <div className="text-base font-bold text-green-800">
                   {formatCurrency(totalBudgeted)}
                 </div>
               </div>}
               <div>
-                <CardTitle className={`text-xs ${totalEarned - totalSpent >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                <CardTitle className={`text-[10px] ${totalEarned - totalSpent >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                   Difference
                 </CardTitle>
-                <div className={`text-lg font-bold ${totalEarned - totalSpent >= 0 ? 'text-green-800' : 'text-red-800'}`}>
+                <div className={`text-base font-bold ${totalEarned - totalSpent >= 0 ? 'text-green-800' : 'text-red-800'}`}>
                   {formatCurrency(query ? totalBudgeted - totalSpent : totalEarned - totalSpent)}
                 </div>
               </div>
@@ -165,7 +164,7 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
         </Card>
 
         {/* Category Details Table */}
-        <Card>
+        <Card className="text-sm">
           <CardContent className="py-0">
             <Table>
               <TableHeader>
@@ -206,17 +205,17 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
                         setIsModalOpen(true);
                       }}
                     >
-                      <TableCell className="py-1 text-sm font-medium">{category}</TableCell>
-                      <TableCell className="py-1 text-sm text-right font-mono">
+                      <TableCell className="py-1 text-xs font-medium">{category}</TableCell>
+                      <TableCell className="py-1 text-xs text-right font-mono">
                         {formatCurrencyDollars(amount)}
                       </TableCell>
-                      <TableCell className="py-1 text-sm text-right font-mono">
+                      <TableCell className="py-1 text-xs text-right font-mono">
                         {formatCurrencyDollars(budgetAmount)}
                       </TableCell>
-                      <TableCell className="py-1 text-sm text-right font-mono">
+                      <TableCell className="py-1 text-xs text-right font-mono">
                         {formatCurrencyDollars(difference)}
                       </TableCell>
-                      <TableCell className="py-1 text-sm text-right font-mono">
+                      <TableCell className="py-1 text-xs text-right font-mono">
                         {percentage.toFixed(0)}%
                       </TableCell>
                     </TableRow>
