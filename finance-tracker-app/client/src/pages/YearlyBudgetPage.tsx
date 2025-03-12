@@ -404,34 +404,39 @@ export default function YearlyBudgetPage() {
   });
 
   // Calculate summary data for each month
-  const monthlySummary = months.map(month => {
-    const monthNum = month.month;
+  const monthlySummary = months
+    .filter(month => {
+      // Only include months that are completely done (not the current month and year)
+      return month.year < currentYear || (month.year === currentYear && month.month < currentMonth);
+    })
+    .map(month => {
+      const monthNum = month.month;
 
-    // Calculate total income for the month
-    const totalIncome = Object.entries(categoryActuals)
-      .filter(([category]) => category.toLowerCase().includes('income'))
-      .reduce((sum, [category, monthValues]) => sum + (monthValues[monthNum] || 0), 0);
+      // Calculate total income for the month
+      const totalIncome = Object.entries(categoryActuals)
+        .filter(([category]) => category.toLowerCase().includes('income'))
+        .reduce((sum, [category, monthValues]) => sum + (monthValues[monthNum] || 0), 0);
 
-    // Calculate total expenses for the month
-    const totalExpenses = Object.entries(categoryActuals)
-      .filter(([category]) => !category.toLowerCase().includes('income'))
-      .reduce((sum, [category, monthValues]) => sum + (monthValues[monthNum] || 0), 0);
+      // Calculate total expenses for the month
+      const totalExpenses = Object.entries(categoryActuals)
+        .filter(([category]) => !category.toLowerCase().includes('income'))
+        .reduce((sum, [category, monthValues]) => sum + (monthValues[monthNum] || 0), 0);
 
-    // Calculate savings (income - expenses)
-    const savings = totalIncome - totalExpenses;
+      // Calculate savings (income - expenses)
+      const savings = totalIncome - totalExpenses;
 
-    // Calculate savings rate (savings / income)
-    const savingsRate = totalIncome > 0 ? (savings / totalIncome) * 100 : 0;
+      // Calculate savings rate (savings / income)
+      const savingsRate = totalIncome > 0 ? (savings / totalIncome) * 100 : 0;
 
-    return {
-      month: monthNum,
-      label: month.label,
-      totalIncome,
-      totalExpenses,
-      savings,
-      savingsRate
-    };
-  });
+      return {
+        month: monthNum,
+        label: month.label,
+        totalIncome,
+        totalExpenses,
+        savings,
+        savingsRate
+      };
+    });
 
   // Create a map of transactions by category and month for quick lookup
   const transactionsByCategory: Record<string, Record<number, Transaction[]>> = {};
