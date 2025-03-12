@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import TransactionsPage from './pages/TransactionsPage';
+import YearlyBudgetPage from './pages/YearlyBudgetPage';
 import { AuthModal } from '@/components/AuthModal';
 import { API_PASSWORD_KEY } from '@/lib/api';
 
@@ -25,6 +26,7 @@ function App() {
       {isAuthenticated ? (
         <Routes>
           <Route path="/" element={<TransactionsPage />} />
+          <Route path="/yearly-budget" element={<YearlyBudgetPage />} />
         </Routes>
       ) : null}
     </>
