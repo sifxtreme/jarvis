@@ -35,7 +35,10 @@ export default function FilterControls({ onSearch, initialFilters, className }: 
       prevYear = currentYear - 1;
     }
 
-    onSearch({ month: prevMonth, year: prevYear });
+    onSearch({
+      month: prevMonth,
+      year: initialFilters?.year === undefined ? undefined : prevYear
+    });
   };
 
   const handleNextMonth = () => {
@@ -50,7 +53,10 @@ export default function FilterControls({ onSearch, initialFilters, className }: 
       nextYear = currentYear + 1;
     }
 
-    onSearch({ month: nextMonth, year: nextYear });
+    onSearch({
+      month: nextMonth,
+      year: initialFilters?.year === undefined ? undefined : nextYear
+    });
   };
 
   const handleYearChange = (value: string) => {

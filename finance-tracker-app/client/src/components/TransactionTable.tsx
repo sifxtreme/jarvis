@@ -64,6 +64,11 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
   const [sortField, setSortField] = useState<SortField>('transacted_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
+  // Calculate total amount of all transactions, excluding those with "Income" in the category
+  const totalExpenses = transactions
+    .filter(transaction => !transaction.category?.includes('Income'))
+    .reduce((sum, transaction) => sum + Number(transaction.amount), 0);
+
   const sortedTransactions = [...transactions].sort((a, b) => {
     const direction = sortDirection === 'asc' ? 1 : -1;
     const aValue = a[sortField];
@@ -143,6 +148,14 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
         title="Add Transaction"
       />
 
+      {/* Floating total amount div */}
+      <div className="fixed bottom-4 left-4 z-50 bg-background shadow-lg rounded-lg p-3 border border-border flex items-center gap-2">
+        <DollarSign className="h-5 w-5 text-primary" />
+        <div>
+          <div className="font-mono font-bold">{formatCurrency(totalExpenses)}</div>
+        </div>
+      </div>
+
       {/* Desktop view */}
       <div className="hidden md:block rounded-md border">
         <Table>
@@ -162,24 +175,6 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                 <div className="flex items-center gap-2">
                   Date
                   {sortField === 'transacted_at' && (
-                    sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
-                  )}
-                </div>
-              </TableHead>
-              <TableHead
-                className="cursor-pointer hover:bg-muted/50 w-[180px]"
-                onClick={() => {
-                  if (sortField === 'plaid_name') {
-                    setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-                  } else {
-                    setSortField('plaid_name');
-                    setSortDirection('asc');
-                  }
-                }}
-              >
-                <div className="flex items-center gap-2">
-                  Vendor
-                  {sortField === 'plaid_name' && (
                     sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
                   )}
                 </div>
@@ -263,8 +258,7 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                 )}
               >
                 <TableCell>{formatDate(transaction.transacted_at)}</TableCell>
-                <TableCell>{transaction.plaid_name}</TableCell>
-                <TableCell>{transaction.merchant_name}</TableCell>
+                <TableCell>{transaction.merchant_name || transaction.plaid_name}</TableCell>
                 <TableCell>{transaction.category || 'Uncategorized'}</TableCell>
                 <TableCell>
                   <TooltipProvider>

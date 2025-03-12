@@ -131,7 +131,7 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
                 <CardTitle className="text-[10px] text-green-700">
                   Total Spent
                 </CardTitle>
-                <div className="text-base font-bold text-green-800">
+                <div className="text-base font-bold text-green-800 font-mono">
                   {formatCurrency(totalSpent)}
                 </div>
               </div>
@@ -139,7 +139,7 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
                 <CardTitle className="text-[10px] text-green-700">
                   Total Earned
                 </CardTitle>
-                <div className="text-base font-bold text-green-800">
+                <div className="text-base font-bold text-green-800 font-mono">
                   {formatCurrency(totalEarned)}
                 </div>
               </div>}
@@ -147,7 +147,7 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
                 <CardTitle className="text-[10px] text-green-700">
                   Total Budgeted
                 </CardTitle>
-                <div className="text-base font-bold text-green-800">
+                <div className="text-base font-bold text-green-800 font-mono">
                   {formatCurrency(totalBudgeted)}
                 </div>
               </div>}
@@ -155,7 +155,7 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
                 <CardTitle className={`text-[10px] ${totalEarned - totalSpent >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                   Difference
                 </CardTitle>
-                <div className={`text-base font-bold ${totalEarned - totalSpent >= 0 ? 'text-green-800' : 'text-red-800'}`}>
+                <div className={`text-base font-bold ${totalEarned - totalSpent >= 0 ? 'text-green-800' : 'text-red-800'} font-mono`}>
                   {formatCurrency(query ? totalBudgeted - totalSpent : totalEarned - totalSpent)}
                 </div>
               </div>
@@ -205,7 +205,7 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
                         setIsModalOpen(true);
                       }}
                     >
-                      <TableCell className="py-1 text-xs font-medium">{category}</TableCell>
+                      <TableCell className="py-1 text-xs font-medium font-mono">{category}</TableCell>
                       <TableCell className="py-1 text-xs text-right font-mono">
                         {formatCurrencyDollars(amount)}
                       </TableCell>
