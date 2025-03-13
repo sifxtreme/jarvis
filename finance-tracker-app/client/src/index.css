@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -34,6 +34,8 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    font-feature-settings: "tnum" 1;
+    letter-spacing: -0.01em;
   }
 
   /* Add custom typography styles */
@@ -41,7 +43,8 @@
     @apply font-semibold tracking-tight;
   }
 
-  .font-mono {
+  /* All text should use tabular numbers for better alignment */
+  .font-mono, .text-xs, .text-sm, .text-base, .text-lg, .text-xl, .text-2xl, .text-3xl {
     font-feature-settings: "tnum" 1;
   }
 }

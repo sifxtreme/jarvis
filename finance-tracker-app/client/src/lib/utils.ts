@@ -21,7 +21,7 @@ export function formatDate(dateString: string): string {
   try {
     const date = parseISO(dateString);
     const utcDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
-    const formattedDate = format(utcDate, 'MMM d, yyyy');
+    const formattedDate = format(utcDate, 'yyyy-MM-dd');
     return formattedDate;
   } catch (error) {
     console.error('[Date Formatting] Error formatting date:', error);

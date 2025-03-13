@@ -79,7 +79,15 @@ export default function TransactionsPage() {
           <div className="h-full flex flex-col">
             <div className="p-4 flex-shrink-0">
               <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold">Finances</h1>
+                <div className="flex items-center gap-4">
+                  <h1 className="text-3xl font-bold">Finances</h1>
+                  <a
+                    href="/yearly-budget"
+                    className="text-sm text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded-md hover:bg-muted"
+                  >
+                    Yearly Budget →
+                  </a>
+                </div>
 
                 {/* Desktop inline filters */}
                 <div className="hidden md:block">
@@ -91,7 +99,13 @@ export default function TransactionsPage() {
                 </div>
 
                 {/* Mobile sheet filters */}
-                <div className="md:hidden">
+                <div className="md:hidden flex items-center gap-2">
+                  <a
+                    href="/yearly-budget"
+                    className="text-xs text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded-md hover:bg-muted"
+                  >
+                    Yearly Budget →
+                  </a>
                   <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
                     <SheetTrigger asChild>
                       <Button variant="outline" size="sm">

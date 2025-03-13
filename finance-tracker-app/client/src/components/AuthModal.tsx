@@ -7,7 +7,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { API_PASSWORD_KEY } from "../lib/api";
+import { setAuthentication } from "../lib/api";
 import { Eye, EyeOff } from "lucide-react";
 
 interface AuthModalProps {
@@ -18,11 +18,26 @@ interface AuthModalProps {
 export function AuthModal({ isOpen, onAuthenticate }: AuthModalProps) {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem(API_PASSWORD_KEY, password);
-    onAuthenticate();
+    setIsLoading(true);
+    setError("");
+
+    try {
+      // Store the password in localStorage
+      setAuthentication(password);
+
+      // Call the onAuthenticate callback
+      onAuthenticate();
+    } catch (err) {
+      console.error("Authentication error:", err);
+      setError("Authentication failed. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -32,6 +47,11 @@ export function AuthModal({ isOpen, onAuthenticate }: AuthModalProps) {
           <DialogTitle>Authentication Required</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="text-sm text-red-500 p-2 bg-red-50 rounded">
+              {error}
+            </div>
+          )}
           <div className="relative">
             <Input
               type={showPassword ? "text" : "password"}
@@ -39,17 +59,19 @@ export function AuthModal({ isOpen, onAuthenticate }: AuthModalProps) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoFocus
+              disabled={isLoading}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              disabled={isLoading}
             >
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
-          <Button type="submit" className="w-full">
-            Submit
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? "Authenticating..." : "Submit"}
           </Button>
         </form>
       </DialogContent>

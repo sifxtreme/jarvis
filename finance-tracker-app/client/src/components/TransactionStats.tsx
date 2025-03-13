@@ -122,67 +122,82 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
     });
 
   return (
-    <ScrollArea className="h-full text-sm">
-      <div className="space-y-4 p-2">
-        <Card>
-          <CardHeader className="py-2 px-3">
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <CardTitle className="text-[10px] text-green-700">
-                  Total Spent
-                </CardTitle>
-                <div className="text-base font-bold text-green-800 font-mono">
-                  {formatCurrency(totalSpent)}
-                </div>
-              </div>
-              {!query && <div>
-                <CardTitle className="text-[10px] text-green-700">
-                  Total Earned
-                </CardTitle>
-                <div className="text-base font-bold text-green-800 font-mono">
-                  {formatCurrency(totalEarned)}
-                </div>
-              </div>}
-              {query && <div>
-                <CardTitle className="text-[10px] text-green-700">
-                  Total Budgeted
-                </CardTitle>
-                <div className="text-base font-bold text-green-800 font-mono">
-                  {formatCurrency(totalBudgeted)}
-                </div>
-              </div>}
-              <div>
-                <CardTitle className={`text-[10px] ${totalEarned - totalSpent >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                  Difference
-                </CardTitle>
-                <div className={`text-base font-bold ${totalEarned - totalSpent >= 0 ? 'text-green-800' : 'text-red-800'} font-mono`}>
-                  {formatCurrency(query ? totalBudgeted - totalSpent : totalEarned - totalSpent)}
-                </div>
+    <div className="space-y-4 p-4 font-mono">
+      <Card>
+        <CardHeader className="py-2 px-3">
+          <CardTitle className="text-lg">
+            {query ? `Filtered Stats` : `Monthly Summary`}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="py-2">
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <div className="text-xs text-muted-foreground">Income</div>
+              <div className="text-lg font-bold">{formatCurrency(totalEarned)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Spent</div>
+              <div className="text-lg font-bold">{formatCurrency(totalSpent)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Remaining</div>
+              <div className={`text-lg font-bold ${totalEarned - totalSpent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {formatCurrency(totalEarned - totalSpent)}
               </div>
             </div>
-          </CardHeader>
-        </Card>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Category Details Table */}
-        <Card className="text-sm">
-          <CardContent className="py-0">
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="font-mono">Transaction Details</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="flex-1 pr-4">
+            <div className="space-y-4">
+              {selectedTransactions.map(transaction => (
+                <div key={transaction.id} className="border-b pb-2">
+                  <div className="flex justify-between">
+                    <div className="font-mono font-medium">{transaction.merchant_name || transaction.plaid_name}</div>
+                    <div className="font-mono font-bold">{formatCurrency(transaction.amount)}</div>
+                  </div>
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <div className="font-mono">{formatDate(transaction.transacted_at)}</div>
+                    <div className="font-mono">{transaction.original_category || transaction.category}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      <div className="space-y-2">
+        <Card>
+          <CardHeader className="py-2 px-3">
+            <CardTitle className="text-sm">
+              Budget vs. Actual
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="py-0 px-0">
             <Table>
               <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="py-2 text-xs cursor-pointer hover:bg-gray-50" onClick={() => handleSort('category')}>
-                    Category {sortField === 'category' && <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>}
+                <TableRow>
+                  <TableHead className="py-1 text-xs font-medium cursor-pointer" onClick={() => handleSort('category')}>
+                    Category
                   </TableHead>
-                  <TableHead className="py-2 text-xs text-right cursor-pointer hover:bg-gray-50" onClick={() => handleSort('amount')}>
-                    Spent {sortField === 'amount' && <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>}
+                  <TableHead className="py-1 text-xs text-right cursor-pointer" onClick={() => handleSort('amount')}>
+                    Actual
                   </TableHead>
-                  <TableHead className="py-2 text-xs text-right cursor-pointer hover:bg-gray-50" onClick={() => handleSort('budgetAmount')}>
-                    Budget {sortField === 'budgetAmount' && <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>}
+                  <TableHead className="py-1 text-xs text-right cursor-pointer" onClick={() => handleSort('budgetAmount')}>
+                    Budget
                   </TableHead>
-                  <TableHead className="py-2 text-xs text-right cursor-pointer hover:bg-gray-50" onClick={() => handleSort('difference')}>
-                    Diff {sortField === 'difference' && <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>}
+                  <TableHead className="py-1 text-xs text-right cursor-pointer" onClick={() => handleSort('difference')}>
+                    Diff
                   </TableHead>
-                  <TableHead className="py-2 text-xs text-right cursor-pointer hover:bg-gray-50" onClick={() => handleSort('percentage')}>
-                    % {sortField === 'percentage' && <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>}
+                  <TableHead className="py-1 text-xs text-right cursor-pointer" onClick={() => handleSort('percentage')}>
+                    %
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -226,36 +241,6 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
           </CardContent>
         </Card>
       </div>
-
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-xl">
-          <div className="max-h-[60vh] overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Merchant</TableHead>
-                  {selectedTransactions[0]?.category === 'Other' && <TableHead>Category</TableHead>}
-                  <TableHead className="text-right">Amount</TableHead>
-
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {selectedTransactions.map((transaction) => (
-                  <TableRow key={transaction.id}>
-                    <TableCell>{formatDate(transaction.transacted_at)}</TableCell>
-                    <TableCell>{transaction.merchant_name || transaction.plaid_name}</TableCell>
-                    {transaction.category === 'Other' && <TableCell>{transaction.original_category}</TableCell>}
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(transaction.amount)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </ScrollArea>
+    </div>
   );
 }

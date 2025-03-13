@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getBudgets, getTransactions, type TransactionFilters, type Budget, type Transaction } from "../lib/api";
 import {
@@ -50,7 +50,7 @@ interface TransactionPopoverProps {
 function TransactionPopover({ transactions, category, month, year }: TransactionPopoverProps) {
   if (!transactions || transactions.length === 0) {
     return (
-      <div className="p-2 text-sm text-muted-foreground">
+      <div className="p-2 text-sm text-muted-foreground font-mono">
         No transactions found for {category} in {new Date(year, month - 1).toLocaleString('default', { month: 'long' })} {year}
       </div>
     );
@@ -71,7 +71,7 @@ function TransactionPopover({ transactions, category, month, year }: Transaction
   const sortedMerchants = Object.entries(groupedByMerchant).sort((a, b) => b[1].total - a[1].total);
 
   return (
-    <div className="max-h-[400px]">
+    <div className="max-h-[400px] font-mono">
       <div className="p-2 font-semibold border-b">
         {transactions.length} transaction{transactions.length !== 1 ? 's' : ''} for {category}
       </div>
@@ -87,10 +87,10 @@ function TransactionPopover({ transactions, category, month, year }: Transaction
             {transactions.map((transaction) => (
               <div key={transaction.id} className="p-2 text-xs hover:bg-muted">
                 <div className="flex justify-between">
-                  <span className="font-medium">{formatDate(transaction.transacted_at)}</span>
+                  <span className="font-mono">{formatDate(transaction.transacted_at)}</span>
                   <span className="font-mono">{formatCurrency(transaction.amount)}</span>
                 </div>
-                <div className="text-muted-foreground">{transaction.merchant_name || transaction.plaid_name}</div>
+                <div className="text-muted-foreground font-mono">{transaction.merchant_name || transaction.plaid_name}</div>
               </div>
             ))}
           </div>
@@ -101,10 +101,10 @@ function TransactionPopover({ transactions, category, month, year }: Transaction
             {sortedMerchants.map(([merchant, data]) => (
               <div key={merchant} className="p-2 text-xs hover:bg-muted">
                 <div className="flex justify-between font-medium">
-                  <span>{merchant}</span>
+                  <span className="font-mono">{merchant}</span>
                   <span className="font-mono">{formatCurrency(data.total)}</span>
                 </div>
-                <div className="text-muted-foreground">
+                <div className="text-muted-foreground font-mono">
                   {data.transactions.length} transaction{data.transactions.length !== 1 ? 's' : ''}
                 </div>
 
@@ -112,7 +112,7 @@ function TransactionPopover({ transactions, category, month, year }: Transaction
                 <div className="mt-1 pl-2 border-l-2 border-muted space-y-1">
                   {data.transactions.map(transaction => (
                     <div key={transaction.id} className="text-xs flex justify-between">
-                      <span>{formatDate(transaction.transacted_at)}</span>
+                      <span className="font-mono">{formatDate(transaction.transacted_at)}</span>
                       <span className="font-mono">{formatCurrency(transaction.amount)}</span>
                     </div>
                   ))}
@@ -130,7 +130,7 @@ function TransactionPopover({ transactions, category, month, year }: Transaction
 function AllTransactionsPopover({ transactions, category, year }: { transactions: Transaction[], category: string, year: number }) {
   if (!transactions || transactions.length === 0) {
     return (
-      <div className="p-2 text-sm text-muted-foreground">
+      <div className="p-2 text-sm text-muted-foreground font-mono">
         No transactions found for {category} in {year}
       </div>
     );
@@ -151,7 +151,7 @@ function AllTransactionsPopover({ transactions, category, year }: { transactions
   const sortedMerchants = Object.entries(groupedByMerchant).sort((a, b) => b[1].total - a[1].total);
 
   return (
-    <div className="max-h-[400px]">
+    <div className="max-h-[400px] font-mono">
       <div className="p-2 font-semibold border-b">
         {transactions.length} transaction{transactions.length !== 1 ? 's' : ''} for {category} in {year}
       </div>
@@ -167,10 +167,10 @@ function AllTransactionsPopover({ transactions, category, year }: { transactions
             {transactions.map((transaction) => (
               <div key={transaction.id} className="p-2 text-xs hover:bg-muted">
                 <div className="flex justify-between">
-                  <span className="font-medium">{formatDate(transaction.transacted_at)}</span>
+                  <span className="font-mono">{formatDate(transaction.transacted_at)}</span>
                   <span className="font-mono">{formatCurrency(transaction.amount)}</span>
                 </div>
-                <div className="text-muted-foreground">{transaction.merchant_name || transaction.plaid_name}</div>
+                <div className="text-muted-foreground font-mono">{transaction.merchant_name || transaction.plaid_name}</div>
               </div>
             ))}
           </div>
@@ -181,10 +181,10 @@ function AllTransactionsPopover({ transactions, category, year }: { transactions
             {sortedMerchants.map(([merchant, data]) => (
               <div key={merchant} className="p-2 text-xs hover:bg-muted">
                 <div className="flex justify-between font-medium">
-                  <span>{merchant}</span>
+                  <span className="font-mono">{merchant}</span>
                   <span className="font-mono">{formatCurrency(data.total)}</span>
                 </div>
-                <div className="text-muted-foreground">
+                <div className="text-muted-foreground font-mono">
                   {data.transactions.length} transaction{data.transactions.length !== 1 ? 's' : ''}
                 </div>
 
@@ -192,7 +192,7 @@ function AllTransactionsPopover({ transactions, category, year }: { transactions
                 <div className="mt-1 pl-2 border-l-2 border-muted space-y-1">
                   {data.transactions.map(transaction => (
                     <div key={transaction.id} className="text-xs flex justify-between">
-                      <span>{formatDate(transaction.transacted_at)}</span>
+                      <span className="font-mono">{formatDate(transaction.transacted_at)}</span>
                       <span className="font-mono">{formatCurrency(transaction.amount)}</span>
                     </div>
                   ))}
@@ -227,23 +227,27 @@ export default function YearlyBudgetPage() {
     setSearchParams({ year: selectedYear.toString() }, { replace: true });
   }, [selectedYear, setSearchParams]);
 
-  // Create an array of all months for the selected year, but only include months up to the current month
+  // Get current date information
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1; // JavaScript months are 0-indexed
 
-  const months = Array.from({ length: 12 }, (_, i) => ({
-    year: selectedYear,
-    month: i + 1,
-    label: new Date(selectedYear, i).toLocaleString('default', { month: 'long' })
-  })).filter(month => {
-    // Include all months for past years
-    if (month.year < currentYear) return true;
-    // For current year, only include months up to the current month
-    if (month.year === currentYear) return month.month <= currentMonth;
-    // Exclude all months for future years
-    return false;
-  });
+  // Create an array of all months for the selected year, but only include months up to the current month
+  // Use useMemo to prevent recalculation on every render
+  const months = useMemo(() => {
+    return Array.from({ length: 12 }, (_, i) => ({
+      year: selectedYear,
+      month: i + 1,
+      label: new Date(selectedYear, i).toLocaleString('default', { month: 'long' })
+    })).filter(month => {
+      // Include all months for past years
+      if (month.year < currentYear) return true;
+      // For current year, only include months up to the current month
+      if (month.year === currentYear) return month.month <= currentMonth;
+      // Exclude all months for future years
+      return false;
+    });
+  }, [selectedYear, currentYear, currentMonth]);
 
   // Initialize column visibility for months when months array changes
   useEffect(() => {
@@ -266,7 +270,7 @@ export default function YearlyBudgetPage() {
 
   // Fetch budgets for the selected year (we'll fetch all months at once)
   const { data: yearBudgets = [], isLoading: isLoadingBudgets } = useQuery({
-    queryKey: ['year-budgets', selectedYear],
+    queryKey: ['year-budgets', selectedYear, months.length],
     queryFn: async () => {
       // Fetch budgets for each month of the year
       const budgetPromises = months.map(month =>
@@ -287,7 +291,7 @@ export default function YearlyBudgetPage() {
 
   // Fetch transactions for the selected year (we'll fetch all months at once)
   const { data: yearTransactions = [], isLoading: isLoadingTransactions } = useQuery({
-    queryKey: ['year-transactions', selectedYear],
+    queryKey: ['year-transactions', selectedYear, months.length],
     queryFn: async () => {
       // Fetch transactions for each month of the year
       const transactionPromises = months.map(month =>
@@ -496,9 +500,17 @@ export default function YearlyBudgetPage() {
   );
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="container mx-auto py-6 font-mono">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Yearly Budget Comparison</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-3xl font-bold">Yearly Budget Comparison</h1>
+          <a
+            href="/"
+            className="text-sm text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded-md hover:bg-muted"
+          >
+            ← Transactions
+          </a>
+        </div>
         <Select value={selectedYear.toString()} onValueChange={handleYearChange}>
           <SelectTrigger className="w-32">
             <SelectValue placeholder="Year" />
@@ -523,19 +535,19 @@ export default function YearlyBudgetPage() {
               <TableHeader className="sticky top-0 z-10">
                 <TableRow className="hover:bg-muted/0 [&>th]:p-0">
                   <TableHead className="border border-border bg-muted font-semibold p-2">
-                    <div className="px-3 py-2 text-sm">Month</div>
+                    <div className="px-3 py-2 text-sm font-mono">Month</div>
                   </TableHead>
                   <TableHead className="text-right border border-border bg-muted font-semibold p-2">
-                    <div className="px-3 py-2 text-sm">Income</div>
+                    <div className="px-3 py-2 text-sm font-mono">Income</div>
                   </TableHead>
                   <TableHead className="text-right border border-border bg-muted font-semibold p-2">
-                    <div className="px-3 py-2 text-sm">Expenses</div>
+                    <div className="px-3 py-2 text-sm font-mono">Expenses</div>
                   </TableHead>
                   <TableHead className="text-right border border-border bg-muted font-semibold p-2">
-                    <div className="px-3 py-2 text-sm">Savings</div>
+                    <div className="px-3 py-2 text-sm font-mono">Savings</div>
                   </TableHead>
                   <TableHead className="text-right border border-border bg-muted font-semibold p-2">
-                    <div className="px-3 py-2 text-sm">Savings Rate</div>
+                    <div className="px-3 py-2 text-sm font-mono">Savings Rate</div>
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -543,7 +555,7 @@ export default function YearlyBudgetPage() {
                 {monthlySummary.map((summary, index) => (
                   <TableRow key={summary.month} className="hover:bg-muted/80 transition-colors">
                     <TableCell className="font-medium border border-border p-0">
-                      <div className="px-3 py-2 text-sm">{summary.label}</div>
+                      <div className="px-3 py-2 text-sm font-mono">{summary.label}</div>
                     </TableCell>
                     <TableCell className="text-right font-mono border border-border p-0">
                       <div className="px-3 py-2 text-sm">{formatCurrency(summary.totalIncome)}</div>
@@ -567,7 +579,7 @@ export default function YearlyBudgetPage() {
                 {/* Yearly Total Row */}
                 <TableRow className="font-bold hover:bg-muted/80 transition-colors border-t-2 border-border">
                   <TableCell className="font-medium border border-border p-0">
-                    <div className="px-3 py-2 text-sm">Yearly Total</div>
+                    <div className="px-3 py-2 text-sm font-mono">Yearly Total</div>
                   </TableCell>
                   <TableCell className="text-right font-mono border border-border p-0">
                     <div className="px-3 py-2 text-sm">
@@ -615,7 +627,7 @@ export default function YearlyBudgetPage() {
           <CardTitle>{selectedYear} Budget vs. Actual</CardTitle>
           <div className="flex items-center space-x-2">
             <Select value={displayMode} onValueChange={(value) => setDisplayMode(value as DisplayMode)}>
-              <SelectTrigger className="w-36 h-8">
+              <SelectTrigger className="w-44 h-8">
                 <SelectValue placeholder="Display Mode" />
               </SelectTrigger>
               <SelectContent>
@@ -659,16 +671,20 @@ export default function YearlyBudgetPage() {
               <TableHeader className="sticky top-0 z-10">
                 <TableRow className="hover:bg-muted/0 [&>th]:p-0">
                   <TableHead className="w-[100px] min-w-[100px] border border-border bg-muted font-semibold p-2">
-                    <div className="px-2 py-1 text-sm">Category</div>
+                    <div className="px-2 py-1 text-sm font-mono">Category</div>
                   </TableHead>
                   <TableHead className="text-right border border-border bg-muted font-semibold w-[100px] min-w-[100px] p-2">
-                    <div className="px-2 py-1 text-sm">Budget</div>
+                    <div className="px-2 py-1 text-sm font-mono">Budget</div>
                   </TableHead>
 
                   {/* Conditionally render Avg Actual column */}
                   {columnVisibility.avgActual && (
                     <TableHead className="text-right border border-border bg-muted font-semibold w-[150px] min-w-[150px] p-2">
-                      <div className="px-2 py-1 text-sm">Avg Actual</div>
+                      <div className="px-2 py-1 text-sm font-mono">
+                        {displayMode === 'variance' ? 'Avg Variance' :
+                         displayMode === 'percentage' ? 'Avg %' :
+                         'Avg Actual'}
+                      </div>
                     </TableHead>
                   )}
 
@@ -678,7 +694,7 @@ export default function YearlyBudgetPage() {
                       key={`${month.year}-${month.month}`}
                       className="text-right border border-border bg-muted font-semibold w-[120px] min-w-[120px] p-2"
                     >
-                      <div className="px-2 py-1 text-sm">{month.label}</div>
+                      <div className="px-2 py-1 text-sm font-mono">{month.label}</div>
                     </TableHead>
                   ))}
                 </TableRow>
@@ -700,6 +716,11 @@ export default function YearlyBudgetPage() {
                     ? actualValues.reduce((sum, val) => sum + val, 0) / actualValues.length
                     : 0;
 
+                  // Calculate variance for the average
+                  const avgVariance = isIncome
+                    ? avgActual - avgBudget  // For income, positive variance means over budget (good)
+                    : avgBudget - avgActual; // For expenses, positive variance means under budget (good)
+
                   // Determine if average actual is positive compared to budget
                   const isAvgPositive = isIncome
                     ? avgActual >= avgBudget
@@ -713,7 +734,7 @@ export default function YearlyBudgetPage() {
                         ${isLastRow ? 'border-b border-border' : ''}
                       `}
                     >
-                      <TableCell className="font-medium border border-border p-0">
+                      <TableCell className="font-mono border border-border p-0">
                         <div className="px-2 py-1 text-sm">{category}</div>
                       </TableCell>
                       <TableCell className="text-right font-mono border border-border p-0">
@@ -726,9 +747,35 @@ export default function YearlyBudgetPage() {
                           <Popover>
                             <PopoverTrigger asChild>
                               <div className={`px-2 py-1 text-sm cursor-pointer ${
-                                isAvgPositive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                                avgVariance >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
                               }`}>
-                                {formatCurrency(avgActual)}
+                                {(() => {
+                                  // Calculate percentage of budget
+                                  const percentage = avgBudget !== 0
+                                    ? (avgActual / avgBudget) * 100
+                                    : avgActual > 0 ? Infinity : 0;
+
+                                  // Determine what value to display based on the display mode
+                                  let displayValue: string;
+                                  if (displayMode === 'variance') {
+                                    displayValue = formatCurrency(Math.abs(avgVariance));
+                                    if (avgVariance === 0) {
+                                      displayValue = formatCurrency(0);
+                                    } else if (avgVariance < 0) {
+                                      displayValue = `-${displayValue}`;
+                                    } else {
+                                      displayValue = `+${displayValue}`;
+                                    }
+                                  } else if (displayMode === 'percentage') {
+                                    displayValue = avgBudget === 0
+                                      ? avgActual === 0 ? '0%' : '∞%'
+                                      : `${percentage.toFixed(1)}%`;
+                                  } else {
+                                    // Default to actual amount
+                                    displayValue = formatCurrency(avgActual);
+                                  }
+                                  return displayValue;
+                                })()}
                               </div>
                             </PopoverTrigger>
                             <PopoverContent className="w-96 p-0">

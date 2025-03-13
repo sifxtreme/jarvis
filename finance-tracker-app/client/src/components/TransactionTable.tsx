@@ -257,9 +257,9 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                     : "hover:bg-muted/50"
                 )}
               >
-                <TableCell>{formatDate(transaction.transacted_at)}</TableCell>
-                <TableCell>{transaction.merchant_name || transaction.plaid_name}</TableCell>
-                <TableCell>{transaction.category || 'Uncategorized'}</TableCell>
+                <TableCell className="font-mono">{formatDate(transaction.transacted_at)}</TableCell>
+                <TableCell className="font-mono">{transaction.merchant_name || transaction.plaid_name}</TableCell>
+                <TableCell className="font-mono">{transaction.category || 'Uncategorized'}</TableCell>
                 <TableCell>
                   <TooltipProvider>
                     <div className="flex items-center gap-2">
@@ -268,10 +268,10 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                           {getSourceIcon(transaction.source)}
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>{transaction.source} transaction</p>
+                          <p className="font-mono">{transaction.source} transaction</p>
                         </TooltipContent>
                       </Tooltip>
-                      <span>{transaction.source}</span>
+                      <span className="font-mono">{transaction.source}</span>
                     </div>
                   </TooltipProvider>
                 </TableCell>
@@ -339,22 +339,20 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
           >
             <div className="flex justify-between items-start mb-2">
               <div>
-                <div className="font-medium">{transaction.merchant_name || transaction.plaid_name}</div>
-                <div className="text-sm text-muted-foreground">{formatDate(transaction.transacted_at)}</div>
+                <div className="font-mono font-medium">{transaction.merchant_name || transaction.plaid_name}</div>
+                <div className="font-mono text-sm text-muted-foreground">{formatDate(transaction.transacted_at)}</div>
               </div>
               <div className="text-right">
                 <div className="font-mono font-medium">{formatCurrency(transaction.amount)}</div>
                 <div className="flex items-center justify-end gap-1 text-sm text-muted-foreground mt-2">
                   {getSourceIcon(transaction.source)}
-                  <span>{transaction.source}</span>
+                  <span className="font-mono">{transaction.source}</span>
                 </div>
               </div>
             </div>
 
             <div className="flex items-center justify-between mt-4">
-              <div className="text-sm text-muted-foreground">
-                {transaction.category || 'Uncategorized'}
-              </div>
+              <div className="font-mono text-sm">{transaction.category || 'Uncategorized'}</div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setEditingTransaction(transaction)}
