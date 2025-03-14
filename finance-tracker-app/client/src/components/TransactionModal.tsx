@@ -67,6 +67,13 @@ export function TransactionModal({
   const sourceInputRef = useRef<HTMLInputElement>(null);
   const [selectedSourceIndex, setSelectedSourceIndex] = useState(-1);
 
+  // State for validation errors
+  const [validationErrors, setValidationErrors] = useState({
+    amount: false,
+    merchant_name: false,
+    source: false
+  });
+
   // Fetch budget categories when the modal opens
   useEffect(() => {
     if (open) {
@@ -253,6 +260,25 @@ export function TransactionModal({
           <form onSubmit={async (e) => {
             e.preventDefault();
             const formData = new FormData(e.currentTarget);
+
+            // Validate required fields
+            const amount = formData.get('amount') as string;
+            const merchant_name = formData.get('merchant_name') as string;
+
+            // Reset validation errors
+            const errors = {
+              amount: !amount,
+              merchant_name: !merchant_name,
+              source: !sourceInput
+            };
+
+            setValidationErrors(errors);
+
+            // If any required field is empty, prevent form submission
+            if (errors.amount || errors.merchant_name || errors.source) {
+              return;
+            }
+
             // Override the category and source fields with our state values
             formData.set('category', categoryInput);
             formData.set('source', sourceInput);
@@ -280,14 +306,17 @@ export function TransactionModal({
                 </div>
 
                 <div className="grid gap-2">
-                  <label htmlFor="amount" className="text-[15px]">Amount</label>
+                  <label htmlFor="amount" className="text-[15px] flex items-center">
+                    Amount
+                  </label>
                   <input
                     id="amount"
                     type="number"
                     name="amount"
                     defaultValue={transaction?.amount}
                     step="0.01"
-                    className="w-full p-2 border rounded text-right font-mono"
+                    className={`w-full p-2 border rounded text-right font-mono ${validationErrors.amount ? 'border-red-500 outline-red-500' : ''}`}
+                    onChange={() => setValidationErrors(prev => ({ ...prev, amount: false }))}
                   />
                 </div>
               </div>
@@ -310,13 +339,16 @@ export function TransactionModal({
                 </div>
 
                 <div className="grid gap-2">
-                  <label htmlFor="merchant_name" className="text-[15px]">Merchant</label>
+                  <label htmlFor="merchant_name" className="text-[15px] flex items-center">
+                    Merchant
+                  </label>
                   <input
                     id="merchant_name"
                     type="text"
                     name="merchant_name"
                     defaultValue={transaction?.merchant_name}
-                    className="w-full p-2 border rounded"
+                    className={`w-full p-2 border rounded ${validationErrors.merchant_name ? 'border-red-500 outline-red-500' : ''}`}
+                    onChange={() => setValidationErrors(prev => ({ ...prev, merchant_name: false }))}
                   />
                 </div>
               </div>
@@ -353,17 +385,22 @@ export function TransactionModal({
                 </div>
 
                 <div className="grid gap-2 relative">
-                  <label htmlFor="source" className="text-[15px]">Source</label>
+                  <label htmlFor="source" className="text-[15px] flex items-center">
+                    Source
+                  </label>
                   <input
                     id="source"
                     type="text"
                     name="source"
                     value={sourceInput}
-                    onChange={handleSourceChange}
+                    onChange={(e) => {
+                      handleSourceChange(e);
+                      setValidationErrors(prev => ({ ...prev, source: false }));
+                    }}
                     onFocus={() => setShowSourceSuggestions(true)}
                     onKeyDown={handleSourceKeyDown}
                     ref={sourceInputRef}
-                    className="w-full p-2 border rounded"
+                    className={`w-full p-2 border rounded ${validationErrors.source ? 'border-red-500 outline-red-500' : ''}`}
                     autoComplete="off"
                   />
                   {showSourceSuggestions && filteredSources.length > 0 && (
