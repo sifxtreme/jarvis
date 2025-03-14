@@ -6,6 +6,20 @@ import { getBudgets } from '../lib/api';
 import { FaCcAmex, FaCcVisa, FaUniversity, FaCreditCard } from 'react-icons/fa';
 import { Wallet, Send, DollarSign } from 'lucide-react';
 
+// CSS for diagonal stripes
+const diagonalStripesStyle = `
+  .bg-stripes {
+    opacity: 0.3;
+    background-image: repeating-linear-gradient(
+      45deg,
+      #888,
+      #888 5px,
+      transparent 5px,
+      transparent 15px
+    );
+  }
+`;
+
 interface TransactionModalProps {
   open: boolean;
   onClose: () => void;
@@ -228,6 +242,7 @@ export function TransactionModal({
 
   return (
     <Dialog.Root open={open} onOpenChange={onClose}>
+      <style dangerouslySetInnerHTML={{ __html: diagonalStripesStyle }} />
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <Dialog.Content className="fixed left-[50%] top-[50%] max-h-[85vh] w-[90vw] max-w-[600px] translate-x-[-50%] translate-y-[-50%] rounded-[6px] bg-white p-[25px] shadow-[hsl(206_22%_7%_/_35%)_0px_10px_38px_-10px,_hsl(206_22%_7%_/_20%)_0px_10px_20px_-15px] focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]">
@@ -241,6 +256,13 @@ export function TransactionModal({
             // Override the category and source fields with our state values
             formData.set('category', categoryInput);
             formData.set('source', sourceInput);
+            // Ensure plaid_name is included even though the field is disabled
+            if (transaction?.plaid_name) {
+              formData.set('plaid_name', transaction.plaid_name);
+            } else {
+              // For new transactions, set an empty string for plaid_name
+              formData.set('plaid_name', '');
+            }
             await onSubmit(formData);
           }}>
             <div className="grid gap-4">
@@ -274,13 +296,17 @@ export function TransactionModal({
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <label htmlFor="plaid_name" className="text-[15px]">Vendor</label>
-                  <input
-                    id="plaid_name"
-                    type="text"
-                    name="plaid_name"
-                    defaultValue={transaction?.plaid_name}
-                    className="w-full p-2 border rounded"
-                  />
+                  <div className="relative">
+                    <input
+                      id="plaid_name"
+                      type="text"
+                      name="plaid_name"
+                      defaultValue={transaction?.plaid_name}
+                      className="w-full p-2 border rounded bg-gray-200 text-gray-700 cursor-not-allowed"
+                      disabled
+                    />
+                    <div className="absolute inset-0 bg-stripes rounded pointer-events-none"></div>
+                  </div>
                 </div>
 
                 <div className="grid gap-2">
