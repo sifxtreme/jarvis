@@ -39,7 +39,7 @@ export default function SheetFilterControls({ onSearch, initialFilters, classNam
       <div className="space-y-2">
         <Input
           type="search"
-          placeholder="Search transactions..."
+          placeholder="Search..."
           className="w-full"
           value={filters.query ?? ''}
           onChange={(e) => handleFilterChange({ query: e.target.value })}

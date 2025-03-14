@@ -47,14 +47,14 @@ const getSourceIcon = (source: string | null) => {
   if (!source) return null;
 
   switch(source.toLowerCase()) {
-    case 'amex': return <FaCcAmex className="h-4 w-4 text-blue-600" />;
-    case 'hafsa_chase': return <FaCcVisa className="h-4 w-4 text-blue-500" />;
-    case 'asif_chase': return <FaCcVisa className="h-4 w-4 text-blue-500" />;
-    case 'asif_citi': return <FaCreditCard className="h-4 w-4 text-purple-500" />;
-    case 'cash': return <Wallet className="h-4 w-4 text-green-500" />;
-    case 'bofa': return <FaUniversity className="h-4 w-4 text-red-600" />;
-    case 'zelle': return <Send className="h-4 w-4 text-purple-600" />;
-    case 'venmo': return <DollarSign className="h-4 w-4 text-blue-400" />;
+    case 'amex': return <FaCcAmex className="h-5 w-5 text-blue-600 transform scale-90 antialiased" />;
+    case 'hafsa_chase': return <FaCcVisa className="h-5 w-5 text-blue-500 transform scale-90 antialiased" />;
+    case 'asif_chase': return <FaCcVisa className="h-5 w-5 text-blue-500 transform scale-90 antialiased" />;
+    case 'asif_citi': return <FaCreditCard className="h-5 w-5 text-purple-500 transform scale-90 antialiased" />;
+    case 'cash': return <Wallet className="h-5 w-5 text-green-500 transform scale-90 antialiased" />;
+    case 'bofa': return <FaUniversity className="h-5 w-5 text-red-600 transform scale-90 antialiased" />;
+    case 'zelle': return <Send className="h-5 w-5 text-purple-600 transform scale-90 antialiased" />;
+    case 'venmo': return <DollarSign className="h-5 w-5 text-blue-400 transform scale-90 antialiased" />;
     default: return null;
   }
 };

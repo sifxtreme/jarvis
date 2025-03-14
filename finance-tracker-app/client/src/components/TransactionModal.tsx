@@ -17,14 +17,14 @@ interface TransactionModalProps {
 
 // Hardcoded list of sources with their icons
 const SOURCES = [
-  { name: 'amex', icon: <FaCcAmex className="h-4 w-4 text-blue-600" /> },
-  { name: 'hafsa_chase', icon: <FaCcVisa className="h-4 w-4 text-blue-500" /> },
-  { name: 'asif_chase', icon: <FaCcVisa className="h-4 w-4 text-blue-500" /> },
-  { name: 'asif_citi', icon: <FaCreditCard className="h-4 w-4 text-purple-500" /> },
-  { name: 'cash', icon: <Wallet className="h-4 w-4 text-green-500" /> },
-  { name: 'bofa', icon: <FaUniversity className="h-4 w-4 text-red-600" /> },
-  { name: 'zelle', icon: <Send className="h-4 w-4 text-purple-600" /> },
-  { name: 'venmo', icon: <DollarSign className="h-4 w-4 text-blue-400" /> },
+  { name: 'amex', icon: <FaCcAmex className="h-5 w-5 text-blue-600 transform scale-90 antialiased" /> },
+  { name: 'hafsa_chase', icon: <FaCcVisa className="h-5 w-5 text-blue-500 transform scale-90 antialiased" /> },
+  { name: 'asif_chase', icon: <FaCcVisa className="h-5 w-5 text-blue-500 transform scale-90 antialiased" /> },
+  { name: 'asif_citi', icon: <FaCreditCard className="h-5 w-5 text-purple-500 transform scale-90 antialiased" /> },
+  { name: 'cash', icon: <Wallet className="h-5 w-5 text-green-500 transform scale-90 antialiased" /> },
+  { name: 'bofa', icon: <FaUniversity className="h-5 w-5 text-red-600 transform scale-90 antialiased" /> },
+  { name: 'zelle', icon: <Send className="h-5 w-5 text-purple-600 transform scale-90 antialiased" /> },
+  { name: 'venmo', icon: <DollarSign className="h-5 w-5 text-blue-400 transform scale-90 antialiased" /> },
 ];
 
 export function TransactionModal({
@@ -189,7 +189,7 @@ export function TransactionModal({
                     type="date"
                     name="transacted_at"
                     defaultValue={isDuplicating ? today : (transaction?.transacted_at.split('T')[0] || today)}
-                    className="w-full p-2 border rounded"
+                    className="w-full p-2 border rounded font-mono"
                   />
                 </div>
 

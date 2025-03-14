@@ -123,7 +123,7 @@ export default function FilterControls({ onSearch, initialFilters, className }: 
 
       <Input
         type="search"
-        placeholder="Search transactions..."
+        placeholder="Search..."
         className="w-48"
         value={initialFilters?.query ?? ''}
         onChange={(e) => onSearch({ query: e.target.value })}
