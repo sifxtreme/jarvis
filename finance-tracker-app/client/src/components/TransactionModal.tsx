@@ -44,12 +44,14 @@ export function TransactionModal({
   const [categoryInput, setCategoryInput] = useState(transaction?.category || '');
   const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
   const categoryInputRef = useRef<HTMLInputElement>(null);
+  const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(-1);
 
   // State for source suggestions
   const [filteredSources, setFilteredSources] = useState(SOURCES);
   const [sourceInput, setSourceInput] = useState(transaction?.source || '');
   const [showSourceSuggestions, setShowSourceSuggestions] = useState(false);
   const sourceInputRef = useRef<HTMLInputElement>(null);
+  const [selectedSourceIndex, setSelectedSourceIndex] = useState(-1);
 
   // Fetch budget categories when the modal opens
   useEffect(() => {
@@ -96,6 +98,8 @@ export function TransactionModal({
     } else {
       setFilteredCategories([]);
     }
+    // Reset selected index when filtered list changes
+    setSelectedCategoryIndex(-1);
   }, [categoryInput, categories]);
 
   // Filter sources based on input
@@ -108,6 +112,8 @@ export function TransactionModal({
     } else {
       setFilteredSources(SOURCES);
     }
+    // Reset selected index when filtered list changes
+    setSelectedSourceIndex(-1);
   }, [sourceInput]);
 
   // Handle category input change
@@ -126,6 +132,7 @@ export function TransactionModal({
   const handleCategorySelect = (category: string) => {
     setCategoryInput(category);
     setShowCategorySuggestions(false);
+    setSelectedCategoryIndex(-1);
 
     // Focus back on the input after selection
     if (categoryInputRef.current) {
@@ -137,10 +144,67 @@ export function TransactionModal({
   const handleSourceSelect = (source: string) => {
     setSourceInput(source);
     setShowSourceSuggestions(false);
+    setSelectedSourceIndex(-1);
 
     // Focus back on the input after selection
     if (sourceInputRef.current) {
       sourceInputRef.current.focus();
+    }
+  };
+
+  // Handle keyboard navigation for category suggestions
+  const handleCategoryKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showCategorySuggestions || filteredCategories.length === 0) return;
+
+    // Arrow down
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedCategoryIndex(prev =>
+        prev < filteredCategories.length - 1 ? prev + 1 : prev
+      );
+    }
+    // Arrow up
+    else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedCategoryIndex(prev => (prev > 0 ? prev - 1 : 0));
+    }
+    // Enter
+    else if (e.key === 'Enter' && selectedCategoryIndex >= 0) {
+      e.preventDefault();
+      handleCategorySelect(filteredCategories[selectedCategoryIndex]);
+    }
+    // Escape
+    else if (e.key === 'Escape') {
+      setShowCategorySuggestions(false);
+      setSelectedCategoryIndex(-1);
+    }
+  };
+
+  // Handle keyboard navigation for source suggestions
+  const handleSourceKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSourceSuggestions || filteredSources.length === 0) return;
+
+    // Arrow down
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedSourceIndex(prev =>
+        prev < filteredSources.length - 1 ? prev + 1 : prev
+      );
+    }
+    // Arrow up
+    else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedSourceIndex(prev => (prev > 0 ? prev - 1 : 0));
+    }
+    // Enter
+    else if (e.key === 'Enter' && selectedSourceIndex >= 0) {
+      e.preventDefault();
+      handleSourceSelect(filteredSources[selectedSourceIndex].name);
+    }
+    // Escape
+    else if (e.key === 'Escape') {
+      setShowSourceSuggestions(false);
+      setSelectedSourceIndex(-1);
     }
   };
 
@@ -242,6 +306,7 @@ export function TransactionModal({
                     value={categoryInput}
                     onChange={handleCategoryChange}
                     onFocus={() => setShowCategorySuggestions(true)}
+                    onKeyDown={handleCategoryKeyDown}
                     ref={categoryInputRef}
                     className="w-full p-2 border rounded"
                     autoComplete="off"
@@ -251,7 +316,7 @@ export function TransactionModal({
                       {filteredCategories.map((category, index) => (
                         <div
                           key={index}
-                          className="p-2 hover:bg-gray-100 cursor-pointer"
+                          className={`p-2 cursor-pointer ${selectedCategoryIndex === index ? 'bg-blue-100' : 'hover:bg-gray-100'}`}
                           onClick={() => handleCategorySelect(category)}
                         >
                           {category}
@@ -270,6 +335,7 @@ export function TransactionModal({
                     value={sourceInput}
                     onChange={handleSourceChange}
                     onFocus={() => setShowSourceSuggestions(true)}
+                    onKeyDown={handleSourceKeyDown}
                     ref={sourceInputRef}
                     className="w-full p-2 border rounded"
                     autoComplete="off"
@@ -279,7 +345,7 @@ export function TransactionModal({
                       {filteredSources.map((source, index) => (
                         <div
                           key={index}
-                          className="p-2 hover:bg-gray-100 cursor-pointer flex items-center gap-2"
+                          className={`p-2 flex items-center gap-2 cursor-pointer ${selectedSourceIndex === index ? 'bg-blue-100' : 'hover:bg-gray-100'}`}
                           onClick={() => handleSourceSelect(source.name)}
                         >
                           {source.icon}
