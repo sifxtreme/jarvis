@@ -25,7 +25,7 @@ import {
   ChevronDown,
   Copy
 } from "lucide-react";
-import { FaCcAmex, FaCcVisa, FaUniversity, FaCreditCard } from 'react-icons/fa';
+import { FaCcAmex, FaCcVisa, FaUniversity, FaCreditCard, FaAmazon } from 'react-icons/fa';
 import { api, Transaction } from "../lib/api";
 import { formatCurrency, formatDate } from "../lib/utils";
 import { cn } from "@/lib/utils";
@@ -57,6 +57,12 @@ const getSourceIcon = (source: string | null) => {
     case 'venmo': return <DollarSign className="h-5 w-5 text-blue-400 transform scale-90 antialiased" />;
     default: return null;
   }
+};
+
+// Function to check if a merchant is Amazon
+const isAmazonMerchant = (plaidName: string | null): boolean => {
+  if (!plaidName) return false;
+  return /amazon|amzn/i.test(plaidName);
 };
 
 export default function TransactionTable({ transactions = [], isLoading, onUpdate }: TransactionTableProps) {
@@ -283,7 +289,23 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                 )}
               >
                 <TableCell className="font-mono">{formatDate(transaction.transacted_at)}</TableCell>
-                <TableCell className="font-mono">{transaction.merchant_name || transaction.plaid_name}</TableCell>
+                <TableCell className="font-mono">
+                  <div className="flex items-center gap-1">
+                    {isAmazonMerchant(transaction.plaid_name) && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <FaAmazon className="h-4 w-4 text-[#FF9900]" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Amazon Purchase</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                    {transaction.merchant_name || transaction.plaid_name}
+                  </div>
+                </TableCell>
                 <TableCell className="font-mono">{transaction.category || 'Uncategorized'}</TableCell>
                 <TableCell>
                   <TooltipProvider>
@@ -390,7 +412,23 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
           >
             <div className="flex justify-between items-start mb-2">
               <div>
-                <div className="font-mono font-medium">{transaction.merchant_name || transaction.plaid_name}</div>
+                <div className="font-mono font-medium">
+                  <div className="flex items-center gap-1">
+                    {isAmazonMerchant(transaction.plaid_name) && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <FaAmazon className="h-4 w-4 text-[#FF9900]" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Amazon Purchase</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                    {transaction.merchant_name || transaction.plaid_name}
+                  </div>
+                </div>
                 <div className="font-mono text-sm text-muted-foreground">{formatDate(transaction.transacted_at)}</div>
               </div>
               <div className="text-right">
