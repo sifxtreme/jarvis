@@ -8,6 +8,7 @@ interface TransactionModalProps {
   onSubmit: (formData: FormData) => Promise<void>;
   transaction?: Transaction;
   title: string;
+  isDuplicating?: boolean;
 }
 
 export function TransactionModal({
@@ -15,8 +16,12 @@ export function TransactionModal({
   onClose,
   onSubmit,
   transaction,
-  title
+  title,
+  isDuplicating = false
 }: TransactionModalProps) {
+  // Get today's date in YYYY-MM-DD format for the date input
+  const today = new Date().toISOString().split('T')[0];
+
   return (
     <Dialog.Root open={open} onOpenChange={onClose}>
       <Dialog.Portal>
@@ -40,7 +45,7 @@ export function TransactionModal({
                     id="transacted_at"
                     type="date"
                     name="transacted_at"
-                    defaultValue={transaction?.transacted_at.split('T')[0] || new Date().toISOString().split('T')[0]}
+                    defaultValue={isDuplicating ? today : (transaction?.transacted_at.split('T')[0] || today)}
                     className="w-full p-2 border rounded"
                   />
                 </div>
@@ -108,8 +113,8 @@ export function TransactionModal({
                 </div>
               </div>
 
-              {/* Status checkboxes */}
-              {transaction && (
+              {/* Status checkboxes - only show for editing, not for duplicating */}
+              {transaction && !isDuplicating && (
                 <div className="flex gap-4">
                   <div className="flex items-center gap-2">
                     <input

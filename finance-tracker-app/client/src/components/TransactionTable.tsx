@@ -22,7 +22,8 @@ import {
   DollarSign,
   PencilIcon,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Copy
 } from "lucide-react";
 import { FaCcAmex, FaCcVisa, FaUniversity, FaCreditCard } from 'react-icons/fa';
 import { api, Transaction } from "../lib/api";
@@ -60,6 +61,7 @@ const getSourceIcon = (source: string | null) => {
 
 export default function TransactionTable({ transactions = [], isLoading, onUpdate }: TransactionTableProps) {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [duplicatingTransaction, setDuplicatingTransaction] = useState<Transaction | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [sortField, setSortField] = useState<SortField>('transacted_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -117,6 +119,7 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
         reviewed: false
       });
       setIsCreating(false);
+      setDuplicatingTransaction(null);
       onUpdate?.();
     } catch (error) {
       console.error('Failed to create transaction:', error);
@@ -142,10 +145,15 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
       />
 
       <TransactionModal
-        open={isCreating}
-        onClose={() => setIsCreating(false)}
+        open={isCreating || !!duplicatingTransaction}
+        onClose={() => {
+          setIsCreating(false);
+          setDuplicatingTransaction(null);
+        }}
         onSubmit={handleCreateSubmit}
-        title="Add Transaction"
+        transaction={duplicatingTransaction || undefined}
+        title={duplicatingTransaction ? "Duplicate Transaction" : "Add Transaction"}
+        isDuplicating={!!duplicatingTransaction}
       />
 
       {/* Floating total amount div */}
@@ -282,7 +290,7 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                   <TooltipProvider>
                     <div className="flex items-center space-x-2">
                       <Tooltip>
-                        <TooltipTrigger>
+                        <TooltipTrigger className="flex items-center justify-center w-6 h-6">
                           {transaction.hidden ? (
                             <EyeOff className="h-4 w-4 text-gray-500" />
                           ) : (
@@ -295,7 +303,7 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                       </Tooltip>
 
                       <Tooltip>
-                        <TooltipTrigger>
+                        <TooltipTrigger className="flex items-center justify-center w-6 h-6">
                           {transaction.reviewed ? (
                             <CheckCircle className="h-4 w-4 text-green-500" />
                           ) : (
@@ -307,9 +315,35 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                         </TooltipContent>
                       </Tooltip>
 
-                      <button onClick={() => setEditingTransaction(transaction)}>
-                        <PencilIcon className="h-4 w-4 text-blue-500 hover:text-blue-700" />
-                      </button>
+                      <Tooltip>
+                        <TooltipTrigger
+                          className="flex items-center justify-center w-6 h-6"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDuplicatingTransaction(transaction);
+                          }}
+                        >
+                          <Copy className="h-4 w-4 text-purple-500 hover:text-purple-700" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Duplicate Transaction</p>
+                        </TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger
+                          className="flex items-center justify-center w-6 h-6"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTransaction(transaction);
+                          }}
+                        >
+                          <PencilIcon className="h-4 w-4 text-blue-500 hover:text-blue-700" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Edit Transaction</p>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                   </TooltipProvider>
                 </TableCell>
@@ -355,19 +389,31 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
               <div className="font-mono text-sm">{transaction.category || 'Uncategorized'}</div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setEditingTransaction(transaction)}
-                  className="p-2 hover:bg-muted rounded-full"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDuplicatingTransaction(transaction);
+                  }}
+                  className="p-2 hover:bg-muted rounded-full flex items-center justify-center"
+                >
+                  <Copy className="h-4 w-4 text-purple-500" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingTransaction(transaction);
+                  }}
+                  className="p-2 hover:bg-muted rounded-full flex items-center justify-center"
                 >
                   <PencilIcon className="h-4 w-4 text-blue-500" />
                 </button>
-                <button className="p-2 hover:bg-muted rounded-full">
+                <button className="p-2 hover:bg-muted rounded-full flex items-center justify-center">
                   {transaction.hidden ? (
                     <EyeOff className="h-4 w-4 text-gray-500" />
                   ) : (
                     <Eye className="h-4 w-4 text-gray-400" />
                   )}
                 </button>
-                <button className="p-2 hover:bg-muted rounded-full">
+                <button className="p-2 hover:bg-muted rounded-full flex items-center justify-center">
                   {transaction.reviewed ? (
                     <CheckCircle className="h-4 w-4 text-green-500" />
                   ) : (
