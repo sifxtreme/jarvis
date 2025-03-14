@@ -23,7 +23,8 @@ import {
   PencilIcon,
   ChevronUp,
   ChevronDown,
-  Copy
+  Copy,
+  Scissors
 } from "lucide-react";
 import { FaCcAmex, FaCcVisa, FaUniversity, FaCreditCard, FaAmazon } from 'react-icons/fa';
 import { api, Transaction } from "../lib/api";
@@ -33,6 +34,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TransactionModal } from "./TransactionModal";
+import { SplitTransactionModal } from "./SplitTransactionModal";
 
 interface TransactionTableProps {
   transactions: Transaction[];
@@ -68,6 +70,7 @@ const isAmazonMerchant = (plaidName: string | null): boolean => {
 export default function TransactionTable({ transactions = [], isLoading, onUpdate }: TransactionTableProps) {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [duplicatingTransaction, setDuplicatingTransaction] = useState<Transaction | null>(null);
+  const [splittingTransaction, setSplittingTransaction] = useState<Transaction | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [sortField, setSortField] = useState<SortField>('transacted_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -132,6 +135,41 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
     }
   };
 
+  const handleSplitSubmit = async (originalTransaction: Transaction, splitTransactions: Omit<Transaction, 'id'>[]) => {
+    try {
+      // Update the original transaction with the new amount
+      await api.updateTransaction(originalTransaction.id, {
+        transacted_at: originalTransaction.transacted_at,
+        plaid_name: originalTransaction.plaid_name,
+        merchant_name: originalTransaction.merchant_name,
+        category: originalTransaction.category,
+        source: originalTransaction.source,
+        amount: originalTransaction.amount,
+        hidden: originalTransaction.hidden,
+        reviewed: originalTransaction.reviewed
+      });
+
+      // Create the new split transactions
+      for (const splitTransaction of splitTransactions) {
+        await api.createTransaction({
+          transacted_at: splitTransaction.transacted_at,
+          plaid_name: splitTransaction.plaid_name,
+          merchant_name: splitTransaction.merchant_name,
+          category: splitTransaction.category,
+          source: splitTransaction.source,
+          amount: splitTransaction.amount,
+          hidden: splitTransaction.hidden,
+          reviewed: splitTransaction.reviewed
+        });
+      }
+
+      setSplittingTransaction(null);
+      onUpdate?.();
+    } catch (error) {
+      console.error('Failed to split transaction:', error);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="w-full h-64 flex items-center justify-center">
@@ -160,6 +198,13 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
         transaction={duplicatingTransaction || undefined}
         title={duplicatingTransaction ? "Duplicate Transaction" : "Add Transaction"}
         isDuplicating={!!duplicatingTransaction}
+      />
+
+      <SplitTransactionModal
+        open={!!splittingTransaction}
+        onClose={() => setSplittingTransaction(null)}
+        onSubmit={handleSplitSubmit}
+        transaction={splittingTransaction}
       />
 
       {/* Floating total amount div */}
@@ -374,6 +419,21 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                           className="flex items-center justify-center w-6 h-6"
                           onClick={(e) => {
                             e.stopPropagation();
+                            setSplittingTransaction(transaction);
+                          }}
+                        >
+                          <Scissors className="h-4 w-4 text-orange-500 hover:text-orange-700" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Split Transaction</p>
+                        </TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger
+                          className="flex items-center justify-center w-6 h-6"
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setEditingTransaction(transaction);
                           }}
                         >
@@ -451,6 +511,15 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                   className="p-2 hover:bg-muted rounded-full flex items-center justify-center"
                 >
                   <Copy className="h-4 w-4 text-purple-500" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSplittingTransaction(transaction);
+                  }}
+                  className="p-2 hover:bg-muted rounded-full flex items-center justify-center"
+                >
+                  <Scissors className="h-4 w-4 text-orange-500" />
                 </button>
                 <button
                   onClick={(e) => {
