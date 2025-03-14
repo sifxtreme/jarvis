@@ -40,21 +40,21 @@ interface TransactionTableProps {
   onUpdate?: () => void;
 }
 
-type SortField = 'transacted_at' | 'plaid_name' | 'merchant_name' | 'category' | 'amount';
+type SortField = 'transacted_at' | 'plaid_name' | 'merchant_name' | 'category' | 'amount' | 'source';
 type SortDirection = 'asc' | 'desc';
 
 const getSourceIcon = (source: string | null) => {
   if (!source) return null;
 
   switch(source.toLowerCase()) {
-    case 'amex': return <FaCcAmex className="h-4 w-4" />;
-    case 'hafsa_chase': return <FaCcVisa className="h-4 w-4" />;
-    case 'asif_chase': return <FaCcVisa className="h-4 w-4" />;
-    case 'asif_citi': return <FaCreditCard className="h-4 w-4" />;
-    case 'cash': return <Wallet className="h-4 w-4" />;
-    case 'bofa': return <FaUniversity className="h-4 w-4" />;
-    case 'zelle': return <Send className="h-4 w-4" />;
-    case 'venmo': return <DollarSign className="h-4 w-4" />;
+    case 'amex': return <FaCcAmex className="h-4 w-4 text-blue-600" />;
+    case 'hafsa_chase': return <FaCcVisa className="h-4 w-4 text-blue-500" />;
+    case 'asif_chase': return <FaCcVisa className="h-4 w-4 text-blue-500" />;
+    case 'asif_citi': return <FaCreditCard className="h-4 w-4 text-purple-500" />;
+    case 'cash': return <Wallet className="h-4 w-4 text-green-500" />;
+    case 'bofa': return <FaUniversity className="h-4 w-4 text-red-600" />;
+    case 'zelle': return <Send className="h-4 w-4 text-purple-600" />;
+    case 'venmo': return <DollarSign className="h-4 w-4 text-blue-400" />;
     default: return null;
   }
 };
@@ -223,7 +223,24 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                   )}
                 </div>
               </TableHead>
-              <TableHead className="w-[120px]">Source</TableHead>
+              <TableHead
+                className="cursor-pointer hover:bg-muted/50 w-[120px]"
+                onClick={() => {
+                  if (sortField === 'source') {
+                    setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                  } else {
+                    setSortField('source');
+                    setSortDirection('asc');
+                  }
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  Source
+                  {sortField === 'source' && (
+                    sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                  )}
+                </div>
+              </TableHead>
               <TableHead
                 className="text-right cursor-pointer hover:bg-muted/50 w-[120px]"
                 onClick={() => {

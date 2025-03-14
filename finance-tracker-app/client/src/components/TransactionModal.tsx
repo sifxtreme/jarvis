@@ -1,6 +1,10 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { Transaction } from "../lib/api";
 import { Cross2Icon } from '@radix-ui/react-icons';
+import { useState, useEffect, useRef } from 'react';
+import { getBudgets } from '../lib/api';
+import { FaCcAmex, FaCcVisa, FaUniversity, FaCreditCard } from 'react-icons/fa';
+import { Wallet, Send, DollarSign } from 'lucide-react';
 
 interface TransactionModalProps {
   open: boolean;
@@ -10,6 +14,18 @@ interface TransactionModalProps {
   title: string;
   isDuplicating?: boolean;
 }
+
+// Hardcoded list of sources with their icons
+const SOURCES = [
+  { name: 'amex', icon: <FaCcAmex className="h-4 w-4 text-blue-600" /> },
+  { name: 'hafsa_chase', icon: <FaCcVisa className="h-4 w-4 text-blue-500" /> },
+  { name: 'asif_chase', icon: <FaCcVisa className="h-4 w-4 text-blue-500" /> },
+  { name: 'asif_citi', icon: <FaCreditCard className="h-4 w-4 text-purple-500" /> },
+  { name: 'cash', icon: <Wallet className="h-4 w-4 text-green-500" /> },
+  { name: 'bofa', icon: <FaUniversity className="h-4 w-4 text-red-600" /> },
+  { name: 'zelle', icon: <Send className="h-4 w-4 text-purple-600" /> },
+  { name: 'venmo', icon: <DollarSign className="h-4 w-4 text-blue-400" /> },
+];
 
 export function TransactionModal({
   open,
@@ -21,6 +37,130 @@ export function TransactionModal({
 }: TransactionModalProps) {
   // Get today's date in YYYY-MM-DD format for the date input
   const today = new Date().toISOString().split('T')[0];
+
+  // State for category suggestions
+  const [categories, setCategories] = useState<string[]>([]);
+  const [filteredCategories, setFilteredCategories] = useState<string[]>([]);
+  const [categoryInput, setCategoryInput] = useState(transaction?.category || '');
+  const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
+  const categoryInputRef = useRef<HTMLInputElement>(null);
+
+  // State for source suggestions
+  const [filteredSources, setFilteredSources] = useState(SOURCES);
+  const [sourceInput, setSourceInput] = useState(transaction?.source || '');
+  const [showSourceSuggestions, setShowSourceSuggestions] = useState(false);
+  const sourceInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch budget categories when the modal opens
+  useEffect(() => {
+    if (open) {
+      const fetchCategories = async () => {
+        try {
+          const currentDate = new Date();
+          const budgets = await getBudgets({
+            year: currentDate.getFullYear(),
+            month: currentDate.getMonth() + 1,
+            show_hidden: false,
+            show_needs_review: false
+          });
+
+          // Extract unique category names from budgets
+          const categoryNames = budgets.map(budget => budget.name);
+          setCategories(categoryNames);
+        } catch (error) {
+          console.error('Failed to fetch categories:', error);
+        }
+      };
+
+      fetchCategories();
+
+      // Initialize category input if transaction exists
+      if (transaction?.category) {
+        setCategoryInput(transaction.category);
+      }
+
+      // Initialize source input if transaction exists
+      if (transaction?.source) {
+        setSourceInput(transaction.source);
+      }
+    }
+  }, [open, transaction]);
+
+  // Filter categories based on input
+  useEffect(() => {
+    if (categoryInput) {
+      const filtered = categories.filter(category =>
+        category.toLowerCase().includes(categoryInput.toLowerCase())
+      );
+      setFilteredCategories(filtered);
+    } else {
+      setFilteredCategories([]);
+    }
+  }, [categoryInput, categories]);
+
+  // Filter sources based on input
+  useEffect(() => {
+    if (sourceInput) {
+      const filtered = SOURCES.filter(source =>
+        source.name.toLowerCase().includes(sourceInput.toLowerCase())
+      );
+      setFilteredSources(filtered);
+    } else {
+      setFilteredSources(SOURCES);
+    }
+  }, [sourceInput]);
+
+  // Handle category input change
+  const handleCategoryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCategoryInput(e.target.value);
+    setShowCategorySuggestions(true);
+  };
+
+  // Handle source input change
+  const handleSourceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSourceInput(e.target.value);
+    setShowSourceSuggestions(true);
+  };
+
+  // Handle category suggestion selection
+  const handleCategorySelect = (category: string) => {
+    setCategoryInput(category);
+    setShowCategorySuggestions(false);
+
+    // Focus back on the input after selection
+    if (categoryInputRef.current) {
+      categoryInputRef.current.focus();
+    }
+  };
+
+  // Handle source suggestion selection
+  const handleSourceSelect = (source: string) => {
+    setSourceInput(source);
+    setShowSourceSuggestions(false);
+
+    // Focus back on the input after selection
+    if (sourceInputRef.current) {
+      sourceInputRef.current.focus();
+    }
+  };
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (categoryInputRef.current && !categoryInputRef.current.contains(e.target as Node)) {
+        setShowCategorySuggestions(false);
+      }
+
+      if (sourceInputRef.current && !sourceInputRef.current.contains(e.target as Node)) {
+        setShowSourceSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   return (
     <Dialog.Root open={open} onOpenChange={onClose}>
@@ -34,6 +174,9 @@ export function TransactionModal({
           <form onSubmit={async (e) => {
             e.preventDefault();
             const formData = new FormData(e.currentTarget);
+            // Override the category and source fields with our state values
+            formData.set('category', categoryInput);
+            formData.set('source', sourceInput);
             await onSubmit(formData);
           }}>
             <div className="grid gap-4">
@@ -90,26 +233,61 @@ export function TransactionModal({
 
               {/* Third row */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
+                <div className="grid gap-2 relative">
                   <label htmlFor="category" className="text-[15px]">Category</label>
                   <input
                     id="category"
                     type="text"
                     name="category"
-                    defaultValue={transaction?.category}
+                    value={categoryInput}
+                    onChange={handleCategoryChange}
+                    onFocus={() => setShowCategorySuggestions(true)}
+                    ref={categoryInputRef}
                     className="w-full p-2 border rounded"
+                    autoComplete="off"
                   />
+                  {showCategorySuggestions && filteredCategories.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border rounded shadow-lg z-10">
+                      {filteredCategories.map((category, index) => (
+                        <div
+                          key={index}
+                          className="p-2 hover:bg-gray-100 cursor-pointer"
+                          onClick={() => handleCategorySelect(category)}
+                        >
+                          {category}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                <div className="grid gap-2">
+                <div className="grid gap-2 relative">
                   <label htmlFor="source" className="text-[15px]">Source</label>
                   <input
                     id="source"
                     type="text"
                     name="source"
-                    defaultValue={transaction?.source}
+                    value={sourceInput}
+                    onChange={handleSourceChange}
+                    onFocus={() => setShowSourceSuggestions(true)}
+                    ref={sourceInputRef}
                     className="w-full p-2 border rounded"
+                    autoComplete="off"
                   />
+                  {showSourceSuggestions && filteredSources.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border rounded shadow-lg z-10">
+                      {filteredSources.map((source, index) => (
+                        <div
+                          key={index}
+                          className="p-2 hover:bg-gray-100 cursor-pointer flex items-center gap-2"
+                          onClick={() => handleSourceSelect(source.name)}
+                        >
+                          {source.icon}
+                          <span>{source.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
