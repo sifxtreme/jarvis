@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="32" height="32">
+  <!-- Background circle with primary color -->
+  <circle cx="50" cy="50" r="48" fill="hsl(221.2, 83.2%, 53.3%)" />
+
+  <!-- Inner circle with lighter shade -->
+  <circle cx="50" cy="50" r="42" fill="hsl(221.2, 83.2%, 58%)" />
+
+  <!-- Dollar sign with shadow effect -->
+  <g>
+    <!-- Shadow -->
+    <text x="52" y="72" font-family="Arial" font-size="60" font-weight="bold" text-anchor="middle" fill="rgba(0,0,0,0.2)">$</text>
+    <!-- Main text -->
+    <text x="50" y="70" font-family="Arial" font-size="60" font-weight="bold" text-anchor="middle" fill="white">$</text>
+  </g>
+</svg>
