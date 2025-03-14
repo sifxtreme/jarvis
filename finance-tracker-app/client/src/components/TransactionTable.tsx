@@ -309,9 +309,9 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                       <Tooltip>
                         <TooltipTrigger className="flex items-center justify-center w-6 h-6">
                           {transaction.hidden ? (
-                            <EyeOff className="h-4 w-4 text-gray-500" />
+                            <EyeOff className="h-4 w-4 text-gray-500" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
                           ) : (
-                            <Eye className="h-4 w-4 text-gray-400" />
+                            <Eye className="h-4 w-4 text-gray-400" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
                           )}
                         </TooltipTrigger>
                         <TooltipContent>
@@ -322,9 +322,9 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                       <Tooltip>
                         <TooltipTrigger className="flex items-center justify-center w-6 h-6">
                           {transaction.reviewed ? (
-                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <CheckCircle className="h-4 w-4 text-green-500" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
                           ) : (
-                            <AlertCircle className="h-4 w-4 text-yellow-500" />
+                            <AlertCircle className="h-4 w-4 text-yellow-500" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
                           )}
                         </TooltipTrigger>
                         <TooltipContent>
@@ -425,16 +425,16 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                 </button>
                 <button className="p-2 hover:bg-muted rounded-full flex items-center justify-center">
                   {transaction.hidden ? (
-                    <EyeOff className="h-4 w-4 text-gray-500" />
+                    <EyeOff className="h-4 w-4 text-gray-500" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
                   ) : (
-                    <Eye className="h-4 w-4 text-gray-400" />
+                    <Eye className="h-4 w-4 text-gray-400" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
                   )}
                 </button>
                 <button className="p-2 hover:bg-muted rounded-full flex items-center justify-center">
                   {transaction.reviewed ? (
-                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <CheckCircle className="h-4 w-4 text-green-500" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
                   ) : (
-                    <AlertCircle className="h-4 w-4 text-yellow-500" />
+                    <AlertCircle className="h-4 w-4 text-yellow-500" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
                   )}
                 </button>
               </div>
