@@ -100,12 +100,6 @@ export default function TransactionsPage() {
 
                 {/* Mobile sheet filters */}
                 <div className="md:hidden flex items-center gap-2">
-                  <a
-                    href="/yearly-budget"
-                    className="text-xs text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded-md hover:bg-muted"
-                  >
-                    Yearly Budget →
-                  </a>
                   <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
                     <SheetTrigger asChild>
                       <Button variant="outline" size="sm">
