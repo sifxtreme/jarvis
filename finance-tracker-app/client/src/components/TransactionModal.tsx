@@ -112,8 +112,9 @@ export function TransactionModal({
   // Filter categories based on input
   useEffect(() => {
     if (categoryInput) {
+      const searchTerm = categoryInput.toLowerCase().trim();
       const filtered = categories.filter(category =>
-        category.toLowerCase().includes(categoryInput.toLowerCase())
+        category.toLowerCase().includes(searchTerm)
       );
       setFilteredCategories(filtered);
     } else {
@@ -139,6 +140,7 @@ export function TransactionModal({
 
   // Handle category input change
   const handleCategoryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Don't trim here to allow typing spaces, but we'll trim on selection and submission
     setCategoryInput(e.target.value);
     setShowCategorySuggestions(true);
   };
@@ -151,7 +153,9 @@ export function TransactionModal({
 
   // Handle category suggestion selection
   const handleCategorySelect = (category: string) => {
-    setCategoryInput(category);
+    console.log("Selected category:", category); // Add logging for debugging
+    // Ensure the category is properly trimmed and set
+    setCategoryInput(category.trim());
     setShowCategorySuggestions(false);
     setSelectedCategoryIndex(-1);
 
@@ -232,11 +236,24 @@ export function TransactionModal({
   // Close suggestions when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (categoryInputRef.current && !categoryInputRef.current.contains(e.target as Node)) {
+      // Don't close the dropdown if we're clicking inside it
+      const target = e.target as Node;
+
+      // For category dropdown
+      const categoryDropdown = document.querySelector('.category-dropdown');
+      const isClickInCategoryInput = categoryInputRef.current?.contains(target);
+      const isClickInCategoryDropdown = categoryDropdown?.contains(target);
+
+      if (!isClickInCategoryInput && !isClickInCategoryDropdown) {
         setShowCategorySuggestions(false);
       }
 
-      if (sourceInputRef.current && !sourceInputRef.current.contains(e.target as Node)) {
+      // For source dropdown
+      const sourceDropdown = document.querySelector('.source-dropdown');
+      const isClickInSourceInput = sourceInputRef.current?.contains(target);
+      const isClickInSourceDropdown = sourceDropdown?.contains(target);
+
+      if (!isClickInSourceInput && !isClickInSourceDropdown) {
         setShowSourceSuggestions(false);
       }
     };
@@ -280,8 +297,8 @@ export function TransactionModal({
             }
 
             // Override the category and source fields with our state values
-            formData.set('category', categoryInput);
-            formData.set('source', sourceInput);
+            formData.set('category', categoryInput.trim());
+            formData.set('source', sourceInput.trim());
             // Ensure plaid_name is included even though the field is disabled
             if (transaction?.plaid_name) {
               formData.set('plaid_name', transaction.plaid_name);
@@ -370,12 +387,22 @@ export function TransactionModal({
                     autoComplete="off"
                   />
                   {showCategorySuggestions && filteredCategories.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border rounded shadow-lg z-10">
+                    <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border rounded shadow-lg z-10 category-dropdown">
                       {filteredCategories.map((category, index) => (
                         <div
                           key={index}
-                          className={`p-2 cursor-pointer ${selectedCategoryIndex === index ? 'bg-blue-100' : 'hover:bg-gray-100'}`}
-                          onClick={() => handleCategorySelect(category)}
+                          className={`p-3 cursor-pointer border-b border-gray-100 last:border-b-0 ${
+                            selectedCategoryIndex === index
+                              ? 'bg-blue-100 font-medium'
+                              : 'hover:bg-gray-100'
+                          }`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleCategorySelect(category);
+                          }}
+                          role="button"
+                          tabIndex={0}
                         >
                           {category}
                         </div>
@@ -404,15 +431,27 @@ export function TransactionModal({
                     autoComplete="off"
                   />
                   {showSourceSuggestions && filteredSources.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border rounded shadow-lg z-10">
+                    <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border rounded shadow-lg z-10 source-dropdown">
                       {filteredSources.map((source, index) => (
                         <div
                           key={index}
-                          className={`p-2 flex items-center gap-2 cursor-pointer ${selectedSourceIndex === index ? 'bg-blue-100' : 'hover:bg-gray-100'}`}
-                          onClick={() => handleSourceSelect(source.name)}
+                          className={`p-3 cursor-pointer border-b border-gray-100 last:border-b-0 ${
+                            selectedSourceIndex === index
+                              ? 'bg-blue-100 font-medium'
+                              : 'hover:bg-gray-100'
+                          }`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleSourceSelect(source.name);
+                          }}
+                          role="button"
+                          tabIndex={0}
                         >
-                          {source.icon}
-                          <span>{source.name}</span>
+                          <div className="flex items-center">
+                            {source.icon}
+                            <span className="ml-2">{source.name}</span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -422,7 +461,7 @@ export function TransactionModal({
 
               {/* Status checkboxes - only show for editing, not for duplicating */}
               {transaction && !isDuplicating && (
-                <div className="flex gap-4">
+                <div className="flex gap-4 mt-4">
                   <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -448,7 +487,7 @@ export function TransactionModal({
             </div>
 
             <div className="mt-6 flex justify-end gap-2">
-            <button
+              <button
                 type="button"
                 onClick={onClose}
                 className="inline-flex items-center justify-center rounded px-4 py-2 text-sm font-medium border border-gray-200 bg-white text-gray-900 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
