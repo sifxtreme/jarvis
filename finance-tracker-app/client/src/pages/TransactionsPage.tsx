@@ -167,7 +167,7 @@ export default function TransactionsPage() {
             <ResizablePanel
               defaultSize={30}
               minSize={20}
-              className={`hidden md:block ${!isStatsVisible ? 'w-0 !min-w-0' : ''}`}
+              className={`hidden md:block h-full overflow-hidden ${!isStatsVisible ? 'w-0 !min-w-0' : ''}`}
               style={{ display: !isStatsVisible ? 'none' : undefined }}
             >
               <TransactionStats
