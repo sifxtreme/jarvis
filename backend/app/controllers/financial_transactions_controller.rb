@@ -7,7 +7,7 @@ class FinancialTransactionsController < ApplicationController
     show_hidden = params[:show_hidden]
     show_needs_review = params[:show_needs_review]
     db_query = FinancialTransaction.select(:id, :plaid_id, :plaid_name, :merchant_name, :category, :source, :amount, :transacted_at, :created_at,
-                                           :updated_at, :hidden, :reviewed).all
+                                           :updated_at, :hidden, :reviewed, :amortized_months).all
     db_query = db_query.where('extract(year from transacted_at) = ?', year) if year && year != 'null'
     db_query = db_query.where('extract(month from transacted_at) = ?', month) if month && month != 'null'
     db_query = db_query.where('category ilike ? or merchant_name ilike ? or plaid_name ilike ?', "%#{query}%", "%#{query}%", "%#{query}%") if query
@@ -16,7 +16,17 @@ class FinancialTransactionsController < ApplicationController
     db_query = db_query.where('reviewed is false') if show_needs_review == 'true'
     db_query = db_query.order('transacted_at DESC, id DESC')
 
-    render json: { results: db_query.map }
+    transactions = db_query.map
+    if month
+      current_year_month = "#{year}-#{month.rjust(2, '0')}"
+      transactions.each do |transaction|
+        if transaction.amortized_months.present? && transaction.amortized_months.include?(current_year_month)
+          transaction.amount = transaction.amount / transaction.amortized_months.length
+        end
+      end
+    end
+
+    render json: { results: transactions }
   end
 
   def create
