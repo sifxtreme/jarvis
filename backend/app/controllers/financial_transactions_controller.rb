@@ -8,8 +8,13 @@ class FinancialTransactionsController < ApplicationController
     show_needs_review = params[:show_needs_review]
     db_query = FinancialTransaction.select(:id, :plaid_id, :plaid_name, :merchant_name, :category, :source, :amount, :transacted_at, :created_at,
                                            :updated_at, :hidden, :reviewed, :amortized_months).all
-    db_query = db_query.where('extract(year from transacted_at) = ?', year) if year && year != 'null'
-    db_query = db_query.where('extract(month from transacted_at) = ?', month) if month && month != 'null'
+    if year && year != 'null'
+      db_query = db_query.where('extract(year from transacted_at) = ?', year)
+    end
+    if month && month != 'null'
+      current_year_month = "#{year}-#{month.rjust(2, '0')}"
+      db_query = db_query.where('extract(month from transacted_at) = ? OR ? = ANY(amortized_months)', month, current_year_month)
+    end
     db_query = db_query.where('category ilike ? or merchant_name ilike ? or plaid_name ilike ?', "%#{query}%", "%#{query}%", "%#{query}%") if query
     db_query = db_query.where('hidden is true') if show_hidden == 'true'
     db_query = db_query.where('hidden is false') if show_hidden == 'false'

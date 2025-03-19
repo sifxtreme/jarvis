@@ -406,11 +406,12 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                             e.stopPropagation();
                             setDuplicatingTransaction(transaction);
                           }}
+                          disabled={!!transaction.amortized_months?.length}
                         >
-                          <Copy className="h-4 w-4 text-purple-500 hover:text-purple-700" />
+                          <Copy className={`h-4 w-4 ${transaction.amortized_months?.length ? 'text-gray-400' : 'text-purple-500 hover:text-purple-700'}`} />
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>Duplicate Transaction</p>
+                          <p>{transaction.amortized_months?.length ? 'Cannot duplicate amortized transaction' : 'Duplicate Transaction'}</p>
                         </TooltipContent>
                       </Tooltip>
 
@@ -421,11 +422,12 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                             e.stopPropagation();
                             setSplittingTransaction(transaction);
                           }}
+                          disabled={!!transaction.amortized_months?.length}
                         >
-                          <Scissors className="h-4 w-4 text-orange-500 hover:text-orange-700" />
+                          <Scissors className={`h-4 w-4 ${transaction.amortized_months?.length ? 'text-gray-400' : 'text-orange-500 hover:text-orange-700'}`} />
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>Split Transaction</p>
+                          <p>{transaction.amortized_months?.length ? 'Cannot split amortized transaction' : 'Split Transaction'}</p>
                         </TooltipContent>
                       </Tooltip>
 
@@ -436,11 +438,12 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                             e.stopPropagation();
                             setEditingTransaction(transaction);
                           }}
+                          disabled={!!transaction.amortized_months?.length}
                         >
-                          <PencilIcon className="h-4 w-4 text-blue-500 hover:text-blue-700" />
+                          <PencilIcon className={`h-4 w-4 ${transaction.amortized_months?.length ? 'text-gray-400' : 'text-blue-500 hover:text-blue-700'}`} />
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>Edit Transaction</p>
+                          <p>{transaction.amortized_months?.length ? 'Cannot edit amortized transaction' : 'Edit Transaction'}</p>
                         </TooltipContent>
                       </Tooltip>
                     </div>
@@ -508,27 +511,30 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                     e.stopPropagation();
                     setDuplicatingTransaction(transaction);
                   }}
-                  className="p-2 hover:bg-muted rounded-full flex items-center justify-center"
+                  disabled={!!transaction.amortized_months?.length}
+                  className={`p-2 hover:bg-muted rounded-full flex items-center justify-center ${transaction.amortized_months?.length ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
-                  <Copy className="h-4 w-4 text-purple-500" />
+                  <Copy className={`h-4 w-4 ${transaction.amortized_months?.length ? 'text-gray-400' : 'text-purple-500'}`} />
                 </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setSplittingTransaction(transaction);
                   }}
-                  className="p-2 hover:bg-muted rounded-full flex items-center justify-center"
+                  disabled={!!transaction.amortized_months?.length}
+                  className={`p-2 hover:bg-muted rounded-full flex items-center justify-center ${transaction.amortized_months?.length ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
-                  <Scissors className="h-4 w-4 text-orange-500" />
+                  <Scissors className={`h-4 w-4 ${transaction.amortized_months?.length ? 'text-gray-400' : 'text-orange-500'}`} />
                 </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setEditingTransaction(transaction);
                   }}
-                  className="p-2 hover:bg-muted rounded-full flex items-center justify-center"
+                  disabled={!!transaction.amortized_months?.length}
+                  className={`p-2 hover:bg-muted rounded-full flex items-center justify-center ${transaction.amortized_months?.length ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
-                  <PencilIcon className="h-4 w-4 text-blue-500" />
+                  <PencilIcon className={`h-4 w-4 ${transaction.amortized_months?.length ? 'text-gray-400' : 'text-blue-500'}`} />
                 </button>
                 <button className="p-2 hover:bg-muted rounded-full flex items-center justify-center">
                   {transaction.hidden ? (

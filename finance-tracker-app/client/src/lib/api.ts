@@ -98,6 +98,7 @@ export interface Transaction {
   amount: number;
   hidden: boolean;
   reviewed: boolean;
+  amortized_months?: string[];
 }
 
 export interface Budget {
