@@ -249,7 +249,7 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
                   .map(transaction => (
                     <div key={transaction.id} className="border-b pb-2">
                       <div className="flex justify-between">
-                        <div className="font-mono font-medium">{transaction.merchant_name || transaction.plaid_name}</div>
+                        <div className="font-mono font-medium" title={transaction.plaid_name}>{transaction.merchant_name || transaction.plaid_name}</div>
                         <div className="font-mono font-bold">{formatCurrency(transaction.amount)}</div>
                       </div>
                       <div className="flex justify-between text-sm text-muted-foreground">

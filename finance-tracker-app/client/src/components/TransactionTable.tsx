@@ -48,7 +48,7 @@ type SortDirection = 'asc' | 'desc';
 const getSourceIcon = (source: string | null) => {
   if (!source) return null;
 
-  switch(source.toLowerCase()) {
+  switch (source.toLowerCase()) {
     case 'amex': return <FaCcAmex className="h-5 w-5 text-blue-600 transform scale-90 antialiased" />;
     case 'hafsa_chase': return <FaCcVisa className="h-5 w-5 text-blue-500 transform scale-90 antialiased" />;
     case 'asif_chase': return <FaCcVisa className="h-5 w-5 text-blue-500 transform scale-90 antialiased" />;
@@ -348,7 +348,18 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                         </Tooltip>
                       </TooltipProvider>
                     )}
-                    {transaction.merchant_name || transaction.plaid_name}
+                    {transaction.merchant_name ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-default">{transaction.merchant_name}</span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="font-mono">Original: {transaction.plaid_name || 'N/A'}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : transaction.plaid_name}
                   </div>
                 </TableCell>
                 <TableCell className="font-mono">{transaction.category || 'Uncategorized'}</TableCell>
@@ -489,7 +500,18 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                         </Tooltip>
                       </TooltipProvider>
                     )}
-                    {transaction.merchant_name || transaction.plaid_name}
+                    {transaction.merchant_name ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-default">{transaction.merchant_name}</span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="font-mono">Original: {transaction.plaid_name || 'N/A'}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : transaction.plaid_name}
                   </div>
                 </div>
                 <div className="font-mono text-sm text-muted-foreground">{formatDate(transaction.transacted_at)}</div>
