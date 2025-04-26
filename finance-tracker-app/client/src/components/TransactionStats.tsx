@@ -30,6 +30,9 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [selectedTransactions, setSelectedTransactions] = useState<(Transaction & { original_category?: string })[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalSortField, setModalSortField] = useState<'date' | 'amount'>('date');
+  const [modalSortDirection, setModalSortDirection] = useState<SortDirection>('desc');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
 
   const handleSort = (field: SortField) => {
     if (field === sortField) {
@@ -37,6 +40,15 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
     } else {
       setSortField(field);
       setSortDirection('asc');
+    }
+  };
+
+  const handleModalSort = (field: 'date' | 'amount') => {
+    if (field === modalSortField) {
+      setModalSortDirection(modalSortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setModalSortField(field);
+      setModalSortDirection('desc');
     }
   };
 
@@ -152,13 +164,93 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
           </Card>
 
           <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-            <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="font-mono">Transaction Details</DialogTitle>
+                <div className="text-sm text-muted-foreground font-mono">
+                  {selectedCategory} - {selectedTransactions.length} transaction{selectedTransactions.length !== 1 ? 's' : ''} totaling {formatCurrency(selectedTransactions.reduce((sum, t) => sum + t.amount, 0))}
+                </div>
+                <div className="text-xs text-muted-foreground font-mono">
+                  Avg: {formatCurrency(selectedTransactions.length > 0 ?
+                    selectedTransactions.reduce((sum, t) => sum + t.amount, 0) / selectedTransactions.length : 0)}
+                </div>
               </DialogHeader>
-              <ScrollArea className="flex-1 pr-4">
-                <div className="space-y-4">
-                  {selectedTransactions.map(transaction => (
+
+              {selectedCategory === 'Other' && (
+                <div className="mb-4 mt-2 p-3 bg-gray-50 rounded-md border">
+                  <div className="grid gap-1 max-h-[150px] overflow-y-auto pr-1">
+                    {Object.entries(
+                      selectedTransactions.reduce((acc, transaction) => {
+                        const category = transaction.original_category || 'Uncategorized';
+                        if (!acc[category]) acc[category] = 0;
+                        acc[category] += transaction.amount;
+                        return acc;
+                      }, {} as Record<string, number>)
+                    )
+                      .sort((a, b) => b[1] - a[1]) // Sort by amount descending
+                      .map(([category, amount]) => (
+                        <div key={category} className="flex justify-between text-xs">
+                          <span className="font-mono">{category}</span>
+                          <span className="font-mono font-medium">{formatCurrency(amount)}</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedCategory !== 'Other' && selectedTransactions.length > 5 && (
+                <div className="mb-4 mt-2 p-3 bg-gray-50 rounded-md border">
+                  <div className="grid gap-1 max-h-[150px] overflow-y-auto pr-1">
+                    {Object.entries(
+                      selectedTransactions.reduce((acc, transaction) => {
+                        const merchantName = transaction.merchant_name || transaction.plaid_name || 'Unknown';
+                        if (!acc[merchantName]) acc[merchantName] = 0;
+                        acc[merchantName] += transaction.amount;
+                        return acc;
+                      }, {} as Record<string, number>)
+                    )
+                      .sort((a, b) => b[1] - a[1]) // Sort by amount descending
+                      .map(([merchant, amount]) => (
+                        <div key={merchant} className="flex justify-between text-xs">
+                          <span className="font-mono">{merchant}</span>
+                          <span className="font-mono font-medium">{formatCurrency(amount)}</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-between mb-3 px-1 text-xs text-muted-foreground border-b pb-1">
+                <button
+                  className={`flex items-center font-mono ${modalSortField === 'date' ? 'font-bold' : ''}`}
+                  onClick={() => handleModalSort('date')}
+                >
+                  Date
+                  {modalSortField === 'date' && (
+                    <span className="ml-1">{modalSortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </button>
+                <button
+                  className={`flex items-center font-mono ${modalSortField === 'amount' ? 'font-bold' : ''}`}
+                  onClick={() => handleModalSort('amount')}
+                >
+                  Amount
+                  {modalSortField === 'amount' && (
+                    <span className="ml-1">{modalSortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </button>
+              </div>
+              <div className="space-y-4">
+                {selectedTransactions
+                  .sort((a, b) => {
+                    const multiplier = modalSortDirection === 'asc' ? 1 : -1;
+                    if (modalSortField === 'date') {
+                      return multiplier * (new Date(a.transacted_at).getTime() - new Date(b.transacted_at).getTime());
+                    } else {
+                      return multiplier * (a.amount - b.amount);
+                    }
+                  })
+                  .map(transaction => (
                     <div key={transaction.id} className="border-b pb-2">
                       <div className="flex justify-between">
                         <div className="font-mono font-medium">{transaction.merchant_name || transaction.plaid_name}</div>
@@ -166,12 +258,15 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
                       </div>
                       <div className="flex justify-between text-sm text-muted-foreground">
                         <div className="font-mono">{formatDate(transaction.transacted_at)}</div>
-                        <div className="font-mono">{transaction.original_category || transaction.category}</div>
+                        <div className="font-mono">
+                          {transaction.original_category && selectedCategory === 'Other'
+                            ? <span className="text-xs rounded bg-gray-100 px-1.5 py-0.5">{transaction.original_category}</span>
+                            : transaction.category}
+                        </div>
                       </div>
                     </div>
                   ))}
-                </div>
-              </ScrollArea>
+              </div>
             </DialogContent>
           </Dialog>
 
@@ -219,6 +314,7 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
                           className={`${rowClassName} cursor-pointer hover:bg-gray-50`}
                           onClick={() => {
                             setSelectedTransactions(transactions);
+                            setSelectedCategory(category);
                             setIsModalOpen(true);
                           }}
                         >

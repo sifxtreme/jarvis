@@ -682,8 +682,8 @@ export default function YearlyBudgetPage() {
                     <TableHead className="text-right border border-border bg-muted font-semibold w-[150px] min-w-[150px] p-2">
                       <div className="px-2 py-1 text-sm font-mono">
                         {displayMode === 'variance' ? 'Avg Variance' :
-                         displayMode === 'percentage' ? 'Avg %' :
-                         'Avg Actual'}
+                          displayMode === 'percentage' ? 'Avg %' :
+                            'Avg Actual'}
                       </div>
                     </TableHead>
                   )}
@@ -711,10 +711,25 @@ export default function YearlyBudgetPage() {
                     : 0;
 
                   // Calculate average actual spending for the category across all months
-                  const actualValues = Object.values(categoryActuals[category] || {});
-                  const avgActual = actualValues.length > 0
-                    ? actualValues.reduce((sum, val) => sum + val, 0) / actualValues.length
-                    : 0;
+                  const actualValues = Object.entries(categoryActuals[category] || {})
+                    .filter(([monthKey, _]) => {
+                      const monthNum = parseInt(monthKey);
+                      // Only include past months (not current or future months)
+                      return selectedYear < currentYear || (selectedYear === currentYear && monthNum < currentMonth);
+                    })
+                    .map(([_, value]) => value);
+
+                  // For the average calculation, we need to account for all months including those with zero values
+                  // Get the total number of months we should be considering
+                  const totalMonthsToConsider = months
+                    .filter(month => month.year < currentYear || (month.year === currentYear && month.month < currentMonth))
+                    .length;
+
+                  // Calculate the sum of all actual values
+                  const actualSum = actualValues.reduce((sum, val) => sum + val, 0);
+
+                  // Calculate the average by dividing by the total number of months to consider
+                  const avgActual = totalMonthsToConsider > 0 ? actualSum / totalMonthsToConsider : 0;
 
                   // Calculate variance for the average
                   const avgVariance = isIncome
@@ -746,9 +761,8 @@ export default function YearlyBudgetPage() {
                         <TableCell className="text-right font-mono border border-border p-0">
                           <Popover>
                             <PopoverTrigger asChild>
-                              <div className={`px-2 py-1 text-sm cursor-pointer ${
-                                avgVariance >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-                              }`}>
+                              <div className={`px-2 py-1 text-sm cursor-pointer ${avgVariance >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                                }`}>
                                 {(() => {
                                   // Calculate percentage of budget
                                   const percentage = avgBudget !== 0
@@ -838,9 +852,8 @@ export default function YearlyBudgetPage() {
                             <Popover>
                               <PopoverTrigger asChild>
                                 <div
-                                  className={`px-2 py-1 text-sm cursor-pointer ${
-                                    isPositive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-                                  }`}
+                                  className={`px-2 py-1 text-sm cursor-pointer ${isPositive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                                    }`}
                                 >
                                   {displayValue}
                                 </div>

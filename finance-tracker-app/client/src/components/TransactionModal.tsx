@@ -269,7 +269,7 @@ export function TransactionModal({
       <style dangerouslySetInnerHTML={{ __html: diagonalStripesStyle }} />
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <Dialog.Content className="fixed left-[50%] top-[50%] max-h-[85vh] w-[90vw] max-w-[600px] translate-x-[-50%] translate-y-[-50%] rounded-[6px] bg-white p-[25px] shadow-[hsl(206_22%_7%_/_35%)_0px_10px_38px_-10px,_hsl(206_22%_7%_/_20%)_0px_10px_20px_-15px] focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]">
+        <Dialog.Content className="fixed left-[50%] top-[50%] max-h-[85vh] w-[90vw] max-w-[600px] translate-x-[-50%] translate-y-[-50%] rounded-[6px] bg-white p-[25px] overflow-y-auto shadow-[hsl(206_22%_7%_/_35%)_0px_10px_38px_-10px,_hsl(206_22%_7%_/_20%)_0px_10px_20px_-15px] focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]">
           <Dialog.Title className="m-0 text-[17px] font-medium mb-4">
             {title}
           </Dialog.Title>
@@ -391,11 +391,10 @@ export function TransactionModal({
                       {filteredCategories.map((category, index) => (
                         <div
                           key={index}
-                          className={`p-3 cursor-pointer border-b border-gray-100 last:border-b-0 ${
-                            selectedCategoryIndex === index
-                              ? 'bg-blue-100 font-medium'
-                              : 'hover:bg-gray-100'
-                          }`}
+                          className={`p-3 cursor-pointer border-b border-gray-100 last:border-b-0 ${selectedCategoryIndex === index
+                            ? 'bg-blue-100 font-medium'
+                            : 'hover:bg-gray-100'
+                            }`}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -435,11 +434,10 @@ export function TransactionModal({
                       {filteredSources.map((source, index) => (
                         <div
                           key={index}
-                          className={`p-3 cursor-pointer border-b border-gray-100 last:border-b-0 ${
-                            selectedSourceIndex === index
-                              ? 'bg-blue-100 font-medium'
-                              : 'hover:bg-gray-100'
-                          }`}
+                          className={`p-3 cursor-pointer border-b border-gray-100 last:border-b-0 ${selectedSourceIndex === index
+                            ? 'bg-blue-100 font-medium'
+                            : 'hover:bg-gray-100'
+                            }`}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
