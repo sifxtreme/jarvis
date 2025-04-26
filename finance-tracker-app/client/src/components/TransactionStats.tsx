@@ -170,10 +170,6 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
                 <div className="text-sm text-muted-foreground font-mono">
                   {selectedCategory} - {selectedTransactions.length} transaction{selectedTransactions.length !== 1 ? 's' : ''} totaling {formatCurrency(selectedTransactions.reduce((sum, t) => sum + t.amount, 0))}
                 </div>
-                <div className="text-xs text-muted-foreground font-mono">
-                  Avg: {formatCurrency(selectedTransactions.length > 0 ?
-                    selectedTransactions.reduce((sum, t) => sum + t.amount, 0) / selectedTransactions.length : 0)}
-                </div>
               </DialogHeader>
 
               {selectedCategory === 'Other' && (
