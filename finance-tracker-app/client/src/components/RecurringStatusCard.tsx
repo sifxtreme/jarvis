@@ -9,8 +9,91 @@ import {
 } from "@/components/ui/collapsible";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
-import { ChevronDown, ChevronUp, Plus, AlertCircle, Clock, Calendar, TrendingUp } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { ChevronDown, ChevronUp, Plus, AlertCircle, Clock, Calendar, TrendingUp, X, RotateCcw } from "lucide-react";
+
+// LocalStorage key for dismissed recurring items
+const DISMISSED_RECURRING_KEY = 'jarvis_dismissed_recurring';
+
+interface DismissedItem {
+  merchant_key: string;
+  year: number;
+  month: number;
+  dismissed_at: string;
+}
+
+interface DismissedRecurring {
+  items: DismissedItem[];
+}
+
+// Helper to get dismissed items from localStorage
+const getDismissedItems = (): DismissedRecurring => {
+  try {
+    const stored = localStorage.getItem(DISMISSED_RECURRING_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.error('Error reading dismissed recurring items:', e);
+  }
+  return { items: [] };
+};
+
+// Helper to save dismissed items to localStorage
+const saveDismissedItems = (data: DismissedRecurring) => {
+  try {
+    localStorage.setItem(DISMISSED_RECURRING_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.error('Error saving dismissed recurring items:', e);
+  }
+};
+
+// Helper to check if an item is dismissed for a specific month
+const isDismissedForMonth = (merchant_key: string, year: number, month: number): boolean => {
+  const data = getDismissedItems();
+  return data.items.some(item =>
+    item.merchant_key === merchant_key &&
+    item.year === year &&
+    item.month === month
+  );
+};
+
+// Helper to dismiss an item for a specific month
+const dismissForMonth = (merchant_key: string, year: number, month: number) => {
+  const data = getDismissedItems();
+  // Don't add if already dismissed
+  if (!isDismissedForMonth(merchant_key, year, month)) {
+    data.items.push({
+      merchant_key,
+      year,
+      month,
+      dismissed_at: new Date().toISOString()
+    });
+    saveDismissedItems(data);
+  }
+};
+
+// Helper to restore a dismissed item
+const restoreForMonth = (merchant_key: string, year: number, month: number) => {
+  const data = getDismissedItems();
+  data.items = data.items.filter(item =>
+    !(item.merchant_key === merchant_key && item.year === year && item.month === month)
+  );
+  saveDismissedItems(data);
+};
+
+// Helper to get count of dismissed items for a month
+const getDismissedCountForMonth = (year: number, month: number): number => {
+  const data = getDismissedItems();
+  return data.items.filter(item => item.year === year && item.month === month).length;
+};
+
+// Helper to restore all dismissed items for a month
+const restoreAllForMonth = (year: number, month: number) => {
+  const data = getDismissedItems();
+  data.items = data.items.filter(item => !(item.year === year && item.month === month));
+  saveDismissedItems(data);
+};
 
 interface RecurringStatusCardProps {
   year: number;
@@ -60,6 +143,20 @@ const getStatusText = (pattern: RecurringPattern): string => {
 
 export function RecurringStatusCard({ year, month, onQuickAdd }: RecurringStatusCardProps) {
   const [isOpen, setIsOpen] = useState(true);
+  const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(new Set());
+  const [dismissedCount, setDismissedCount] = useState(0);
+
+  // Load dismissed items on mount and when year/month changes
+  useEffect(() => {
+    const data = getDismissedItems();
+    const dismissed = new Set(
+      data.items
+        .filter(item => item.year === year && item.month === month)
+        .map(item => item.merchant_key)
+    );
+    setDismissedKeys(dismissed);
+    setDismissedCount(dismissed.size);
+  }, [year, month]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['recurring-status', year, month],
@@ -85,18 +182,39 @@ export function RecurringStatusCard({ year, month, onQuickAdd }: RecurringStatus
     });
   };
 
+  const handleDismiss = useCallback((merchant_key: string) => {
+    dismissForMonth(merchant_key, year, month);
+    setDismissedKeys(prev => {
+      const next = new Set(prev);
+      next.add(merchant_key);
+      return next;
+    });
+    setDismissedCount(prev => prev + 1);
+  }, [year, month]);
+
+  const handleRestoreAll = useCallback(() => {
+    restoreAllForMonth(year, month);
+    setDismissedKeys(new Set());
+    setDismissedCount(0);
+  }, [year, month]);
+
   // Filter to only show manual sources that need attention (for expenses)
   const manualSources = ['zelle', 'cash', 'venmo', 'bofa'];
-  const missingManual = data?.missing?.filter(p =>
-    !p.is_income && manualSources.includes(p.source?.toLowerCase() || '')
-  ) || [];
 
-  const missingAuto = data?.missing?.filter(p =>
-    !p.is_income && !manualSources.includes(p.source?.toLowerCase() || '')
-  ) || [];
+  // Filter out dismissed items
+  const filterDismissed = (patterns: RecurringPattern[]) =>
+    patterns.filter(p => !dismissedKeys.has(p.merchant_key));
+
+  const missingManual = filterDismissed(
+    data?.missing?.filter(p =>
+      !p.is_income && manualSources.includes(p.source?.toLowerCase() || '')
+    ) || []
+  );
 
   // Income items (show all, regardless of source)
-  const missingIncome = data?.missing?.filter(p => p.is_income) || [];
+  const missingIncome = filterDismissed(
+    data?.missing?.filter(p => p.is_income) || []
+  );
 
   const overdueManual = missingManual.filter(p => p.status === 'overdue');
   const upcomingManual = missingManual.filter(p => p.status !== 'overdue');
@@ -107,13 +225,73 @@ export function RecurringStatusCard({ year, month, onQuickAdd }: RecurringStatus
     return null;
   }
 
-  // Don't show if nothing to display
-  if (missingManual.length === 0 && missingIncome.length === 0) {
+  // Don't show if nothing to display (but show if there are dismissed items to restore)
+  if (missingManual.length === 0 && missingIncome.length === 0 && dismissedCount === 0) {
     return null;
   }
 
   const totalMissing = missingManual.length + missingIncome.length;
   const totalOverdue = overdueManual.length + overdueIncome.length;
+
+  // Render a single recurring item row
+  const renderItem = (pattern: RecurringPattern, isOverdue: boolean) => (
+    <div
+      key={pattern.merchant_key}
+      className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 group"
+    >
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        {getStatusIcon(pattern.status!, pattern.is_income)}
+        <div className="flex-1 min-w-0">
+          <div className={cn(
+            "font-mono text-sm truncate",
+            pattern.is_income
+              ? (isOverdue ? "text-green-600" : "text-green-600/70")
+              : (isOverdue ? "" : "text-muted-foreground")
+          )}>
+            {pattern.display_name}
+          </div>
+          <div className="text-xs text-muted-foreground flex items-center gap-2">
+            <span>Day {formatDay(pattern.typical_day)}</span>
+            <span>•</span>
+            <span className={cn(
+              "font-mono",
+              pattern.is_income && (isOverdue ? "text-green-600" : "text-green-600/70")
+            )}>
+              {pattern.is_income ? '+' : '~'}{formatCurrency(pattern.typical_amount)}
+            </span>
+            <span>•</span>
+            <span>{pattern.source}</span>
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className={cn(
+          "text-xs",
+          isOverdue ? "font-medium text-red-500" : "text-muted-foreground"
+        )}>
+          {getStatusText(pattern)}
+        </span>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={() => handleQuickAdd(pattern)}
+          title="Quick add transaction"
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+          onClick={() => handleDismiss(pattern.merchant_key)}
+          title="Dismiss for this month"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -136,6 +314,11 @@ export function RecurringStatusCard({ year, month, onQuickAdd }: RecurringStatus
                     ({totalOverdue} overdue)
                   </span>
                 )}
+                {dismissedCount > 0 && (
+                  <span className="text-xs text-muted-foreground font-normal">
+                    ({dismissedCount} dismissed)
+                  </span>
+                )}
               </CardTitle>
               {isOpen ? (
                 <ChevronUp className="h-4 w-4 text-muted-foreground" />
@@ -147,160 +330,38 @@ export function RecurringStatusCard({ year, month, onQuickAdd }: RecurringStatus
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="py-2 px-4">
-            <div className="space-y-1">
-              {/* Overdue expenses first */}
-              {overdueManual.map((pattern) => (
-                <div
-                  key={pattern.merchant_key}
-                  className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 group"
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {getStatusIcon(pattern.status!, pattern.is_income)}
-                    <div className="flex-1 min-w-0">
-                      <div className="font-mono text-sm truncate">
-                        {pattern.display_name}
-                      </div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-2">
-                        <span>Day {formatDay(pattern.typical_day)}</span>
-                        <span>•</span>
-                        <span className="font-mono">~{formatCurrency(pattern.typical_amount)}</span>
-                        <span>•</span>
-                        <span>{pattern.source}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-red-500">
-                      {getStatusText(pattern)}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => handleQuickAdd(pattern)}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+            {totalMissing === 0 && dismissedCount > 0 ? (
+              <div className="text-sm text-muted-foreground text-center py-2">
+                All items dismissed for this month
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {/* Overdue expenses first */}
+                {overdueManual.map((pattern) => renderItem(pattern, true))}
 
-              {/* Overdue income */}
-              {overdueIncome.map((pattern) => (
-                <div
-                  key={pattern.merchant_key}
-                  className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 group"
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {getStatusIcon(pattern.status!, pattern.is_income)}
-                    <div className="flex-1 min-w-0">
-                      <div className="font-mono text-sm truncate text-green-600">
-                        {pattern.display_name}
-                      </div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-2">
-                        <span>Day {formatDay(pattern.typical_day)}</span>
-                        <span>•</span>
-                        <span className="font-mono text-green-600">+{formatCurrency(pattern.typical_amount)}</span>
-                        <span>•</span>
-                        <span>{pattern.source}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-red-500">
-                      {getStatusText(pattern)}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => handleQuickAdd(pattern)}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                {/* Overdue income */}
+                {overdueIncome.map((pattern) => renderItem(pattern, true))}
 
-              {/* Upcoming expenses */}
-              {upcomingManual.map((pattern) => (
-                <div
-                  key={pattern.merchant_key}
-                  className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 group"
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {getStatusIcon(pattern.status!, pattern.is_income)}
-                    <div className="flex-1 min-w-0">
-                      <div className="font-mono text-sm truncate text-muted-foreground">
-                        {pattern.display_name}
-                      </div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-2">
-                        <span>Day {formatDay(pattern.typical_day)}</span>
-                        <span>•</span>
-                        <span className="font-mono">~{formatCurrency(pattern.typical_amount)}</span>
-                        <span>•</span>
-                        <span>{pattern.source}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">
-                      {getStatusText(pattern)}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => handleQuickAdd(pattern)}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                {/* Upcoming expenses */}
+                {upcomingManual.map((pattern) => renderItem(pattern, false))}
 
-              {/* Upcoming income */}
-              {upcomingIncome.map((pattern) => (
-                <div
-                  key={pattern.merchant_key}
-                  className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 group"
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {getStatusIcon(pattern.status!, pattern.is_income)}
-                    <div className="flex-1 min-w-0">
-                      <div className="font-mono text-sm truncate text-green-600/70">
-                        {pattern.display_name}
-                      </div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-2">
-                        <span>Day {formatDay(pattern.typical_day)}</span>
-                        <span>•</span>
-                        <span className="font-mono text-green-600/70">+{formatCurrency(pattern.typical_amount)}</span>
-                        <span>•</span>
-                        <span>{pattern.source}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">
-                      {getStatusText(pattern)}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => handleQuickAdd(pattern)}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                {/* Upcoming income */}
+                {upcomingIncome.map((pattern) => renderItem(pattern, false))}
+              </div>
+            )}
 
-            {/* Show auto-sync missing as a subtle note */}
-            {missingAuto.length > 0 && (
-              <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
-                {missingAuto.length} auto-synced recurring transaction{missingAuto.length === 1 ? '' : 's'} also missing
+            {/* Restore dismissed items button */}
+            {dismissedCount > 0 && (
+              <div className="mt-2 pt-2 border-t">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                  onClick={handleRestoreAll}
+                >
+                  <RotateCcw className="h-3 w-3 mr-1" />
+                  Restore {dismissedCount} dismissed item{dismissedCount === 1 ? '' : 's'}
+                </Button>
               </div>
             )}
           </CardContent>
