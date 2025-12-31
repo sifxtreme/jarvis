@@ -220,15 +220,19 @@ class FinancialTransactionsController < ApplicationController
   private
 
   def period_summary(scope, year)
-    expenses = scope.where('amount > 0')
-    income = scope.where('amount < 0')
+    # Income is identified by category containing "income", not by negative amounts
+    income = scope.where("category ILIKE '%income%'")
+    expenses = scope.where("category NOT ILIKE '%income%' OR category IS NULL").where('amount > 0')
+
+    total_income = income.sum(:amount).to_f.abs
+    total_spent = expenses.sum(:amount).to_f
 
     {
       year: year,
       total_transactions: scope.count,
-      total_spent: expenses.sum(:amount).to_f.round(2),
-      total_income: income.sum(:amount).to_f.abs.round(2),
-      net_savings: (income.sum(:amount).abs - expenses.sum(:amount)).to_f.round(2)
+      total_spent: total_spent.round(2),
+      total_income: total_income.round(2),
+      net_savings: (total_income - total_spent).round(2)
     }
   end
 
