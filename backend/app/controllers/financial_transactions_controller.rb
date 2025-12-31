@@ -103,12 +103,11 @@ class FinancialTransactionsController < ApplicationController
     end_of_last_month = current_date - 1.day
     start_of_period = (current_date - 12.months)
 
-    # Get all transactions from the last 12 full months
+    # Get all transactions from the last 12 full months (including income)
     historical = FinancialTransaction
       .where('transacted_at >= ? AND transacted_at <= ?', start_of_period, end_of_last_month)
       .where(hidden: false)
-      .where('amount > 0') # expenses only
-      .where("category NOT ILIKE '%income%' OR category IS NULL")
+      .where('amount != 0')
 
     # Group by merchant identifier
     grouped = historical.group_by { |t| merchant_key(t) }
@@ -125,10 +124,10 @@ class FinancialTransactionsController < ApplicationController
 
       # Calculate statistics
       days = transactions.map { |t| t.transacted_at.day }
-      amounts = transactions.map { |t| t.amount.to_f }
+      latest_transaction = transactions.max_by(&:transacted_at)
 
       typical_day = median(days).round
-      typical_amount = median(amounts).round(2)
+      typical_amount = latest_transaction.amount.to_f.abs.round(2)
 
       # Get most common source and category
       sources = transactions.map(&:source).compact
@@ -140,6 +139,8 @@ class FinancialTransactionsController < ApplicationController
       sample = transactions.first
       display_name = sample.merchant_name.presence || sample.plaid_name
 
+      is_income = typical_category&.downcase&.include?('income') || latest_transaction.amount.to_f < 0
+
       recurring_patterns << {
         merchant_key: merchant_key,
         display_name: display_name,
@@ -150,7 +151,8 @@ class FinancialTransactionsController < ApplicationController
         source: typical_source,
         category: typical_category,
         months_present: months.length,
-        last_occurrence: transactions.max_by(&:transacted_at).transacted_at.to_date.iso8601
+        last_occurrence: latest_transaction.transacted_at.to_date.iso8601,
+        is_income: is_income
       }
     end
 

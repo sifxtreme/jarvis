@@ -329,6 +329,7 @@ export interface RecurringPattern {
   category: string;
   months_present: number;
   last_occurrence: string;
+  is_income: boolean;
   status?: 'overdue' | 'due_soon' | 'upcoming';
   days_difference?: number;
 }

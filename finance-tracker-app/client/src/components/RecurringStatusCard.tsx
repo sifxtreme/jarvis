@@ -10,7 +10,7 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Plus, AlertCircle, Clock, Calendar } from "lucide-react";
+import { ChevronDown, ChevronUp, Plus, AlertCircle, Clock, Calendar, TrendingUp } from "lucide-react";
 
 interface RecurringStatusCardProps {
   year: number;
@@ -32,7 +32,10 @@ const formatDay = (day: number): string => {
   return `${day}${getOrdinalSuffix(day)}`;
 };
 
-const getStatusIcon = (status: string) => {
+const getStatusIcon = (status: string, isIncome: boolean) => {
+  if (isIncome) {
+    return <TrendingUp className="h-4 w-4 text-green-500" />;
+  }
   switch (status) {
     case 'overdue':
       return <AlertCircle className="h-4 w-4 text-red-500" />;
@@ -67,11 +70,14 @@ export function RecurringStatusCard({ year, month, onQuickAdd }: RecurringStatus
     // Create a date for this month with the typical day
     const transactionDate = new Date(year, month - 1, Math.min(pattern.typical_day, 28));
 
+    // For income, amount should be negative
+    const amount = pattern.is_income ? -pattern.typical_amount : pattern.typical_amount;
+
     onQuickAdd({
       transacted_at: transactionDate.toISOString().split('T')[0],
       plaid_name: pattern.plaid_name || pattern.display_name,
       merchant_name: pattern.merchant_name || pattern.display_name,
-      amount: pattern.typical_amount,
+      amount: amount,
       source: pattern.source,
       category: pattern.category,
       hidden: false,
@@ -79,47 +85,55 @@ export function RecurringStatusCard({ year, month, onQuickAdd }: RecurringStatus
     });
   };
 
-  // Filter to only show manual sources that need attention
+  // Filter to only show manual sources that need attention (for expenses)
   const manualSources = ['zelle', 'cash', 'venmo', 'bofa'];
   const missingManual = data?.missing?.filter(p =>
-    manualSources.includes(p.source?.toLowerCase() || '')
+    !p.is_income && manualSources.includes(p.source?.toLowerCase() || '')
   ) || [];
 
   const missingAuto = data?.missing?.filter(p =>
-    !manualSources.includes(p.source?.toLowerCase() || '')
+    !p.is_income && !manualSources.includes(p.source?.toLowerCase() || '')
   ) || [];
+
+  // Income items (show all, regardless of source)
+  const missingIncome = data?.missing?.filter(p => p.is_income) || [];
 
   const overdueManual = missingManual.filter(p => p.status === 'overdue');
   const upcomingManual = missingManual.filter(p => p.status !== 'overdue');
+  const overdueIncome = missingIncome.filter(p => p.status === 'overdue');
+  const upcomingIncome = missingIncome.filter(p => p.status !== 'overdue');
 
   if (isLoading) {
     return null;
   }
 
-  // Don't show if no missing manual transactions
-  if (missingManual.length === 0) {
+  // Don't show if nothing to display
+  if (missingManual.length === 0 && missingIncome.length === 0) {
     return null;
   }
+
+  const totalMissing = missingManual.length + missingIncome.length;
+  const totalOverdue = overdueManual.length + overdueIncome.length;
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <Card className={cn(
         "mb-4 border-l-4",
-        overdueManual.length > 0 ? "border-l-red-500" : "border-l-yellow-500"
+        totalOverdue > 0 ? "border-l-red-500" : "border-l-yellow-500"
       )}>
         <CollapsibleTrigger asChild>
           <CardHeader className="py-2 px-4 cursor-pointer hover:bg-muted/50 transition-colors">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
-                {overdueManual.length > 0 ? (
+                {totalOverdue > 0 ? (
                   <AlertCircle className="h-4 w-4 text-red-500" />
                 ) : (
                   <Clock className="h-4 w-4 text-yellow-500" />
                 )}
-                Missing Recurring ({missingManual.length})
-                {overdueManual.length > 0 && (
+                Missing Recurring ({totalMissing})
+                {totalOverdue > 0 && (
                   <span className="text-xs text-red-500 font-normal">
-                    ({overdueManual.length} overdue)
+                    ({totalOverdue} overdue)
                   </span>
                 )}
               </CardTitle>
@@ -134,14 +148,14 @@ export function RecurringStatusCard({ year, month, onQuickAdd }: RecurringStatus
         <CollapsibleContent>
           <CardContent className="py-2 px-4">
             <div className="space-y-1">
-              {/* Overdue items first */}
+              {/* Overdue expenses first */}
               {overdueManual.map((pattern) => (
                 <div
                   key={pattern.merchant_key}
                   className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 group"
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {getStatusIcon(pattern.status!)}
+                    {getStatusIcon(pattern.status!, pattern.is_income)}
                     <div className="flex-1 min-w-0">
                       <div className="font-mono text-sm truncate">
                         {pattern.display_name}
@@ -156,10 +170,7 @@ export function RecurringStatusCard({ year, month, onQuickAdd }: RecurringStatus
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={cn(
-                      "text-xs font-medium",
-                      pattern.status === 'overdue' ? "text-red-500" : "text-muted-foreground"
-                    )}>
+                    <span className="text-xs font-medium text-red-500">
                       {getStatusText(pattern)}
                     </span>
                     <Button
@@ -174,14 +185,51 @@ export function RecurringStatusCard({ year, month, onQuickAdd }: RecurringStatus
                 </div>
               ))}
 
-              {/* Upcoming items */}
+              {/* Overdue income */}
+              {overdueIncome.map((pattern) => (
+                <div
+                  key={pattern.merchant_key}
+                  className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 group"
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {getStatusIcon(pattern.status!, pattern.is_income)}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-mono text-sm truncate text-green-600">
+                        {pattern.display_name}
+                      </div>
+                      <div className="text-xs text-muted-foreground flex items-center gap-2">
+                        <span>Day {formatDay(pattern.typical_day)}</span>
+                        <span>•</span>
+                        <span className="font-mono text-green-600">+{formatCurrency(pattern.typical_amount)}</span>
+                        <span>•</span>
+                        <span>{pattern.source}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-red-500">
+                      {getStatusText(pattern)}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => handleQuickAdd(pattern)}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              {/* Upcoming expenses */}
               {upcomingManual.map((pattern) => (
                 <div
                   key={pattern.merchant_key}
                   className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 group"
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {getStatusIcon(pattern.status!)}
+                    {getStatusIcon(pattern.status!, pattern.is_income)}
                     <div className="flex-1 min-w-0">
                       <div className="font-mono text-sm truncate text-muted-foreground">
                         {pattern.display_name}
@@ -190,6 +238,43 @@ export function RecurringStatusCard({ year, month, onQuickAdd }: RecurringStatus
                         <span>Day {formatDay(pattern.typical_day)}</span>
                         <span>•</span>
                         <span className="font-mono">~{formatCurrency(pattern.typical_amount)}</span>
+                        <span>•</span>
+                        <span>{pattern.source}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {getStatusText(pattern)}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => handleQuickAdd(pattern)}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              {/* Upcoming income */}
+              {upcomingIncome.map((pattern) => (
+                <div
+                  key={pattern.merchant_key}
+                  className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 group"
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {getStatusIcon(pattern.status!, pattern.is_income)}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-mono text-sm truncate text-green-600/70">
+                        {pattern.display_name}
+                      </div>
+                      <div className="text-xs text-muted-foreground flex items-center gap-2">
+                        <span>Day {formatDay(pattern.typical_day)}</span>
+                        <span>•</span>
+                        <span className="font-mono text-green-600/70">+{formatCurrency(pattern.typical_amount)}</span>
                         <span>•</span>
                         <span>{pattern.source}</span>
                       </div>
