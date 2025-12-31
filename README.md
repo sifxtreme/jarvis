@@ -1,14 +1,22 @@
 # Jarvis
 
-Personal finance tracking and automation platform.
+Personal automation platform. Your digital butler for life's recurring tasks.
 
-## Features
+## Modules
 
+### Finance Tracker
 - **Multi-Bank Transaction Sync** - Automatically syncs credit card transactions from multiple banks via Teller API (every 3 hours)
 - **Smart Categorization** - ML-based prediction of transaction categories and merchant names based on history
 - **Budget Tracking** - Track spending against budgets with visualizations
 - **Email Summaries** - Daily email with credit card balance summaries
 - **Transaction Search** - Search and filter through financial transactions (with trigram indexing for fast ILIKE searches)
+
+### Future Modules
+- Health & Fitness tracking
+- Task & Project management
+- Home automation
+- Calendar & Scheduling
+- And more...
 
 ## Architecture
 
