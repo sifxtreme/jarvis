@@ -160,9 +160,10 @@ class FinancialTransactionsController < ApplicationController
   def merchant_breakdown(scope)
     scope
       .where('amount > 0')
-      .group("COALESCE(NULLIF(merchant_name, ''), plaid_name)")
+      .where.not(plaid_name: [nil, ''])
+      .group(:plaid_name)
       .select(
-        "COALESCE(NULLIF(merchant_name, ''), plaid_name) as merchant",
+        "plaid_name as merchant",
         "SUM(amount) as total",
         "COUNT(*) as transaction_count",
         "array_agg(DISTINCT category) as categories",
@@ -242,21 +243,22 @@ class FinancialTransactionsController < ApplicationController
   end
 
   def monthly_by_merchant(scope)
-    # Get top 10 merchants by total spend
+    # Get top 10 merchants by total spend (using plaid_name)
     top_merchants = scope
       .where('amount > 0')
-      .group("COALESCE(NULLIF(merchant_name, ''), plaid_name)")
+      .where.not(plaid_name: [nil, ''])
+      .group(:plaid_name)
       .order('SUM(amount) DESC')
       .limit(10)
-      .pluck("COALESCE(NULLIF(merchant_name, ''), plaid_name)")
+      .pluck(:plaid_name)
 
     # Get monthly data for those merchants
     data = scope
       .where('amount > 0')
-      .where("COALESCE(NULLIF(merchant_name, ''), plaid_name) IN (?)", top_merchants)
-      .group("COALESCE(NULLIF(merchant_name, ''), plaid_name)", "to_char(transacted_at, 'YYYY-MM')")
+      .where(plaid_name: top_merchants)
+      .group(:plaid_name, "to_char(transacted_at, 'YYYY-MM')")
       .select(
-        "COALESCE(NULLIF(merchant_name, ''), plaid_name) as merchant",
+        "plaid_name as merchant",
         "to_char(transacted_at, 'YYYY-MM') as month",
         "SUM(amount) as total",
         "COUNT(*) as transaction_count"
