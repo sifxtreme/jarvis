@@ -53,15 +53,13 @@ class Teller::API
       raw_transactions = fetch_transactions(bank)
 
       filtered_transactions = raw_transactions.filter do |trx|
-        allowed_types = %w[card_payment refund fee transaction]
-        is_transaction = allowed_types.include?(trx['type'])
         is_complete = trx['status'] == 'posted'
         trx_date = Date.parse(trx['date'])
 
         # Use bank's sync_from_date if set, otherwise sync all
         date_ok = bank.sync_from_date.nil? || trx_date > bank.sync_from_date
 
-        date_ok && is_complete && is_transaction
+        date_ok && is_complete
       end
 
       Rails.logger.info "[Teller] Found #{filtered_transactions.count} transactions for #{bank.name}"
