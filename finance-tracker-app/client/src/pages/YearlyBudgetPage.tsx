@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getBudgets, getTransactions, type TransactionFilters, type Budget, type Transaction } from "../lib/api";
+import { getBudgets, getTransactions, type TransactionFilters, type Budget, type Transaction, OTHER_CATEGORY } from "../lib/api";
 import {
   Card,
   CardHeader,
@@ -349,10 +349,10 @@ export default function YearlyBudgetPage() {
     transactions.forEach(transaction => {
       if (!transaction.category) return;
 
-      // Map non-budgeted categories to "Other"
+      // Map non-budgeted categories to OTHER_CATEGORY
       const category = budgetedCategories.has(transaction.category)
         ? transaction.category
-        : "Other";
+        : OTHER_CATEGORY;
 
       if (!categoryActuals[category]) {
         categoryActuals[category] = {};
@@ -364,9 +364,9 @@ export default function YearlyBudgetPage() {
     });
   });
 
-  // Add "Other" to allCategories if there are transactions in the "Other" category
-  if (categoryActuals["Other"]) {
-    allCategories.add("Other");
+  // Add OTHER_CATEGORY to allCategories if there are transactions in that category
+  if (categoryActuals[OTHER_CATEGORY]) {
+    allCategories.add(OTHER_CATEGORY);
   }
 
   // Store display_order for each category
@@ -380,10 +380,10 @@ export default function YearlyBudgetPage() {
     });
   });
 
-  // Set a high display_order for "Other" category to make it appear at the end
-  // But only if "Other" is not a legitimate budget category
-  if (allCategories.has("Other") && !budgetedCategories.has("Other")) {
-    categoryDisplayOrder["Other"] = 999;
+  // Set a high display_order for OTHER_CATEGORY to make it appear at the end
+  // But only if it's not a legitimate budget category
+  if (allCategories.has(OTHER_CATEGORY) && !budgetedCategories.has(OTHER_CATEGORY)) {
+    categoryDisplayOrder[OTHER_CATEGORY] = 999;
   }
 
   // Sort categories by display_order first, then by type (income first, then expenses)
@@ -451,10 +451,10 @@ export default function YearlyBudgetPage() {
     transactions.forEach(transaction => {
       if (!transaction.category) return;
 
-      // Map non-budgeted categories to "Other"
+      // Map non-budgeted categories to OTHER_CATEGORY
       const category = budgetedCategories.has(transaction.category)
         ? transaction.category
-        : "Other";
+        : OTHER_CATEGORY;
 
       if (!transactionsByCategory[category]) {
         transactionsByCategory[category] = {};

@@ -110,6 +110,10 @@ export interface Budget {
   display_order: number;
 }
 
+// Category used for transactions that don't match any budget category
+export const OTHER_CATEGORY = "Other" as const;
+export type OtherCategory = typeof OTHER_CATEGORY;
+
 export interface TransactionFilters {
   year?: number;
   month?: number;
