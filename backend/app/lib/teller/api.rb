@@ -53,7 +53,8 @@ class Teller::API
       raw_transactions = fetch_transactions(bank)
 
       filtered_transactions = raw_transactions.filter do |trx|
-        is_transaction = trx['type'] == 'card_payment' || trx['type'] == 'refund'
+        allowed_types = %w[card_payment refund fee transaction]
+        is_transaction = allowed_types.include?(trx['type'])
         is_complete = trx['status'] == 'posted'
         trx_date = Date.parse(trx['date'])
 
