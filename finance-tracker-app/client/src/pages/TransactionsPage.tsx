@@ -83,7 +83,7 @@ export default function TransactionsPage() {
         <ResizablePanel defaultSize={70} minSize={50}>
           <div className="h-full flex flex-col">
             <div className="p-4 flex-shrink-0">
-              <div className="flex justify-between items-center mb-6">
+              <div className="flex justify-between items-center mb-2">
                 <h1 className="text-2xl font-bold">Transactions</h1>
 
                 {/* Desktop inline filters */}
