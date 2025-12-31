@@ -173,7 +173,10 @@
         <label for="apiBaseUrl">API Base URL</label>
         <input type="text" id="apiBaseUrl" placeholder="https://your-api.com" value="https://sifxtre.me" />
 
-        <label for="lookupToken">Access Token</label>
+        <label for="apiPassword">API Password</label>
+        <input type="password" id="apiPassword" placeholder="JARVIS_RAILS_PASSWORD" />
+
+        <label for="lookupToken">Teller Access Token</label>
         <input type="text" id="lookupToken" placeholder="token_xxxxxxxxxx" />
 
         <button class="btn-secondary" onclick="lookupAccounts()">Lookup Accounts</button>
@@ -295,17 +298,22 @@
 
         async function lookupAccounts() {
             const baseUrl = document.getElementById('apiBaseUrl').value.trim();
+            const password = document.getElementById('apiPassword').value.trim();
             const token = document.getElementById('lookupToken').value.trim();
 
             if (!baseUrl || !token) {
-                showLookupStatus('Please enter both API URL and Access Token', 'error');
+                showLookupStatus('Please enter API URL and Teller Access Token', 'error');
                 return;
             }
 
             showLookupStatus('Fetching accounts...', 'info');
 
             try {
-                const response = await fetch(`${baseUrl}/teller/accounts?token=${encodeURIComponent(token)}`);
+                const headers = {};
+                if (password) {
+                    headers['Authorization'] = password;
+                }
+                const response = await fetch(`${baseUrl}/teller/accounts?token=${encodeURIComponent(token)}`, { headers });
                 const data = await response.json();
 
                 if (!response.ok) {
