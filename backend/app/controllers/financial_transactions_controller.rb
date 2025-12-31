@@ -58,12 +58,12 @@ class FinancialTransactionsController < ApplicationController
     data = JSON.parse(request.body.read)
 
     f = FinancialTransaction.find(params[:id])
-    f.merchant_name = data['merchant_name']
-    f.category = data['category']
-    f.amount = data['amount']
-    f.transacted_at = get_date(data['transacted_at'])
-    f.source = data['source']
-    f.hidden = data['hidden'] || false
+    f.merchant_name = data['merchant_name'] if data.key?('merchant_name')
+    f.category = data['category'] if data.key?('category')
+    f.amount = data['amount'] if data.key?('amount')
+    f.transacted_at = get_date(data['transacted_at']) if data.key?('transacted_at')
+    f.source = data['source'] if data.key?('source')
+    f.hidden = data.key?('hidden') ? data['hidden'] : f.hidden
     f.reviewed = true
     f.save!
 
