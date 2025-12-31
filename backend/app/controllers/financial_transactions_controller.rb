@@ -103,11 +103,15 @@ class FinancialTransactionsController < ApplicationController
     end_of_last_month = current_date - 1.day
     start_of_period = (current_date - 12.months)
 
-    # Get all transactions from the last 12 full months (including income)
+    # Manual sources only - auto-synced sources (amex, chase, etc.) have too much noise
+    manual_sources = ['zelle', 'cash', 'venmo', 'bofa']
+
+    # Get all transactions from the last 12 full months (manual sources only)
     historical = FinancialTransaction
       .where('transacted_at >= ? AND transacted_at <= ?', start_of_period, end_of_last_month)
       .where(hidden: false)
       .where('amount != 0')
+      .where('LOWER(source) IN (?)', manual_sources)
 
     # Group by merchant identifier
     grouped = historical.group_by { |t| merchant_key(t) }

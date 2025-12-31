@@ -198,26 +198,21 @@ export function RecurringStatusCard({ year, month, onQuickAdd }: RecurringStatus
     setDismissedCount(0);
   }, [year, month]);
 
-  // Filter to only show manual sources that need attention (for expenses)
-  const manualSources = ['zelle', 'cash', 'venmo', 'bofa'];
-
   // Filter out dismissed items
   const filterDismissed = (patterns: RecurringPattern[]) =>
     patterns.filter(p => !dismissedKeys.has(p.merchant_key));
 
-  const missingManual = filterDismissed(
-    data?.missing?.filter(p =>
-      !p.is_income && manualSources.includes(p.source?.toLowerCase() || '')
-    ) || []
+  // Backend already filters to manual sources only (zelle, cash, venmo, bofa)
+  const missingExpenses = filterDismissed(
+    data?.missing?.filter(p => !p.is_income) || []
   );
 
-  // Income items (show all, regardless of source)
   const missingIncome = filterDismissed(
     data?.missing?.filter(p => p.is_income) || []
   );
 
-  const overdueManual = missingManual.filter(p => p.status === 'overdue');
-  const upcomingManual = missingManual.filter(p => p.status !== 'overdue');
+  const overdueExpenses = missingExpenses.filter(p => p.status === 'overdue');
+  const upcomingExpenses = missingExpenses.filter(p => p.status !== 'overdue');
   const overdueIncome = missingIncome.filter(p => p.status === 'overdue');
   const upcomingIncome = missingIncome.filter(p => p.status !== 'overdue');
 
@@ -226,12 +221,12 @@ export function RecurringStatusCard({ year, month, onQuickAdd }: RecurringStatus
   }
 
   // Don't show if nothing to display (but show if there are dismissed items to restore)
-  if (missingManual.length === 0 && missingIncome.length === 0 && dismissedCount === 0) {
+  if (missingExpenses.length === 0 && missingIncome.length === 0 && dismissedCount === 0) {
     return null;
   }
 
-  const totalMissing = missingManual.length + missingIncome.length;
-  const totalOverdue = overdueManual.length + overdueIncome.length;
+  const totalMissing = missingExpenses.length + missingIncome.length;
+  const totalOverdue = overdueExpenses.length + overdueIncome.length;
 
   // Render a single recurring item row
   const renderItem = (pattern: RecurringPattern, isOverdue: boolean) => (
@@ -296,7 +291,7 @@ export function RecurringStatusCard({ year, month, onQuickAdd }: RecurringStatus
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <Card className={cn(
-        "mb-4 border-l-4",
+        "mb-2 border-l-4",
         totalOverdue > 0 ? "border-l-red-500" : "border-l-yellow-500"
       )}>
         <CollapsibleTrigger asChild>
@@ -337,13 +332,13 @@ export function RecurringStatusCard({ year, month, onQuickAdd }: RecurringStatus
             ) : (
               <div className="space-y-1">
                 {/* Overdue expenses first */}
-                {overdueManual.map((pattern) => renderItem(pattern, true))}
+                {overdueExpenses.map((pattern) => renderItem(pattern, true))}
 
                 {/* Overdue income */}
                 {overdueIncome.map((pattern) => renderItem(pattern, true))}
 
                 {/* Upcoming expenses */}
-                {upcomingManual.map((pattern) => renderItem(pattern, false))}
+                {upcomingExpenses.map((pattern) => renderItem(pattern, false))}
 
                 {/* Upcoming income */}
                 {upcomingIncome.map((pattern) => renderItem(pattern, false))}
