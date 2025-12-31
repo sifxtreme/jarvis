@@ -78,7 +78,7 @@ export default function FilterControls({ onSearch, initialFilters, className }: 
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Years</SelectItem>
-          {[currentYear, currentYear - 1, currentYear - 2].map((year) => (
+          {[currentYear + 1, currentYear, currentYear - 1, currentYear - 2].map((year) => (
             <SelectItem key={year} value={year.toString()}>
               {year}
             </SelectItem>
