@@ -31,7 +31,7 @@ import { FaCcAmex, FaCcVisa, FaUniversity, FaCreditCard, FaAmazon } from 'react-
 import { api, Transaction } from "../lib/api";
 import { formatCurrency, formatDate } from "../lib/utils";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TransactionModal } from "./TransactionModal";
