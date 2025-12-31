@@ -142,7 +142,7 @@ const getStatusText = (pattern: RecurringPattern): string => {
 };
 
 export function RecurringStatusCard({ year, month, onQuickAdd }: RecurringStatusCardProps) {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false); // Default closed on desktop
   const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(new Set());
   const [dismissedCount, setDismissedCount] = useState(0);
 
@@ -289,7 +289,7 @@ export function RecurringStatusCard({ year, month, onQuickAdd }: RecurringStatus
   );
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="hidden md:block">
       <Card className={cn(
         "mb-2 border-l-4",
         totalOverdue > 0 ? "border-l-red-500" : "border-l-yellow-500"
