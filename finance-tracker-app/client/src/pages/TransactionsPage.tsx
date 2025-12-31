@@ -34,11 +34,14 @@ export default function TransactionsPage() {
 
   // Update URL when filters change
   useEffect(() => {
-    const params: Record<string, string> = {
-      year: filters.year?.toString(),
-      month: filters.month?.toString()
-    }
+    const params: Record<string, string> = {}
 
+    if (filters.year !== undefined) {
+      params.year = filters.year.toString()
+    }
+    if (filters.month !== undefined) {
+      params.month = filters.month.toString()
+    }
     if (filters.query) {
       params.query = filters.query
     }

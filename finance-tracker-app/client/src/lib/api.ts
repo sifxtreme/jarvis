@@ -118,8 +118,8 @@ export interface TransactionFilters {
 }
 
 export interface BudgetFilters {
-  year: number;
-  month: number;
+  year?: number;
+  month?: number;
   show_hidden: boolean;
   show_needs_review: boolean;
 }
