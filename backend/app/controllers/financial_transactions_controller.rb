@@ -17,7 +17,7 @@ class FinancialTransactionsController < ApplicationController
       current_year_month = "#{year}-#{month.rjust(2, '0')}"
       db_query = db_query.where('extract(month from transacted_at) = ? OR ? = ANY(amortized_months)', month, current_year_month)
     end
-    db_query = db_query.where('category ilike ? or merchant_name ilike ? or plaid_name ilike ?', "%#{query}%", "%#{query}%", "%#{query}%") if query
+    db_query = db_query.where('category ilike ? or merchant_name ilike ? or plaid_name ilike ? or source ilike ?', "%#{query}%", "%#{query}%", "%#{query}%", "%#{query}%") if query
     db_query = db_query.where('hidden is true') if show_hidden == 'true'
     db_query = db_query.where('hidden is false') if show_hidden == 'false'
     db_query = db_query.where('reviewed is false') if show_needs_review == 'true'
