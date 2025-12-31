@@ -79,21 +79,23 @@ class FinancialTransactionsController < ApplicationController
     year = (params[:year] || Date.current.year).to_i
     category_filter = params[:category]
 
-    base_scope = FinancialTransaction
+    # Base scope includes ALL transactions (including income) for accurate totals
+    all_transactions = FinancialTransaction
       .where('extract(year from transacted_at) = ?', year)
       .where(hidden: false)
-      .where("category NOT ILIKE '%income%' OR category IS NULL")
 
-    base_scope = base_scope.where(category: category_filter) if category_filter.present?
+    # Expense-only scope excludes income categories (for spending charts)
+    expense_scope = all_transactions.where("category NOT ILIKE '%income%' OR category IS NULL")
+    expense_scope = expense_scope.where(category: category_filter) if category_filter.present?
 
     render json: {
-      period: period_summary(base_scope, year),
-      monthly_totals: monthly_breakdown(base_scope),
-      by_category: category_breakdown(base_scope),
-      by_merchant: merchant_breakdown(base_scope),
-      budget_comparison: budget_comparison(base_scope, year),
-      monthly_by_category: monthly_by_category(base_scope),
-      monthly_by_merchant: monthly_by_merchant(base_scope)
+      period: period_summary(all_transactions, year),
+      monthly_totals: monthly_breakdown(expense_scope),
+      by_category: category_breakdown(expense_scope),
+      by_merchant: merchant_breakdown(expense_scope),
+      budget_comparison: budget_comparison(expense_scope, year),
+      monthly_by_category: monthly_by_category(expense_scope),
+      monthly_by_merchant: monthly_by_merchant(expense_scope)
     }
   end
 
@@ -260,7 +262,6 @@ class FinancialTransactionsController < ApplicationController
         "COUNT(*) as transaction_count"
       )
       .order('total DESC')
-      .limit(20)
 
     budgets = Budget.where(expense_type: 'expense').index_by(&:name)
 
@@ -294,7 +295,6 @@ class FinancialTransactionsController < ApplicationController
         "MAX(transacted_at) as last_transaction"
       )
       .order('total DESC')
-      .limit(15)
       .map do |row|
         {
           merchant: row.merchant,
@@ -330,19 +330,11 @@ class FinancialTransactionsController < ApplicationController
   end
 
   def monthly_by_category(scope)
-    # Get top 10 categories by total spend
-    top_categories = scope
-      .where('amount > 0')
-      .where.not(category: [nil, ''])
-      .group(:category)
-      .order('SUM(amount) DESC')
-      .limit(10)
-      .pluck(:category)
-
-    # Get monthly data for those categories
+    # Get ALL categories that have transactions (no limit)
+    # This ensures budget tracking charts can show all budgeted categories
     data = scope
       .where('amount > 0')
-      .where(category: top_categories)
+      .where.not(category: [nil, ''])
       .group(:category, "to_char(transacted_at, 'YYYY-MM')")
       .select(
         "category",
@@ -357,7 +349,7 @@ class FinancialTransactionsController < ApplicationController
       result[row.category] << { month: row.month, total: row.total.to_f.round(2) }
     end
 
-    # Sort each category's months and return
+    # Sort each category's months and return (sorted by total spend descending)
     result.map do |category, months|
       {
         category: category,
@@ -367,19 +359,10 @@ class FinancialTransactionsController < ApplicationController
   end
 
   def monthly_by_merchant(scope)
-    # Get top 10 merchants by total spend (using plaid_name)
-    top_merchants = scope
-      .where('amount > 0')
-      .where.not(plaid_name: [nil, ''])
-      .group(:plaid_name)
-      .order('SUM(amount) DESC')
-      .limit(10)
-      .pluck(:plaid_name)
-
-    # Get monthly data for those merchants
+    # Get ALL merchants monthly data (no limit)
     data = scope
       .where('amount > 0')
-      .where(plaid_name: top_merchants)
+      .where.not(plaid_name: [nil, ''])
       .group(:plaid_name, "to_char(transacted_at, 'YYYY-MM')")
       .select(
         "plaid_name as merchant",
@@ -395,7 +378,7 @@ class FinancialTransactionsController < ApplicationController
       result[row.merchant] << { month: row.month, total: row.total.to_f.round(2), transaction_count: row.transaction_count }
     end
 
-    # Sort each merchant's months and return
+    # Sort each merchant's months and return (sorted by total spend descending)
     result.map do |merchant, months|
       {
         merchant: merchant,

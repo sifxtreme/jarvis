@@ -27,8 +27,9 @@ import {
   Scissors,
   Code
 } from "lucide-react";
-import { FaCcAmex, FaCcVisa, FaUniversity, FaCreditCard, FaAmazon } from 'react-icons/fa';
-import { api, Transaction } from "../lib/api";
+import { FaCcAmex, FaCcVisa, FaUniversity, FaCreditCard, FaAmazon, FaUber, FaSeedling, FaLeaf } from 'react-icons/fa';
+import { TbTargetArrow } from 'react-icons/tb';
+import { api, Transaction, OTHER_CATEGORY } from "../lib/api";
 import { formatCurrency, formatDate } from "../lib/utils";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -71,11 +72,58 @@ const getSourceIcon = (source: string | null) => {
   }
 };
 
-// Function to check if a merchant is Amazon
-const isAmazonMerchant = (plaidName: string | null): boolean => {
-  if (!plaidName) return false;
-  return /amazon|amzn/i.test(plaidName);
+// Merchant icon detection
+type MerchantIconInfo = {
+  icon: React.ReactNode;
+  label: string;
 };
+
+const getMerchantIcon = (plaidName: string | null, merchantName: string | null): MerchantIconInfo | null => {
+  const name = (plaidName || merchantName || '').toLowerCase();
+
+  // Amazon / Prime Video
+  if (/amazon|amzn|prime video/i.test(name)) {
+    return {
+      icon: <FaAmazon className="h-4 w-4 text-[#FF9900]" />,
+      label: name.includes('prime video') ? 'Prime Video' : 'Amazon'
+    };
+  }
+
+  // Target
+  if (/\btarget\b/i.test(name)) {
+    return {
+      icon: <TbTargetArrow className="h-4 w-4 text-[#CC0000]" />,
+      label: 'Target'
+    };
+  }
+
+  // Uber / Uber Eats
+  if (/\buber\b/i.test(name)) {
+    return {
+      icon: <FaUber className="h-4 w-4 text-black" />,
+      label: name.includes('eats') ? 'Uber Eats' : 'Uber'
+    };
+  }
+
+  // Sprouts
+  if (/sprouts/i.test(name)) {
+    return {
+      icon: <FaSeedling className="h-4 w-4 text-green-600" />,
+      label: 'Sprouts'
+    };
+  }
+
+  // Whole Foods
+  if (/whole foods/i.test(name)) {
+    return {
+      icon: <FaLeaf className="h-4 w-4 text-green-700" />,
+      label: 'Whole Foods'
+    };
+  }
+
+  return null;
+};
+
 
 export default function TransactionTable({
   transactions = [],
@@ -401,18 +449,24 @@ export default function TransactionTable({
                 <TableCell className="font-mono">{formatDate(transaction.transacted_at)}</TableCell>
                 <TableCell className="font-mono">
                   <div className="flex items-center gap-1">
-                    {isAmazonMerchant(transaction.plaid_name) && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <FaAmazon className="h-4 w-4 text-[#FF9900]" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Amazon Purchase</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
+                    {(() => {
+                      const merchantIcon = getMerchantIcon(transaction.plaid_name, transaction.merchant_name);
+                      if (merchantIcon) {
+                        return (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                {merchantIcon.icon}
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{merchantIcon.label}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        );
+                      }
+                      return null;
+                    })()}
                     {transaction.merchant_name ? (
                       <TooltipProvider>
                         <Tooltip>
@@ -427,7 +481,19 @@ export default function TransactionTable({
                     ) : transaction.plaid_name}
                   </div>
                 </TableCell>
-                <TableCell className="font-mono">{transaction.category || 'Uncategorized'}</TableCell>
+                <TableCell className={cn(
+                  "font-mono",
+                  transaction.category === OTHER_CATEGORY && "text-orange-600 font-medium"
+                )}>
+                  {transaction.category === OTHER_CATEGORY ? (
+                    <span className="inline-flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {transaction.category}
+                    </span>
+                  ) : (
+                    transaction.category || 'Uncategorized'
+                  )}
+                </TableCell>
                 <TableCell>
                   <TooltipProvider>
                     <div className="flex items-center gap-2">
@@ -568,18 +634,24 @@ export default function TransactionTable({
               <div>
                 <div className="font-mono font-medium">
                   <div className="flex items-center gap-1">
-                    {isAmazonMerchant(transaction.plaid_name) && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <FaAmazon className="h-4 w-4 text-[#FF9900]" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Amazon Purchase</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
+                    {(() => {
+                      const merchantIcon = getMerchantIcon(transaction.plaid_name, transaction.merchant_name);
+                      if (merchantIcon) {
+                        return (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                {merchantIcon.icon}
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{merchantIcon.label}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        );
+                      }
+                      return null;
+                    })()}
                     {transaction.merchant_name ? (
                       <TooltipProvider>
                         <Tooltip>
@@ -606,7 +678,19 @@ export default function TransactionTable({
             </div>
 
             <div className="flex items-center justify-between mt-4">
-              <div className="font-mono text-sm">{transaction.category || 'Uncategorized'}</div>
+              <div className={cn(
+                "font-mono text-sm",
+                transaction.category === OTHER_CATEGORY && "text-orange-600 font-medium"
+              )}>
+                {transaction.category === OTHER_CATEGORY ? (
+                  <span className="inline-flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {transaction.category}
+                  </span>
+                ) : (
+                  transaction.category || 'Uncategorized'
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={(e) => {
