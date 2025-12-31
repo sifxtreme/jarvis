@@ -199,13 +199,26 @@ export default function TrendsPage() {
       .filter(cat => hideOther ? cat.category !== OTHER_CATEGORY : true)
       .slice(0, categoryCount);
 
-    return filteredMonths.map(month => {
-      const dataPoint: Record<string, string | number> = { month: formatMonth(month) };
+    const data = filteredMonths.map(month => {
+      const dataPoint: Record<string, string | number | null> = { month: formatMonth(month) };
+      let total = 0;
       categoriesToShow.forEach(cat => {
         const monthData = cat.months.find(m => m.month === month);
-        dataPoint[cat.category] = monthData?.total || 0;
+        const value = monthData?.total || 0;
+        dataPoint[cat.category] = value;
+        if (!hiddenCategories.has(cat.category)) {
+          total += value;
+        }
       });
+      dataPoint._total = total;
       return dataPoint;
+    });
+
+    // Calculate 3-month moving average on total
+    return data.map((item, idx) => {
+      if (idx < 2) return { ...item, movingAvg: null };
+      const sum = data.slice(idx - 2, idx + 1).reduce((acc, d) => acc + (d._total as number), 0);
+      return { ...item, movingAvg: sum / 3 };
     });
   };
 
@@ -248,13 +261,26 @@ export default function TrendsPage() {
     }
     merchantsToShow = merchantsToShow.slice(0, categoryCount);
 
-    return filteredMonths.map(month => {
-      const dataPoint: Record<string, string | number> = { month: formatMonth(month) };
+    const data = filteredMonths.map(month => {
+      const dataPoint: Record<string, string | number | null> = { month: formatMonth(month) };
+      let total = 0;
       merchantsToShow.forEach(merch => {
         const monthData = merch.months.find(m => m.month === month);
-        dataPoint[merch.merchant] = monthData?.total || 0;
+        const value = monthData?.total || 0;
+        dataPoint[merch.merchant] = value;
+        if (!hiddenMerchants.has(merch.merchant)) {
+          total += value;
+        }
       });
+      dataPoint._total = total;
       return dataPoint;
+    });
+
+    // Calculate 3-month moving average on total
+    return data.map((item, idx) => {
+      if (idx < 2) return { ...item, movingAvg: null };
+      const sum = data.slice(idx - 2, idx + 1).reduce((acc, d) => acc + (d._total as number), 0);
+      return { ...item, movingAvg: sum / 3 };
     });
   };
 
@@ -643,8 +669,12 @@ export default function TrendsPage() {
 
       {/* Category Trends */}
       <Card className="mb-8">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Spending by Category (Month over Month)</CardTitle>
+          <div className="text-xs text-muted-foreground flex items-center gap-2">
+            <span className="inline-block w-4 h-0.5 bg-orange-500" style={{ borderTop: '2px dashed #f97316' }}></span>
+            <span>3-Mo Avg</span>
+          </div>
         </CardHeader>
         <CardContent>
           <ChartContainer config={chartConfig} className="h-[400px] w-full">
@@ -666,6 +696,19 @@ export default function TrendsPage() {
                   opacity={hiddenCategories.has(cat.category) ? 0 : 1}
                 />
               ))}
+              {showMovingAvg && (
+                <Line
+                  type="linear"
+                  dataKey="movingAvg"
+                  stroke="#f97316"
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  dot={false}
+                  connectNulls
+                  name="3-Mo Avg"
+                  legendType="none"
+                />
+              )}
             </LineChart>
           </ChartContainer>
         </CardContent>
@@ -675,17 +718,23 @@ export default function TrendsPage() {
       <Card className="mb-8">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Spending by Merchant (Month over Month)</CardTitle>
-          <Select value={merchantCategoryFilter} onValueChange={setMerchantCategoryFilter}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Filter by Category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {availableCategories.map(cat => (
-                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-4">
+            <div className="text-xs text-muted-foreground flex items-center gap-2">
+              <span className="inline-block w-4 h-0.5 bg-orange-500" style={{ borderTop: '2px dashed #f97316' }}></span>
+              <span>3-Mo Avg</span>
+            </div>
+            <Select value={merchantCategoryFilter} onValueChange={setMerchantCategoryFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Filter by Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {availableCategories.map(cat => (
+                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         <CardContent>
           <ChartContainer config={chartConfig} className="h-[400px] w-full">
@@ -706,6 +755,19 @@ export default function TrendsPage() {
                   opacity={hiddenMerchants.has(merch.merchant) ? 0 : 1}
                 />
               ))}
+              {showMovingAvg && (
+                <Line
+                  type="linear"
+                  dataKey="movingAvg"
+                  stroke="#f97316"
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  dot={false}
+                  connectNulls
+                  name="3-Mo Avg"
+                  legendType="none"
+                />
+              )}
             </LineChart>
           </ChartContainer>
         </CardContent>
