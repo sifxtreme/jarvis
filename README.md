@@ -12,7 +12,13 @@ currently jarvis supports:
 
 ## services
 
-### [plaid](docs/plaid.md)
+### [teller](docs/teller.md) (primary)
+
+The primary API for syncing bank transactions. Uses mTLS authentication with certificates.
+
+See [docs/teller.md](docs/teller.md) for setup, troubleshooting (including the common "enrollment disconnected" error), and adding new banks.
+
+### [plaid](docs/plaid.md) (legacy)
 
 a financial api to get all your transactions from credit cards and your balances
 
