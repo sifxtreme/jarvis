@@ -815,23 +815,30 @@ export default function TrendsPage() {
                   const categoryData = trends?.monthly_by_category?.find(c => c.category === budget.name);
                   const monthlyBudget = budget.amount;
 
-                  // Get monthly data for this category
-                  const chartData = categoryData?.months.map(m => {
-                    const variance = monthlyBudget - m.total;
-                    const variancePercent = monthlyBudget > 0 ? ((m.total - monthlyBudget) / monthlyBudget) * 100 : 0;
+                  // Create all 12 months with 0 defaults, then fill in actual data
+                  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                  const actualsByMonth = new Map<string, number>();
+                  categoryData?.months.forEach(m => {
+                    actualsByMonth.set(formatMonth(m.month), m.total);
+                  });
+
+                  const chartData = monthNames.map(monthName => {
+                    const actual = actualsByMonth.get(monthName) || 0;
+                    const variance = monthlyBudget - actual;
+                    const variancePercent = monthlyBudget > 0 ? ((actual - monthlyBudget) / monthlyBudget) * 100 : 0;
                     return {
-                      month: formatMonth(m.month),
-                      actual: m.total,
+                      month: monthName,
+                      actual,
                       budget: monthlyBudget,
                       variance,
                       variancePercent,
-                      overBudget: m.total > monthlyBudget
+                      overBudget: actual > monthlyBudget
                     };
-                  }) || [];
+                  });
 
                   // Calculate YTD totals
                   const ytdActual = chartData.reduce((sum, d) => sum + d.actual, 0);
-                  const ytdBudget = monthlyBudget * chartData.length;
+                  const ytdBudget = monthlyBudget * 12; // Full year budget
                   const ytdVariance = ytdBudget - ytdActual;
                   const ytdVariancePercent = ytdBudget > 0 ? ((ytdActual - ytdBudget) / ytdBudget) * 100 : 0;
                   const isOverBudget = ytdActual > ytdBudget;
