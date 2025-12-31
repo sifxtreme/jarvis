@@ -136,6 +136,11 @@ interface APIResponse<T> {
 }
 
 export const api = {
+  async getTransaction(id: number): Promise<Transaction> {
+    const response = await axiosInstance.get<Transaction>(`/financial_transactions/${id}`);
+    return response.data;
+  },
+
   async createTransaction(data: CreateTransactionData): Promise<Transaction> {
     const response = await axiosInstance.post<Transaction>('/financial_transactions', data);
     return response.data;

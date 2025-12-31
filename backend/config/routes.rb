@@ -1,7 +1,7 @@
 Rails.application.routes.draw do
   root to: 'home#index'
 
-  resources :financial_transactions, only: [:index, :create, :update] do
+  resources :financial_transactions, only: [:index, :show, :create, :update] do
     collection do
       get :trends
       get :recurring_status

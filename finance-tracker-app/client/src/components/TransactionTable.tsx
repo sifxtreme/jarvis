@@ -88,6 +88,7 @@ export default function TransactionTable({
   const [duplicatingTransaction, setDuplicatingTransaction] = useState<Transaction | null>(null);
   const [splittingTransaction, setSplittingTransaction] = useState<Transaction | null>(null);
   const [viewingRawTransaction, setViewingRawTransaction] = useState<Transaction | null>(null);
+  const [isLoadingRawData, setIsLoadingRawData] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [sortField, setSortField] = useState<SortField>('transacted_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -99,6 +100,19 @@ export default function TransactionTable({
       onExternalQuickAddHandled?.();
     }
   }, [externalQuickAdd, onExternalQuickAddHandled]);
+
+  const handleViewRawData = async (transaction: Transaction) => {
+    setIsLoadingRawData(true);
+    setViewingRawTransaction(transaction); // Show modal immediately with basic info
+    try {
+      const fullTransaction = await api.getTransaction(transaction.id);
+      setViewingRawTransaction(fullTransaction);
+    } catch (error) {
+      console.error('Failed to fetch transaction raw data:', error);
+    } finally {
+      setIsLoadingRawData(false);
+    }
+  };
 
   // Calculate total amount of all transactions, excluding those with "Income" in the category
   const totalExpenses = transactions
@@ -237,13 +251,23 @@ export default function TransactionTable({
         <DialogContent className="max-w-2xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle className="font-mono">
-              Transaction Data: {viewingRawTransaction?.merchant_name || viewingRawTransaction?.plaid_name}
+              Raw Data: {viewingRawTransaction?.merchant_name || viewingRawTransaction?.plaid_name}
             </DialogTitle>
           </DialogHeader>
           <ScrollArea className="h-[60vh]">
-            <pre className="font-mono text-xs bg-muted p-4 rounded-lg overflow-x-auto whitespace-pre-wrap">
-              {viewingRawTransaction && JSON.stringify(viewingRawTransaction, null, 2)}
-            </pre>
+            {isLoadingRawData ? (
+              <div className="flex items-center justify-center h-32 text-muted-foreground">
+                Loading...
+              </div>
+            ) : viewingRawTransaction?.raw_data ? (
+              <pre className="font-mono text-xs bg-muted p-4 rounded-lg overflow-x-auto whitespace-pre-wrap">
+                {JSON.stringify(viewingRawTransaction.raw_data, null, 2)}
+              </pre>
+            ) : (
+              <div className="flex items-center justify-center h-32 text-muted-foreground">
+                No raw data available for this transaction
+              </div>
+            )}
           </ScrollArea>
         </DialogContent>
       </Dialog>
@@ -504,7 +528,7 @@ export default function TransactionTable({
                           className="flex items-center justify-center w-6 h-6"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setViewingRawTransaction(transaction);
+                            handleViewRawData(transaction);
                           }}
                         >
                           <Code className="h-4 w-4 text-slate-500 hover:text-slate-700" />
@@ -617,7 +641,7 @@ export default function TransactionTable({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setViewingRawTransaction(transaction);
+                    handleViewRawData(transaction);
                   }}
                   className="p-2 hover:bg-muted rounded-full flex items-center justify-center"
                 >

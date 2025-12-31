@@ -54,6 +54,11 @@ class FinancialTransactionsController < ApplicationController
     render json: f
   end
 
+  def show
+    f = FinancialTransaction.find(params[:id])
+    render json: f
+  end
+
   def update
     data = JSON.parse(request.body.read)
 
