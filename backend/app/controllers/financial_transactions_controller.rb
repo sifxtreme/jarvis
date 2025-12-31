@@ -406,8 +406,8 @@ class FinancialTransactionsController < ApplicationController
   end
 
   def merchant_key(transaction)
-    # Use plaid_name as the primary key, fall back to merchant_name
-    transaction.plaid_name.presence || transaction.merchant_name.presence
+    # Use merchant_name as the primary key, fall back to plaid_name
+    transaction.merchant_name.presence || transaction.plaid_name.presence
   end
 
   def median(array)
