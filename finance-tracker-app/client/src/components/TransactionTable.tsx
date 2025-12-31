@@ -27,8 +27,13 @@ import {
   Scissors,
   Code
 } from "lucide-react";
-import { FaCcAmex, FaCcVisa, FaUniversity, FaCreditCard, FaAmazon, FaUber, FaSeedling, FaLeaf } from 'react-icons/fa';
+import { FaCcAmex, FaCcVisa, FaUniversity, FaCreditCard, FaAmazon, FaUber, FaSeedling, FaLeaf, FaSpotify, FaApple, FaAws, FaPlane } from 'react-icons/fa';
+import { SiNetflix, SiTesla, SiOpenai } from 'react-icons/si';
 import { TbTargetArrow } from 'react-icons/tb';
+import { MdDeliveryDining } from 'react-icons/md';
+import { GiPizzaSlice } from 'react-icons/gi';
+import { HiShoppingCart } from 'react-icons/hi';
+import { RiLeafLine } from 'react-icons/ri';
 import { api, Transaction, OTHER_CATEGORY } from "../lib/api";
 import { formatCurrency, formatDate } from "../lib/utils";
 import { cn } from "@/lib/utils";
@@ -79,46 +84,92 @@ type MerchantIconInfo = {
 };
 
 const getMerchantIcon = (plaidName: string | null, merchantName: string | null): MerchantIconInfo | null => {
-  const name = (plaidName || merchantName || '').toLowerCase();
+  // Check merchantName first (it's the clean/normalized version), then plaidName
+  const name = (merchantName || plaidName || '').toLowerCase();
+  const plaidLower = (plaidName || '').toLowerCase();
 
-  // Amazon / Prime Video
-  if (/amazon|amzn|prime video/i.test(name)) {
-    return {
-      icon: <FaAmazon className="h-4 w-4 text-[#FF9900]" />,
-      label: name.includes('prime video') ? 'Prime Video' : 'Amazon'
-    };
+  // Amazon / Prime Video / Kindle / AWS
+  if (/\baws\b/i.test(name) || /amazon web services/i.test(plaidLower)) {
+    return { icon: <FaAws className="h-4 w-4 text-[#FF9900]" />, label: 'AWS' };
+  }
+  if (/amazon|amzn|prime video|kindle/i.test(name)) {
+    const label = name.includes('prime video') ? 'Prime Video' : name.includes('kindle') ? 'Kindle' : 'Amazon';
+    return { icon: <FaAmazon className="h-4 w-4 text-[#FF9900]" />, label };
+  }
+
+  // Uber Eats (check before Uber)
+  if (/uber eats/i.test(name) || (name.includes('uber') && plaidLower.includes('eats'))) {
+    return { icon: <MdDeliveryDining className="h-4 w-4 text-[#06C167]" />, label: 'Uber Eats' };
+  }
+
+  // Uber
+  if (/\buber\b/i.test(name)) {
+    return { icon: <FaUber className="h-4 w-4 text-black" />, label: 'Uber' };
   }
 
   // Target
   if (/\btarget\b/i.test(name)) {
-    return {
-      icon: <TbTargetArrow className="h-4 w-4 text-[#CC0000]" />,
-      label: 'Target'
-    };
+    return { icon: <TbTargetArrow className="h-4 w-4 text-[#CC0000]" />, label: 'Target' };
   }
 
-  // Uber / Uber Eats
-  if (/\buber\b/i.test(name)) {
-    return {
-      icon: <FaUber className="h-4 w-4 text-black" />,
-      label: name.includes('eats') ? 'Uber Eats' : 'Uber'
-    };
+  // Costco
+  if (/costco/i.test(name)) {
+    return { icon: <HiShoppingCart className="h-4 w-4 text-[#E31837]" />, label: 'Costco' };
   }
 
   // Sprouts
   if (/sprouts/i.test(name)) {
-    return {
-      icon: <FaSeedling className="h-4 w-4 text-green-600" />,
-      label: 'Sprouts'
-    };
+    return { icon: <FaSeedling className="h-4 w-4 text-green-600" />, label: 'Sprouts' };
+  }
+
+  // Trader Joe's
+  if (/trader joe/i.test(name)) {
+    return { icon: <RiLeafLine className="h-4 w-4 text-[#C8102E]" />, label: "Trader Joe's" };
   }
 
   // Whole Foods
   if (/whole foods/i.test(name)) {
-    return {
-      icon: <FaLeaf className="h-4 w-4 text-green-700" />,
-      label: 'Whole Foods'
-    };
+    return { icon: <FaLeaf className="h-4 w-4 text-green-700" />, label: 'Whole Foods' };
+  }
+
+  // Netflix
+  if (/netflix/i.test(name)) {
+    return { icon: <SiNetflix className="h-4 w-4 text-[#E50914]" />, label: 'Netflix' };
+  }
+
+  // Spotify
+  if (/spotify/i.test(name)) {
+    return { icon: <FaSpotify className="h-4 w-4 text-[#1DB954]" />, label: 'Spotify' };
+  }
+
+  // Apple / iCloud
+  if (/\bapple\b|icloud/i.test(name) || /apple\.com/i.test(plaidLower)) {
+    return { icon: <FaApple className="h-4 w-4 text-gray-800" />, label: name.includes('icloud') ? 'iCloud' : 'Apple' };
+  }
+
+  // Tesla
+  if (/tesla/i.test(name)) {
+    return { icon: <SiTesla className="h-4 w-4 text-[#CC0000]" />, label: 'Tesla' };
+  }
+
+  // ChatGPT / OpenAI
+  if (/chatgpt|openai/i.test(name)) {
+    return { icon: <SiOpenai className="h-4 w-4 text-[#10A37F]" />, label: 'ChatGPT' };
+  }
+
+  // Domino's
+  if (/domino/i.test(name)) {
+    return { icon: <GiPizzaSlice className="h-4 w-4 text-[#006491]" />, label: "Domino's" };
+  }
+
+  // Southwest Airlines
+  if (/southwest/i.test(name)) {
+    return { icon: <FaPlane className="h-4 w-4 text-[#304CB2]" />, label: 'Southwest' };
+  }
+
+  // T-Mobile
+  if (/t-mobile|tmobile/i.test(name)) {
+    return { icon: <span className="h-4 w-4 text-[#E20074] font-bold text-xs">T</span>, label: 'T-Mobile' };
   }
 
   return null;
