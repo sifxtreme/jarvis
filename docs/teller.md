@@ -9,7 +9,7 @@ Teller is the primary API for syncing bank transactions (replaced Plaid for most
 - `backend/app/jobs/sync_transactions_for_banks.rb` - Background job that runs every 3 hours
 - `teller/certificate.pem` - mTLS certificate (NOT committed to repo)
 - `teller/private_key.pem` - mTLS private key (NOT committed to repo)
-- `teller-repair.html` - Browser tool to repair disconnected enrollments
+- `finance-tracker-app/.../pages/TellerRepairPage.tsx` - In-app tool to repair disconnected enrollments
 
 ### Authentication
 Teller uses **mutual TLS (mTLS)** + access token:
@@ -18,10 +18,13 @@ Teller uses **mutual TLS (mTLS)** + access token:
 
 All three are required to make API calls. The token alone is useless without the certificates.
 
-### Current Limitations
-- Hardcoded account ID: `acc_p0lv582dt0rb4t46fi000` (Amex)
-- Hardcoded date limit: Only syncs transactions after `2024-06-15`
-- Single account support (unlike Plaid integration which supports multiple)
+### Bank Connections Table
+Multi-account support is managed via the `bank_connections` database table:
+- `name` - Bank identifier (e.g., "chase", "amex")
+- `token` - Teller access token
+- `account_id` - Teller account ID (acc_xxx)
+- `sync_from_date` - Optional date to limit transaction sync
+- `is_active` - Toggle syncing on/off
 
 ## Supported Banks
 Teller supports 5,000+ US institutions including:
@@ -48,38 +51,36 @@ The bank connection has become stale. Banks periodically require re-authenticati
 
 **Solution:**
 
-1. Start a local server:
-   ```bash
-   cd /Users/asifahmed/code/experiments/jarvis
-   python3 -m http.server 8080
-   ```
+1. Go to the Teller Repair page in the app: `/teller-repair`
+   - Or locally: http://localhost:3001/teller-repair
 
-2. Open http://localhost:8080/teller-repair.html
-
-3. Get your credentials from [teller.io/dashboard](https://teller.io/dashboard):
+2. Get your credentials from [teller.io/dashboard](https://teller.io/dashboard):
    - **Application ID** (starts with `app_`)
    - **Enrollment ID** (starts with `enr_`) - find under Enrollments section
 
-4. Enter credentials in the repair tool and click "Repair Enrollment"
+3. Enter credentials in the repair tool and click "Repair Enrollment"
 
-5. Complete the bank's MFA challenge (text/email code)
+4. Complete the bank's MFA challenge (text/email code)
 
-6. If you get a NEW access token, update `backend/app/lib/teller/api.rb` line 18
+5. Copy the new access token shown after success
+
+6. Update the token in the `bank_connections` database table (or in `backend/app/lib/teller/api.rb` if still hardcoded)
 
 **Important:** The repair tool uses `environment: 'development'` which is free (up to 100 enrollments). Production requires payment setup.
 
 ### Error: "your application needs payment setup"
 
-You're using production environment. The `teller-repair.html` tool should be set to `environment: 'development'`. Check that line 202 and 242 in the HTML file say `development`, not `production`.
+You're using production environment. The in-app Teller Repair tool is hardcoded to use `environment: 'development'`, so this shouldn't happen unless you modified the code.
 
 ### Adding a New Bank (e.g., Chase)
 
-1. Open http://localhost:8080/teller-repair.html
-2. Enter your Application ID
-3. Click "Create New Enrollment"
+1. Go to the Teller Repair page: `/teller-repair`
+2. Enter your Application ID (from Teller dashboard)
+3. Click "New Enrollment"
 4. Select the bank and complete authentication
 5. Copy the new access token
-6. Currently requires code changes to support multiple accounts (TODO)
+6. Use "Lookup Account ID" to get the account ID
+7. Add a new row to `bank_connections` table with the token and account ID
 
 ### Refreshing Teller Certificates
 
@@ -106,7 +107,7 @@ Teller has rate limits. The job runs every 3 hours (`0 */3 * * *` in `config/res
 
 ## Future Improvements
 
-- [ ] Support multiple accounts/enrollments (like Plaid integration)
-- [ ] Move access token to environment variable or database
-- [ ] Make date limit configurable
+- [x] Support multiple accounts/enrollments (via `bank_connections` table)
+- [x] Move access token to database (`bank_connections.token`)
+- [x] Make date limit configurable (`bank_connections.sync_from_date`)
 - [ ] Add webhook support for real-time disconnection alerts
