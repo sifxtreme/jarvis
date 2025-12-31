@@ -172,16 +172,16 @@ export const getTransactions = async (filters: TransactionFilters): Promise<Tran
     }
 
     const validTransactions = results.filter(transaction => {
-      const isValid = (
-        typeof transaction.id === 'number' &&
-        typeof transaction.amount === 'number' &&
-        typeof transaction.transacted_at === 'string'
-      );
+      const issues: string[] = [];
+      if (typeof transaction.id !== 'number') issues.push(`id: ${transaction.id} (${typeof transaction.id})`);
+      if (typeof transaction.amount !== 'number') issues.push(`amount: ${transaction.amount} (${typeof transaction.amount})`);
+      if (typeof transaction.transacted_at !== 'string') issues.push(`transacted_at: ${transaction.transacted_at} (${typeof transaction.transacted_at})`);
 
-      if (!isValid) {
-        console.error('[API] Invalid transaction object:', transaction);
+      if (issues.length > 0) {
+        console.error(`[API] Invalid transaction - ${issues.join(', ')} | name: ${transaction.plaid_name || transaction.merchant_name || 'unknown'}`);
+        return false;
       }
-      return isValid;
+      return true;
     });
 
     return validTransactions;
