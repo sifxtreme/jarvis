@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import TransactionsPage from './pages/TransactionsPage';
 import YearlyBudgetPage from './pages/YearlyBudgetPage';
+import TrendsPage from './pages/TrendsPage';
 import { AuthModal } from '@/components/AuthModal';
+import { Navbar } from '@/components/Navbar';
 import { API_PASSWORD_KEY, verifyAuthentication, useAuthStore } from '@/lib/api';
 
 function App() {
@@ -54,10 +56,16 @@ function App() {
       />
 
       {isAuthenticated ? (
-        <Routes>
-          <Route path="/" element={<TransactionsPage />} />
-          <Route path="/yearly-budget" element={<YearlyBudgetPage />} />
-        </Routes>
+        <div className="flex flex-col h-screen">
+          <Navbar />
+          <div className="flex-1 overflow-hidden">
+            <Routes>
+              <Route path="/" element={<TransactionsPage />} />
+              <Route path="/yearly-budget" element={<YearlyBudgetPage />} />
+              <Route path="/trends" element={<TrendsPage />} />
+            </Routes>
+          </div>
+        </div>
       ) : (
         // Show login prompt only if not authenticated and modal not already showing
         <div className="flex h-screen items-center justify-center">

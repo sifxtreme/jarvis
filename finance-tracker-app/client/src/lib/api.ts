@@ -99,6 +99,7 @@ export interface Transaction {
   hidden: boolean;
   reviewed: boolean;
   amortized_months?: string[];
+  raw_data?: Record<string, unknown>;
 }
 
 export interface Budget {
@@ -227,3 +228,91 @@ interface CreateTransactionData {
 interface UpdateTransactionData extends CreateTransactionData {
   // Same fields as CreateTransactionData
 }
+
+// Trends API types
+export interface TrendsPeriod {
+  year: number;
+  total_transactions: number;
+  total_spent: number;
+  total_income: number;
+  net_savings: number;
+}
+
+export interface MonthlyTotal {
+  month: string;
+  spent: number;
+  transaction_count: number;
+}
+
+export interface CategoryBreakdown {
+  category: string;
+  total: number;
+  transaction_count: number;
+  budget: number;
+  variance: number | null;
+  monthly_avg: number;
+}
+
+export interface MerchantBreakdown {
+  merchant: string;
+  total: number;
+  transaction_count: number;
+  categories: string[];
+  last_transaction: string;
+}
+
+export interface BudgetComparison {
+  category: string;
+  budget: number;
+  actual: number;
+  variance: number;
+  variance_percent: number;
+  on_track: boolean;
+}
+
+export interface MonthlyDataPoint {
+  month: string;
+  total: number;
+  transaction_count?: number;
+}
+
+export interface MonthlyCategoryData {
+  category: string;
+  months: MonthlyDataPoint[];
+}
+
+export interface MonthlyMerchantData {
+  merchant: string;
+  months: MonthlyDataPoint[];
+}
+
+export interface TrendsData {
+  period: TrendsPeriod;
+  monthly_totals: MonthlyTotal[];
+  by_category: CategoryBreakdown[];
+  by_merchant: MerchantBreakdown[];
+  budget_comparison: BudgetComparison[];
+  monthly_by_category: MonthlyCategoryData[];
+  monthly_by_merchant: MonthlyMerchantData[];
+}
+
+export interface TrendsFilters {
+  year?: number;
+  category?: string;
+}
+
+export const getTrends = async (filters: TrendsFilters = {}): Promise<TrendsData> => {
+  const params = new URLSearchParams();
+
+  if (filters.year) params.append('year', filters.year.toString());
+  if (filters.category) params.append('category', filters.category);
+
+  try {
+    const response = await axiosInstance.get<TrendsData>('/financial_transactions/trends', { params });
+    return response.data;
+  } catch (error: any) {
+    console.error('[API] Trends error details:', error);
+    const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch trends';
+    throw new Error(`Failed to fetch trends: ${errorMessage}`);
+  }
+};

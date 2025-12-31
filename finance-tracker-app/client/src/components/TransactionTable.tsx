@@ -24,7 +24,8 @@ import {
   ChevronUp,
   ChevronDown,
   Copy,
-  Scissors
+  Scissors,
+  Code
 } from "lucide-react";
 import { FaCcAmex, FaCcVisa, FaUniversity, FaCreditCard, FaAmazon } from 'react-icons/fa';
 import { api, Transaction } from "../lib/api";
@@ -35,6 +36,13 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TransactionModal } from "./TransactionModal";
 import { SplitTransactionModal } from "./SplitTransactionModal";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface TransactionTableProps {
   transactions: Transaction[];
@@ -71,6 +79,7 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [duplicatingTransaction, setDuplicatingTransaction] = useState<Transaction | null>(null);
   const [splittingTransaction, setSplittingTransaction] = useState<Transaction | null>(null);
+  const [viewingRawTransaction, setViewingRawTransaction] = useState<Transaction | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [sortField, setSortField] = useState<SortField>('transacted_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -206,6 +215,22 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
         onSubmit={handleSplitSubmit}
         transaction={splittingTransaction}
       />
+
+      {/* Raw Data Modal */}
+      <Dialog open={!!viewingRawTransaction} onOpenChange={() => setViewingRawTransaction(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="font-mono">
+              Transaction Data: {viewingRawTransaction?.merchant_name || viewingRawTransaction?.plaid_name}
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh]">
+            <pre className="font-mono text-xs bg-muted p-4 rounded-lg overflow-x-auto whitespace-pre-wrap">
+              {viewingRawTransaction && JSON.stringify(viewingRawTransaction, null, 2)}
+            </pre>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
 
       {/* Floating total amount div */}
       <div className="fixed bottom-4 left-4 z-50 bg-background shadow-lg rounded-lg p-3 border border-border flex items-center gap-2">
@@ -457,6 +482,21 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                           <p>{transaction.amortized_months?.length ? 'Cannot edit amortized transaction' : 'Edit Transaction'}</p>
                         </TooltipContent>
                       </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger
+                          className="flex items-center justify-center w-6 h-6"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewingRawTransaction(transaction);
+                          }}
+                        >
+                          <Code className="h-4 w-4 text-slate-500 hover:text-slate-700" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>View Raw Data</p>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                   </TooltipProvider>
                 </TableCell>
@@ -557,6 +597,15 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
                   className={`p-2 hover:bg-muted rounded-full flex items-center justify-center ${transaction.amortized_months?.length ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <PencilIcon className={`h-4 w-4 ${transaction.amortized_months?.length ? 'text-gray-400' : 'text-blue-500'}`} />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setViewingRawTransaction(transaction);
+                  }}
+                  className="p-2 hover:bg-muted rounded-full flex items-center justify-center"
+                >
+                  <Code className="h-4 w-4 text-slate-500" />
                 </button>
                 <button className="p-2 hover:bg-muted rounded-full flex items-center justify-center">
                   {transaction.hidden ? (

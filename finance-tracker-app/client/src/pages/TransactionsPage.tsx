@@ -82,15 +82,7 @@ export default function TransactionsPage() {
           <div className="h-full flex flex-col">
             <div className="p-4 flex-shrink-0">
               <div className="flex justify-between items-center mb-6">
-                <div className="flex items-center gap-4">
-                  <h1 className="text-3xl font-bold">Finances</h1>
-                  <a
-                    href="/yearly-budget"
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded-md hover:bg-muted"
-                  >
-                    Yearly Budget →
-                  </a>
-                </div>
+                <h1 className="text-2xl font-bold">Transactions</h1>
 
                 {/* Desktop inline filters */}
                 <div className="hidden md:block">

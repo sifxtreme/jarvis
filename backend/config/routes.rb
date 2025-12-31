@@ -1,7 +1,11 @@
 Rails.application.routes.draw do
   root to: 'home#index'
 
-  resources :financial_transactions, only: [:index, :create, :update]
+  resources :financial_transactions, only: [:index, :create, :update] do
+    collection do
+      get :trends
+    end
+  end
 
   resources :budgets, only: [:index]
 
