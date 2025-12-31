@@ -78,24 +78,31 @@ class FinancialTransactionsController < ApplicationController
   def trends
     year = (params[:year] || Date.current.year).to_i
     category_filter = params[:category]
+    year_prefix = "#{year}-"
 
-    # Base scope includes ALL transactions (including income) for accurate totals
+    # Fetch ALL transactions that could affect this year:
+    # 1. Transactions with transacted_at in this year (non-amortized)
+    # 2. Transactions with any amortized_month in this year
     all_transactions = FinancialTransaction
-      .where('extract(year from transacted_at) = ?', year)
       .where(hidden: false)
+      .where("extract(year from transacted_at) = ? OR EXISTS (SELECT 1 FROM unnest(amortized_months) AS m WHERE m LIKE ?)", year, "#{year}-%")
 
-    # Expense-only scope excludes income categories (for spending charts)
+    # Expense-only scope excludes income categories
     expense_scope = all_transactions.where("category NOT ILIKE '%income%' OR category IS NULL")
     expense_scope = expense_scope.where(category: category_filter) if category_filter.present?
 
+    # Process transactions with amortization support
+    processed_expenses = process_with_amortization(expense_scope.to_a, year)
+    processed_all = process_with_amortization(all_transactions.to_a, year)
+
     render json: {
-      period: period_summary(all_transactions, year),
-      monthly_totals: monthly_breakdown(expense_scope),
+      period: period_summary_processed(processed_all, year),
+      monthly_totals: monthly_breakdown_processed(processed_expenses),
       by_category: category_breakdown(expense_scope),
       by_merchant: merchant_breakdown(expense_scope),
-      budget_comparison: budget_comparison(expense_scope, year),
-      monthly_by_category: monthly_by_category(expense_scope),
-      monthly_by_merchant: monthly_by_merchant(expense_scope)
+      budget_comparison: budget_comparison_processed(processed_expenses, year),
+      monthly_by_category: monthly_by_category_processed(processed_expenses),
+      monthly_by_merchant: monthly_by_merchant_processed(processed_expenses)
     }
   end
 
@@ -218,6 +225,123 @@ class FinancialTransactionsController < ApplicationController
   end
 
   private
+
+  # Process transactions and distribute amortized amounts across their months
+  # Returns array of hashes: { month: 'YYYY-MM', amount: X, category: Y, plaid_name: Z }
+  def process_with_amortization(transactions, year)
+    year_prefix = "#{year}-"
+    result = []
+
+    transactions.each do |t|
+      if t.amortized_months.present? && t.amortized_months.length > 0
+        # Spread amount across amortized months that fall in this year
+        monthly_amount = t.amount.to_f / t.amortized_months.length
+        t.amortized_months.each do |month|
+          next unless month.start_with?(year_prefix)
+          result << {
+            month: month,
+            amount: monthly_amount,
+            category: t.category,
+            plaid_name: t.plaid_name
+          }
+        end
+      else
+        # Non-amortized: use transacted_at month
+        month = t.transacted_at.strftime('%Y-%m')
+        next unless month.start_with?(year_prefix)
+        result << {
+          month: month,
+          amount: t.amount.to_f,
+          category: t.category,
+          plaid_name: t.plaid_name
+        }
+      end
+    end
+
+    result
+  end
+
+  def period_summary_processed(processed, year)
+    income_items = processed.select { |p| p[:category]&.downcase&.include?('income') }
+    expense_items = processed.select { |p| !p[:category]&.downcase&.include?('income') && p[:amount] > 0 }
+
+    total_income = income_items.sum { |p| p[:amount].abs }
+    total_spent = expense_items.sum { |p| p[:amount] }
+
+    {
+      year: year,
+      total_transactions: processed.length,
+      total_spent: total_spent.round(2),
+      total_income: total_income.round(2),
+      net_savings: (total_income - total_spent).round(2)
+    }
+  end
+
+  def monthly_breakdown_processed(processed)
+    expense_items = processed.select { |p| p[:amount] > 0 }
+
+    expense_items.group_by { |p| p[:month] }
+      .map do |month, items|
+        {
+          month: month,
+          spent: items.sum { |i| i[:amount] }.round(2),
+          transaction_count: items.length
+        }
+      end
+      .sort_by { |r| r[:month] }
+  end
+
+  def budget_comparison_processed(processed, year)
+    expense_items = processed.select { |p| p[:amount] > 0 && p[:category].present? }
+
+    actuals = expense_items.group_by { |p| p[:category] }
+      .transform_values { |items| items.sum { |i| i[:amount] } }
+
+    Budget.where(expense_type: 'expense').map do |budget|
+      actual = actuals[budget.name] || 0
+      annual_budget = budget.amount.to_f * 12
+      variance = annual_budget - actual
+
+      {
+        category: budget.name,
+        budget: annual_budget.round(2),
+        actual: actual.round(2),
+        variance: variance.round(2),
+        variance_percent: annual_budget > 0 ? ((variance / annual_budget) * 100).round(1) : 0,
+        on_track: variance >= 0
+      }
+    end.sort_by { |b| b[:variance] }
+  end
+
+  def monthly_by_category_processed(processed)
+    expense_items = processed.select { |p| p[:amount] > 0 && p[:category].present? }
+
+    # Group by category, then by month
+    by_category = expense_items.group_by { |p| p[:category] }
+
+    by_category.map do |category, items|
+      months_data = items.group_by { |i| i[:month] }
+        .map { |month, month_items| { month: month, total: month_items.sum { |i| i[:amount] }.round(2) } }
+        .sort_by { |m| m[:month] }
+
+      { category: category, months: months_data }
+    end.sort_by { |c| -c[:months].sum { |m| m[:total] } }
+  end
+
+  def monthly_by_merchant_processed(processed)
+    expense_items = processed.select { |p| p[:amount] > 0 && p[:plaid_name].present? }
+
+    # Group by merchant (plaid_name), then by month
+    by_merchant = expense_items.group_by { |p| p[:plaid_name] }
+
+    by_merchant.map do |merchant, items|
+      months_data = items.group_by { |i| i[:month] }
+        .map { |month, month_items| { month: month, total: month_items.sum { |i| i[:amount] }.round(2), transaction_count: month_items.length } }
+        .sort_by { |m| m[:month] }
+
+      { merchant: merchant, months: months_data }
+    end.sort_by { |m| -m[:months].sum { |mo| mo[:total] } }
+  end
 
   def period_summary(scope, year)
     # Income is identified by category containing "income", not by negative amounts

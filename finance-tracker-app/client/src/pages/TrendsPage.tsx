@@ -681,7 +681,24 @@ export default function TrendsPage() {
             <LineChart data={categoryChartData}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-              <YAxis tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} tick={{ fontSize: 12 }} />
+              <YAxis
+                tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                tick={{ fontSize: 12 }}
+                domain={[0, () => {
+                  // Calculate max from visible categories only
+                  const visibleMax = Math.max(...categoryChartData.map(d => {
+                    let max = 0;
+                    allCategories.forEach(cat => {
+                      if (!hiddenCategories.has(cat.category)) {
+                        const val = (d as Record<string, number | string | null>)[cat.category] as number || 0;
+                        if (val > max) max = val;
+                      }
+                    });
+                    return max;
+                  }));
+                  return Math.ceil(visibleMax * 1.1) || 1000; // 10% padding, fallback to 1000
+                }]}
+              />
               <Tooltip content={renderSortedTooltip} />
               <Legend content={(props) => renderClickableLegend(props, hiddenCategories, toggleCategory)} />
               {allCategories.map((cat, idx) => (
@@ -741,7 +758,24 @@ export default function TrendsPage() {
             <LineChart data={merchantChartData}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-              <YAxis tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} tick={{ fontSize: 12 }} />
+              <YAxis
+                tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                tick={{ fontSize: 12 }}
+                domain={[0, () => {
+                  // Calculate max from visible merchants only
+                  const visibleMax = Math.max(...merchantChartData.map(d => {
+                    let max = 0;
+                    allMerchants.forEach(merch => {
+                      if (!hiddenMerchants.has(merch.merchant)) {
+                        const val = (d as Record<string, number | string | null>)[merch.merchant] as number || 0;
+                        if (val > max) max = val;
+                      }
+                    });
+                    return max;
+                  }));
+                  return Math.ceil(visibleMax * 1.1) || 1000; // 10% padding, fallback to 1000
+                }]}
+              />
               <Tooltip content={renderSortedTooltip} />
               <Legend content={(props) => renderClickableLegend(props, hiddenMerchants, toggleMerchant)} />
               {allMerchants.map((merch, idx) => (
