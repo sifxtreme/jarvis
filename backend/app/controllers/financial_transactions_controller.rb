@@ -6,8 +6,10 @@ class FinancialTransactionsController < ApplicationController
     query = params[:query]
     show_hidden = params[:show_hidden]
     show_needs_review = params[:show_needs_review]
-    db_query = FinancialTransaction.select(:id, :plaid_id, :plaid_name, :merchant_name, :category, :source, :amount, :transacted_at, :created_at,
-                                           :updated_at, :hidden, :reviewed, :amortized_months).all
+    columns = [:id, :plaid_id, :plaid_name, :merchant_name, :category, :source, :amount, :transacted_at, :created_at,
+               :updated_at, :hidden, :reviewed, :amortized_months]
+    columns << :raw_data if params[:include_raw_data] == 'true'
+    db_query = FinancialTransaction.select(columns).all
     if year && year != 'null'
       db_query = db_query.where('extract(year from transacted_at) = ?', year)
     end
