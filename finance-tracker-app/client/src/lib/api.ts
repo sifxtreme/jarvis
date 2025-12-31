@@ -316,3 +316,48 @@ export const getTrends = async (filters: TrendsFilters = {}): Promise<TrendsData
     throw new Error(`Failed to fetch trends: ${errorMessage}`);
   }
 };
+
+// Recurring Status types
+export interface RecurringPattern {
+  merchant_key: string;
+  display_name: string;
+  plaid_name: string | null;
+  merchant_name: string | null;
+  typical_day: number;
+  typical_amount: number;
+  source: string;
+  category: string;
+  months_present: number;
+  last_occurrence: string;
+  status?: 'overdue' | 'due_soon' | 'upcoming';
+  days_difference?: number;
+}
+
+export interface RecurringStatusData {
+  year: number;
+  month: number;
+  current_day: number;
+  missing: RecurringPattern[];
+  present: RecurringPattern[];
+}
+
+export interface RecurringStatusFilters {
+  year?: number;
+  month?: number;
+}
+
+export const getRecurringStatus = async (filters: RecurringStatusFilters = {}): Promise<RecurringStatusData> => {
+  const params = new URLSearchParams();
+
+  if (filters.year) params.append('year', filters.year.toString());
+  if (filters.month) params.append('month', filters.month.toString());
+
+  try {
+    const response = await axiosInstance.get<RecurringStatusData>('/financial_transactions/recurring_status', { params });
+    return response.data;
+  } catch (error: any) {
+    console.error('[API] Recurring status error:', error);
+    const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch recurring status';
+    throw new Error(`Failed to fetch recurring status: ${errorMessage}`);
+  }
+};

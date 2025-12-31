@@ -91,6 +91,117 @@ class FinancialTransactionsController < ApplicationController
     }
   end
 
+  def recurring_status
+    year = (params[:year] || Date.current.year).to_i
+    month = (params[:month] || Date.current.month).to_i
+    current_date = Date.new(year, month, 1)
+    today = Date.today
+    current_day = today.day
+
+    # Get last 12 full months (not including current month)
+    end_of_last_month = current_date - 1.day
+    start_of_period = (current_date - 12.months)
+
+    # Get all transactions from the last 12 full months
+    historical = FinancialTransaction
+      .where('transacted_at >= ? AND transacted_at <= ?', start_of_period, end_of_last_month)
+      .where(hidden: false)
+      .where('amount > 0') # expenses only
+
+    # Group by merchant identifier
+    grouped = historical.group_by { |t| merchant_key(t) }
+
+    # Find recurring patterns (9+ months out of 12)
+    recurring_patterns = []
+
+    grouped.each do |merchant_key, transactions|
+      next if merchant_key.blank?
+
+      # Count unique months
+      months = transactions.map { |t| t.transacted_at.strftime('%Y-%m') }.uniq
+      next if months.length < 9
+
+      # Calculate statistics
+      days = transactions.map { |t| t.transacted_at.day }
+      amounts = transactions.map { |t| t.amount.to_f }
+
+      typical_day = median(days).round
+      typical_amount = median(amounts).round(2)
+
+      # Get most common source and category
+      sources = transactions.map(&:source).compact
+      categories = transactions.map(&:category).compact
+      typical_source = mode(sources)
+      typical_category = mode(categories)
+
+      # Get the display name (prefer merchant_name if available, else plaid_name)
+      sample = transactions.first
+      display_name = sample.merchant_name.presence || sample.plaid_name
+
+      recurring_patterns << {
+        merchant_key: merchant_key,
+        display_name: display_name,
+        plaid_name: sample.plaid_name,
+        merchant_name: sample.merchant_name,
+        typical_day: typical_day,
+        typical_amount: typical_amount,
+        source: typical_source,
+        category: typical_category,
+        months_present: months.length,
+        last_occurrence: transactions.max_by(&:transacted_at).transacted_at.to_date.iso8601
+      }
+    end
+
+    # Check which are present in current month
+    current_month_transactions = FinancialTransaction
+      .where('extract(year from transacted_at) = ? AND extract(month from transacted_at) = ?', year, month)
+      .where(hidden: false)
+
+    current_month_keys = current_month_transactions.map { |t| merchant_key(t) }.compact.uniq
+
+    # Categorize as missing or present
+    missing = []
+    present = []
+
+    recurring_patterns.each do |pattern|
+      is_present = current_month_keys.include?(pattern[:merchant_key])
+
+      if is_present
+        present << pattern
+      else
+        # Calculate status based on typical day vs current day
+        if current_day > pattern[:typical_day]
+          days_overdue = current_day - pattern[:typical_day]
+          pattern[:status] = 'overdue'
+          pattern[:days_difference] = days_overdue
+        else
+          days_until = pattern[:typical_day] - current_day
+          pattern[:status] = days_until <= 3 ? 'due_soon' : 'upcoming'
+          pattern[:days_difference] = days_until
+        end
+
+        missing << pattern
+      end
+    end
+
+    # Sort missing: overdue first (by days overdue desc), then upcoming (by days until asc)
+    missing.sort_by! do |p|
+      if p[:status] == 'overdue'
+        [0, -p[:days_difference]]
+      else
+        [1, p[:days_difference]]
+      end
+    end
+
+    render json: {
+      year: year,
+      month: month,
+      current_day: current_day,
+      missing: missing,
+      present: present
+    }
+  end
+
   private
 
   def period_summary(scope, year)
@@ -284,6 +395,23 @@ class FinancialTransactionsController < ApplicationController
     Date.parse(date_param)
   rescue StandardError
     Date.today
+  end
+
+  def merchant_key(transaction)
+    # Use plaid_name as the primary key, fall back to merchant_name
+    transaction.plaid_name.presence || transaction.merchant_name.presence
+  end
+
+  def median(array)
+    return 0 if array.empty?
+    sorted = array.sort
+    mid = sorted.length / 2
+    sorted.length.odd? ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2.0
+  end
+
+  def mode(array)
+    return nil if array.empty?
+    array.group_by(&:itself).max_by { |_, v| v.length }&.first
   end
 
 end

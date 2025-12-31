@@ -48,6 +48,8 @@ interface TransactionTableProps {
   transactions: Transaction[];
   isLoading: boolean;
   onUpdate?: () => void;
+  externalQuickAdd?: Partial<Transaction> | null;
+  onExternalQuickAddHandled?: () => void;
 }
 
 type SortField = 'transacted_at' | 'plaid_name' | 'merchant_name' | 'category' | 'amount' | 'source';
@@ -75,7 +77,13 @@ const isAmazonMerchant = (plaidName: string | null): boolean => {
   return /amazon|amzn/i.test(plaidName);
 };
 
-export default function TransactionTable({ transactions = [], isLoading, onUpdate }: TransactionTableProps) {
+export default function TransactionTable({
+  transactions = [],
+  isLoading,
+  onUpdate,
+  externalQuickAdd,
+  onExternalQuickAddHandled
+}: TransactionTableProps) {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [duplicatingTransaction, setDuplicatingTransaction] = useState<Transaction | null>(null);
   const [splittingTransaction, setSplittingTransaction] = useState<Transaction | null>(null);
@@ -83,6 +91,14 @@ export default function TransactionTable({ transactions = [], isLoading, onUpdat
   const [isCreating, setIsCreating] = useState(false);
   const [sortField, setSortField] = useState<SortField>('transacted_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  // Handle external quick add requests
+  useEffect(() => {
+    if (externalQuickAdd) {
+      setDuplicatingTransaction(externalQuickAdd as Transaction);
+      onExternalQuickAddHandled?.();
+    }
+  }, [externalQuickAdd, onExternalQuickAddHandled]);
 
   // Calculate total amount of all transactions, excluding those with "Income" in the category
   const totalExpenses = transactions

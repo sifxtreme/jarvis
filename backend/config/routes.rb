@@ -4,6 +4,7 @@ Rails.application.routes.draw do
   resources :financial_transactions, only: [:index, :create, :update] do
     collection do
       get :trends
+      get :recurring_status
     end
   end
 

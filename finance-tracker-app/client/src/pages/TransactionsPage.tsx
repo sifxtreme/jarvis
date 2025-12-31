@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { getTransactions, getBudgets, type TransactionFilters } from "../lib/api";
+import { getTransactions, getBudgets, type TransactionFilters, type Transaction } from "../lib/api";
 import TransactionTable from "../components/TransactionTable";
 import TransactionStats from "../components/TransactionStats";
+import { RecurringStatusCard } from "../components/RecurringStatusCard";
 import { useState, useEffect } from "react";
 import {
   Panel as ResizablePanel,
@@ -19,6 +20,7 @@ export default function TransactionsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams()
   const [isStatsVisible, setIsStatsVisible] = useState(true);
+  const [quickAddTransaction, setQuickAddTransaction] = useState<Partial<Transaction> | null>(null);
 
   // Initialize filters from URL or defaults
   const [filters, setFilters] = useState<TransactionFilters>(() => {
@@ -117,10 +119,21 @@ export default function TransactionsPage() {
             </div>
 
             <div className="flex-1 overflow-auto px-4 pb-4">
+              {/* Recurring Status Card */}
+              {filters.year && filters.month && (
+                <RecurringStatusCard
+                  year={filters.year}
+                  month={filters.month}
+                  onQuickAdd={(transaction) => setQuickAddTransaction(transaction)}
+                />
+              )}
+
               <TransactionTable
                 transactions={transactions}
                 isLoading={isLoading}
                 onUpdate={() => refetch()}
+                externalQuickAdd={quickAddTransaction}
+                onExternalQuickAddHandled={() => setQuickAddTransaction(null)}
               />
 
               {error && (
