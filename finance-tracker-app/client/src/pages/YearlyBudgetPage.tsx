@@ -500,6 +500,7 @@ export default function YearlyBudgetPage() {
   );
 
   return (
+    <div className="h-full overflow-auto">
     <div className="container mx-auto py-6 font-mono">
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-4">
@@ -878,6 +879,7 @@ export default function YearlyBudgetPage() {
           </div>
         </CardContent>
       </Card>
+    </div>
     </div>
   );
 }
