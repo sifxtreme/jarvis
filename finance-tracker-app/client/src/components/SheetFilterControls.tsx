@@ -15,9 +15,10 @@ interface SheetFilterControlsProps {
 
 export default function SheetFilterControls({ onSearch, initialFilters, className }: SheetFilterControlsProps) {
   const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
   const [filters, setFilters] = useState<TransactionFilters>({
-    year: initialFilters?.year ?? currentYear,
-    month: initialFilters?.month ?? new Date().getMonth() + 1,
+    year: initialFilters?.year,
+    month: initialFilters?.month,
     show_hidden: initialFilters?.show_hidden ?? false,
     show_needs_review: initialFilters?.show_needs_review ?? false,
     query: initialFilters?.query ?? ''
@@ -53,21 +54,27 @@ export default function SheetFilterControls({ onSearch, initialFilters, classNam
               variant="outline"
               size="icon"
               onClick={() => handleFilterChange({
-                year: filters.year - 1
+                year: (filters.year ?? currentYear) - 1
               })}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
 
-            <div className="flex-1 text-center font-medium">
-              {filters.year}
-            </div>
+            <Button
+              variant="ghost"
+              className="flex-1 font-medium"
+              onClick={() => handleFilterChange({
+                year: filters.year === undefined ? currentYear : undefined
+              })}
+            >
+              {filters.year ?? 'All Years'}
+            </Button>
 
             <Button
               variant="outline"
               size="icon"
               onClick={() => handleFilterChange({
-                year: filters.year + 1
+                year: (filters.year ?? currentYear) + 1
               })}
             >
               <ChevronRight className="h-4 w-4" />
@@ -80,23 +87,37 @@ export default function SheetFilterControls({ onSearch, initialFilters, classNam
             <Button
               variant="outline"
               size="icon"
-              onClick={() => handleFilterChange({
-                month: filters.month === 1 ? 12 : filters.month - 1
-              })}
+              onClick={() => {
+                const m = filters.month ?? currentMonth;
+                handleFilterChange({
+                  month: m === 1 ? 12 : m - 1
+                });
+              }}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
 
-            <div className="flex-1 text-center font-medium">
-              {new Date(2000, filters.month - 1).toLocaleString('default', { month: 'long' })}
-            </div>
+            <Button
+              variant="ghost"
+              className="flex-1 font-medium"
+              onClick={() => handleFilterChange({
+                month: filters.month === undefined ? currentMonth : undefined
+              })}
+            >
+              {filters.month !== undefined
+                ? new Date(2000, filters.month - 1).toLocaleString('default', { month: 'long' })
+                : 'All Months'}
+            </Button>
 
             <Button
               variant="outline"
               size="icon"
-              onClick={() => handleFilterChange({
-                month: filters.month === 12 ? 1 : filters.month + 1
-              })}
+              onClick={() => {
+                const m = filters.month ?? currentMonth;
+                handleFilterChange({
+                  month: m === 12 ? 1 : m + 1
+                });
+              }}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
