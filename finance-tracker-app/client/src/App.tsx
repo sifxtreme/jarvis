@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import TransactionsPage from './pages/TransactionsPage';
 import YearlyBudgetPage from './pages/YearlyBudgetPage';
 import TrendsPage from './pages/TrendsPage';
+import TellerRepairPage from './pages/TellerRepairPage';
 import { AuthModal } from '@/components/AuthModal';
 import { Navbar } from '@/components/Navbar';
 import { API_PASSWORD_KEY, verifyAuthentication, useAuthStore } from '@/lib/api';
@@ -63,6 +64,7 @@ function App() {
               <Route path="/" element={<TransactionsPage />} />
               <Route path="/yearly-budget" element={<YearlyBudgetPage />} />
               <Route path="/trends" element={<TrendsPage />} />
+              <Route path="/teller-repair" element={<TellerRepairPage />} />
             </Routes>
           </div>
         </div>

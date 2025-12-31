@@ -1,12 +1,13 @@
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { TrendingUp, DollarSign, Calendar, Menu } from "lucide-react";
+import { TrendingUp, DollarSign, Calendar, Menu, Wrench } from "lucide-react";
 import { useState } from "react";
 
 const navItems = [
   { path: "/", label: "Transactions", icon: DollarSign },
   { path: "/trends", label: "Trends", icon: TrendingUp },
   { path: "/yearly-budget", label: "Budget", icon: Calendar },
+  { path: "/teller-repair", label: "Teller", icon: Wrench },
 ];
 
 export function Navbar() {
