@@ -231,23 +231,29 @@ export default function YearlyBudgetPage() {
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1; // JavaScript months are 0-indexed
+  const currentDay = currentDate.getDate();
+  const isPastTwentieth = currentDay > 20;
 
-  // Create an array of all months for the selected year, but only include months up to the current month
-  // Use useMemo to prevent recalculation on every render
+  // Create an array of all months for the selected year
+  // Include current month if we're past the 20th
   const months = useMemo(() => {
     return Array.from({ length: 12 }, (_, i) => ({
       year: selectedYear,
       month: i + 1,
-      label: new Date(selectedYear, i).toLocaleString('default', { month: 'long' })
+      label: new Date(selectedYear, i).toLocaleString('default', { month: 'long' }),
+      isCurrentMonth: selectedYear === currentYear && i + 1 === currentMonth
     })).filter(month => {
       // Include all months for past years
       if (month.year < currentYear) return true;
-      // For current year, only include months up to the current month
-      if (month.year === currentYear) return month.month <= currentMonth;
+      // For current year, include up to current month (including current if past 20th)
+      if (month.year === currentYear) {
+        if (isPastTwentieth) return month.month <= currentMonth;
+        return month.month < currentMonth;
+      }
       // Exclude all months for future years
       return false;
     });
-  }, [selectedYear, currentYear, currentMonth]);
+  }, [selectedYear, currentYear, currentMonth, isPastTwentieth]);
 
   // Initialize column visibility for months when months array changes
   useEffect(() => {
@@ -259,14 +265,18 @@ export default function YearlyBudgetPage() {
         const columnKey = `month-${month.month}`;
         // If this is a new column or not yet set, initialize it
         if (newVisibility[columnKey] === undefined) {
-          // Hide current month by default
-          newVisibility[columnKey] = month.month !== currentMonth || month.year !== currentYear;
+          // Show current month if past 20th, otherwise hide it
+          if (month.isCurrentMonth) {
+            newVisibility[columnKey] = isPastTwentieth;
+          } else {
+            newVisibility[columnKey] = true;
+          }
         }
       });
 
       return newVisibility;
     });
-  }, [months, currentMonth, currentYear]);
+  }, [months, currentMonth, currentYear, isPastTwentieth]);
 
   // Fetch budgets for the selected year (we'll fetch all months at once)
   const { data: yearBudgets = [], isLoading: isLoadingBudgets } = useQuery({
@@ -408,10 +418,17 @@ export default function YearlyBudgetPage() {
   });
 
   // Calculate summary data for each month
+  // Include current month if past 20th (with special flag for styling)
   const monthlySummary = months
     .filter(month => {
-      // Only include months that are completely done (not the current month and year)
-      return month.year < currentYear || (month.year === currentYear && month.month < currentMonth);
+      // Only include months that are completely done
+      // OR include current month if past the 20th
+      if (month.year < currentYear) return true;
+      if (month.year === currentYear) {
+        if (month.month < currentMonth) return true;
+        if (month.month === currentMonth && isPastTwentieth) return true;
+      }
+      return false;
     })
     .map(month => {
       const monthNum = month.month;
@@ -438,7 +455,8 @@ export default function YearlyBudgetPage() {
         totalIncome,
         totalExpenses,
         savings,
-        savingsRate
+        savingsRate,
+        isCurrentMonth: month.isCurrentMonth
       };
     });
 
@@ -503,15 +521,7 @@ export default function YearlyBudgetPage() {
     <div className="h-full overflow-auto">
     <div className="container mx-auto py-6 font-mono">
       <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-4">
-          <h1 className="text-3xl font-bold">Yearly Budget Comparison</h1>
-          <a
-            href="/"
-            className="text-sm text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded-md hover:bg-muted"
-          >
-            ← Transactions
-          </a>
-        </div>
+        <h1 className="text-3xl font-bold">Yearly Budget Comparison</h1>
         <Select value={selectedYear.toString()} onValueChange={handleYearChange}>
           <SelectTrigger className="w-32">
             <SelectValue placeholder="Year" />
@@ -554,23 +564,26 @@ export default function YearlyBudgetPage() {
               </TableHeader>
               <TableBody>
                 {monthlySummary.map((summary, index) => (
-                  <TableRow key={summary.month} className="hover:bg-muted/80 transition-colors">
+                  <TableRow key={summary.month} className={`hover:bg-muted/80 transition-colors ${summary.isCurrentMonth ? 'bg-blue-50/50' : ''}`}>
                     <TableCell className="font-medium border border-border p-0">
-                      <div className="px-3 py-2 text-sm font-mono">{summary.label}</div>
+                      <div className={`px-3 py-2 text-sm font-mono ${summary.isCurrentMonth ? 'italic text-blue-700' : ''}`}>
+                        {summary.label}
+                        {summary.isCurrentMonth && <span className="ml-2 text-xs text-blue-500">(In Progress)</span>}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right font-mono border border-border p-0">
-                      <div className="px-3 py-2 text-sm">{formatCurrency(summary.totalIncome)}</div>
+                      <div className={`px-3 py-2 text-sm ${summary.isCurrentMonth ? 'italic text-blue-700' : ''}`}>{formatCurrency(summary.totalIncome)}</div>
                     </TableCell>
                     <TableCell className="text-right font-mono border border-border p-0">
-                      <div className="px-3 py-2 text-sm">{formatCurrency(summary.totalExpenses)}</div>
+                      <div className={`px-3 py-2 text-sm ${summary.isCurrentMonth ? 'italic text-blue-700' : ''}`}>{formatCurrency(summary.totalExpenses)}</div>
                     </TableCell>
                     <TableCell className="text-right font-mono border border-border p-0">
-                      <div className={`px-3 py-2 text-sm ${summary.savings >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                      <div className={`px-3 py-2 text-sm ${summary.isCurrentMonth ? 'italic bg-blue-50 text-blue-700' : summary.savings >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                         {formatCurrency(summary.savings)}
                       </div>
                     </TableCell>
                     <TableCell className="text-right font-mono border border-border p-0">
-                      <div className={`px-3 py-2 text-sm ${summary.savingsRate >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                      <div className={`px-3 py-2 text-sm ${summary.isCurrentMonth ? 'italic bg-blue-50 text-blue-700' : summary.savingsRate >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                         {summary.savingsRate.toFixed(1)}%
                       </div>
                     </TableCell>
@@ -693,9 +706,12 @@ export default function YearlyBudgetPage() {
                   {visibleMonths.map((month) => (
                     <TableHead
                       key={`${month.year}-${month.month}`}
-                      className="text-right border border-border bg-muted font-semibold w-[120px] min-w-[120px] p-2"
+                      className={`text-right border border-border font-semibold w-[120px] min-w-[120px] p-2 ${month.isCurrentMonth ? 'bg-blue-100' : 'bg-muted'}`}
                     >
-                      <div className="px-2 py-1 text-sm font-mono">{month.label}</div>
+                      <div className={`px-2 py-1 text-sm font-mono ${month.isCurrentMonth ? 'italic text-blue-700' : ''}`}>
+                        {month.label}
+                        {month.isCurrentMonth && <span className="block text-xs text-blue-500">(In Progress)</span>}
+                      </div>
                     </TableHead>
                   ))}
                 </TableRow>

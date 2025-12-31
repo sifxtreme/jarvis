@@ -330,7 +330,7 @@ export function RecurringStatusCard({ year, month, onQuickAdd }: RecurringStatus
                 All items dismissed for this month
               </div>
             ) : (
-              <div className="space-y-1">
+              <div className="divide-y divide-border">
                 {/* Overdue expenses first */}
                 {overdueExpenses.map((pattern) => renderItem(pattern, true))}
 

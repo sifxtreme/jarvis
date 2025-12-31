@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getTrends, getTransactions, type TrendsFilters, OTHER_CATEGORY } from "../lib/api";
+import { getTrends, getTransactions, getBudgets, type TrendsFilters, OTHER_CATEGORY } from "../lib/api";
 import { useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ChartContainer } from "@/components/ui/chart";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
-import { Download, TrendingUp, TrendingDown } from "lucide-react";
+import { Download, TrendingUp, TrendingDown, Target } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -72,6 +72,8 @@ export default function TrendsPage() {
   const [hiddenMerchants, setHiddenMerchants] = useState<Set<string>>(new Set());
   const [hideOther, setHideOther] = useState(false);
   const [showMovingAvg, setShowMovingAvg] = useState(true);
+  const [categoryCount, setCategoryCount] = useState<number>(10);
+  const [merchantCategoryFilter, setMerchantCategoryFilter] = useState<string>('all');
 
   // Fetch current year trends
   const { data: trends, isLoading, error } = useQuery({
@@ -91,6 +93,12 @@ export default function TrendsPage() {
   const { data: transactions } = useQuery({
     queryKey: ['transactions-for-sources', filters.year],
     queryFn: () => getTransactions({ year: filters.year, show_hidden: false, show_needs_review: false, query: '' }),
+  });
+
+  // Fetch budgets for per-category charts
+  const { data: budgets } = useQuery({
+    queryKey: ['budgets-for-trends', filters.year],
+    queryFn: () => getBudgets({ year: filters.year, show_hidden: false, show_needs_review: false }),
   });
 
   // Get unique sources from transactions
@@ -187,18 +195,34 @@ export default function TrendsPage() {
       ? months
       : months.filter(m => MONTH_RANGES[monthRange].months.includes(getMonthNumber(m)));
 
+    const categoriesToShow = trends.monthly_by_category
+      .filter(cat => hideOther ? cat.category !== OTHER_CATEGORY : true)
+      .slice(0, categoryCount);
+
     return filteredMonths.map(month => {
       const dataPoint: Record<string, string | number> = { month: formatMonth(month) };
-      trends.monthly_by_category
-        .filter(cat => hideOther ? cat.category !== OTHER_CATEGORY : true)
-        .slice(0, 8)
-        .forEach(cat => {
-          const monthData = cat.months.find(m => m.month === month);
-          dataPoint[cat.category] = monthData?.total || 0;
-        });
+      categoriesToShow.forEach(cat => {
+        const monthData = cat.months.find(m => m.month === month);
+        dataPoint[cat.category] = monthData?.total || 0;
+      });
       return dataPoint;
     });
   };
+
+  // Get merchant-to-category mapping from by_merchant data (which has categories array)
+  const merchantCategories = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    trends?.by_merchant?.forEach(m => {
+      map.set(m.merchant, new Set(m.categories));
+    });
+    return map;
+  }, [trends?.by_merchant]);
+
+  // Get available categories for merchant filter
+  const availableCategories = useMemo(() => {
+    if (!trends?.by_category) return [];
+    return trends.by_category.map(c => c.category).filter(c => c !== OTHER_CATEGORY);
+  }, [trends?.by_category]);
 
   // Transform monthly_by_merchant into recharts format
   const getMerchantChartData = () => {
@@ -214,9 +238,19 @@ export default function TrendsPage() {
       ? months
       : months.filter(m => MONTH_RANGES[monthRange].months.includes(getMonthNumber(m)));
 
+    // Filter merchants by category if selected
+    let merchantsToShow = trends.monthly_by_merchant;
+    if (merchantCategoryFilter !== 'all') {
+      merchantsToShow = merchantsToShow.filter(merch => {
+        const cats = merchantCategories.get(merch.merchant);
+        return cats?.has(merchantCategoryFilter);
+      });
+    }
+    merchantsToShow = merchantsToShow.slice(0, categoryCount);
+
     return filteredMonths.map(month => {
       const dataPoint: Record<string, string | number> = { month: formatMonth(month) };
-      trends.monthly_by_merchant.slice(0, 8).forEach(merch => {
+      merchantsToShow.forEach(merch => {
         const monthData = merch.months.find(m => m.month === month);
         dataPoint[merch.merchant] = monthData?.total || 0;
       });
@@ -328,17 +362,19 @@ export default function TrendsPage() {
 
   const categoryChartData = getCategoryChartData();
   const merchantChartData = getMerchantChartData();
-  const topCategories = (trends?.monthly_by_category || [])
-    .filter(cat => hideOther ? cat.category !== OTHER_CATEGORY : true)
-    .filter(cat => !hiddenCategories.has(cat.category))
-    .slice(0, 8);
   const allCategories = (trends?.monthly_by_category || [])
     .filter(cat => hideOther ? cat.category !== OTHER_CATEGORY : true)
-    .slice(0, 8);
-  const topMerchants = (trends?.monthly_by_merchant || [])
-    .filter(m => !hiddenMerchants.has(m.merchant))
-    .slice(0, 8);
-  const allMerchants = (trends?.monthly_by_merchant || []).slice(0, 8);
+    .slice(0, categoryCount);
+
+  // Filter merchants for chart - apply category filter
+  let filteredMerchants = trends?.monthly_by_merchant || [];
+  if (merchantCategoryFilter !== 'all') {
+    filteredMerchants = filteredMerchants.filter(merch => {
+      const cats = merchantCategories.get(merch.merchant);
+      return cats?.has(merchantCategoryFilter);
+    });
+  }
+  const allMerchants = filteredMerchants.slice(0, categoryCount);
 
   // Filter and add moving average to monthly data
   const monthlyData = filterByMonthRange(trends?.monthly_totals || []);
@@ -429,6 +465,20 @@ export default function TrendsPage() {
               </SelectContent>
             </Select>
           )}
+
+          {/* Category Count */}
+          <Select value={categoryCount.toString()} onValueChange={(v) => setCategoryCount(parseInt(v))}>
+            <SelectTrigger className="w-[100px]">
+              <SelectValue placeholder="Items" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5">Top 5</SelectItem>
+              <SelectItem value="10">Top 10</SelectItem>
+              <SelectItem value="15">Top 15</SelectItem>
+              <SelectItem value="20">Top 20</SelectItem>
+              <SelectItem value="50">All</SelectItem>
+            </SelectContent>
+          </Select>
 
           {/* Hide Other Toggle */}
           <Button
@@ -623,8 +673,19 @@ export default function TrendsPage() {
 
       {/* Merchant Trends */}
       <Card className="mb-8">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Spending by Merchant (Month over Month)</CardTitle>
+          <Select value={merchantCategoryFilter} onValueChange={setMerchantCategoryFilter}>
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Filter by Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {availableCategories.map(cat => (
+                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </CardHeader>
         <CardContent>
           <ChartContainer config={chartConfig} className="h-[400px] w-full">
@@ -662,7 +723,7 @@ export default function TrendsPage() {
                 <Pie
                   data={(trends?.by_category || [])
                     .filter(c => hideOther ? c.category !== OTHER_CATEGORY : true)
-                    .slice(0, 8)}
+                    .slice(0, Math.min(categoryCount, 10))}
                   dataKey="total"
                   nameKey="category"
                   cx="50%"
@@ -674,7 +735,7 @@ export default function TrendsPage() {
                 >
                   {(trends?.by_category || [])
                     .filter(c => hideOther ? c.category !== OTHER_CATEGORY : true)
-                    .slice(0, 8)
+                    .slice(0, Math.min(categoryCount, 10))
                     .map((entry, idx) => (
                       <Cell
                         key={idx}
@@ -707,7 +768,7 @@ export default function TrendsPage() {
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[300px] w-full">
-              <BarChart data={trends?.by_merchant?.slice(0, 8) || []} layout="vertical">
+              <BarChart data={trends?.by_merchant?.slice(0, Math.min(categoryCount, 15)) || []} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
                 <XAxis type="number" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} />
                 <YAxis
@@ -737,11 +798,115 @@ export default function TrendsPage() {
         </Card>
       </div>
 
-      {/* Budget Comparison */}
+      {/* Per-Budget Category Charts */}
+      {budgets && budgets.filter(b => b.expense_type === 'expense').length > 0 && (
+        <Card className="mb-8">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-primary" />
+              <CardTitle>Budget Tracking by Category</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {budgets
+                .filter(b => b.expense_type === 'expense' && b.amount > 0)
+                .map(budget => {
+                  const categoryData = trends?.monthly_by_category?.find(c => c.category === budget.name);
+                  const monthlyBudget = budget.amount;
+
+                  // Get monthly data for this category
+                  const chartData = categoryData?.months.map(m => {
+                    const variance = monthlyBudget - m.total;
+                    const variancePercent = monthlyBudget > 0 ? ((m.total - monthlyBudget) / monthlyBudget) * 100 : 0;
+                    return {
+                      month: formatMonth(m.month),
+                      actual: m.total,
+                      budget: monthlyBudget,
+                      variance,
+                      variancePercent,
+                      overBudget: m.total > monthlyBudget
+                    };
+                  }) || [];
+
+                  // Calculate YTD totals
+                  const ytdActual = chartData.reduce((sum, d) => sum + d.actual, 0);
+                  const ytdBudget = monthlyBudget * chartData.length;
+                  const ytdVariance = ytdBudget - ytdActual;
+                  const ytdVariancePercent = ytdBudget > 0 ? ((ytdActual - ytdBudget) / ytdBudget) * 100 : 0;
+                  const isOverBudget = ytdActual > ytdBudget;
+
+                  return (
+                    <Card key={budget.id} className={cn(
+                      "border-l-4",
+                      isOverBudget ? "border-l-red-500" : "border-l-green-500"
+                    )}>
+                      <CardHeader className="py-2 px-3">
+                        <div className="flex justify-between items-center">
+                          <CardTitle className="text-sm font-medium">{budget.name}</CardTitle>
+                          <span className={cn(
+                            "text-xs font-mono",
+                            isOverBudget ? "text-red-600" : "text-green-600"
+                          )}>
+                            {ytdVariancePercent > 0 ? '+' : ''}{ytdVariancePercent.toFixed(0)}%
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatCurrency(ytdActual)} / {formatCurrency(ytdBudget)} YTD
+                        </div>
+                      </CardHeader>
+                      <CardContent className="py-2 px-3">
+                        <ChartContainer config={chartConfig} className="h-[120px] w-full">
+                          <BarChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+                            <XAxis dataKey="month" tick={{ fontSize: 9 }} axisLine={false} tickLine={false} />
+                            <YAxis hide />
+                            <Tooltip
+                              content={({ active, payload }) => {
+                                if (!active || !payload?.length) return null;
+                                const data = payload[0].payload;
+                                return (
+                                  <div className="bg-background border rounded-lg p-2 shadow-lg text-xs">
+                                    <p className="font-medium">{data.month}</p>
+                                    <p className="font-mono">Actual: {formatCurrency(data.actual)}</p>
+                                    <p className="font-mono text-muted-foreground">Budget: {formatCurrency(data.budget)}</p>
+                                    <p className={cn(
+                                      "font-mono",
+                                      data.overBudget ? "text-red-600" : "text-green-600"
+                                    )}>
+                                      {data.variancePercent > 0 ? '+' : ''}{data.variancePercent.toFixed(0)}% ({data.variance >= 0 ? '+' : ''}{formatCurrency(data.variance)})
+                                    </p>
+                                  </div>
+                                );
+                              }}
+                            />
+                            <ReferenceLine y={monthlyBudget} stroke="#9ca3af" strokeDasharray="3 3" />
+                            <Bar
+                              dataKey="actual"
+                              radius={[2, 2, 0, 0]}
+                            >
+                              {chartData.map((entry, idx) => (
+                                <Cell
+                                  key={idx}
+                                  fill={entry.overBudget ? "#ef4444" : "#22c55e"}
+                                />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ChartContainer>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Budget Comparison Summary */}
       {trends?.budget_comparison && trends.budget_comparison.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Budget vs Actual (Annual)</CardTitle>
+            <CardTitle>Budget vs Actual (Annual Summary)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
