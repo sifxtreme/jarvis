@@ -10,7 +10,7 @@ class PlaidService::API
   end
 
   def banks
-    @banks = PlaidBank.where(is_active: true)
+    @banks = BankConnection.active.plaid
   end
 
   def sync_all_transactions

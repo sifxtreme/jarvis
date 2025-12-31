@@ -166,6 +166,26 @@
         </p>
     </div>
 
+    <div class="card">
+        <h3>Lookup Account ID</h3>
+        <p>Have an access token but need the account ID? Enter it below to fetch account details from your API:</p>
+
+        <label for="apiBaseUrl">API Base URL</label>
+        <input type="text" id="apiBaseUrl" placeholder="https://your-api.com" value="https://sifxtre.me" />
+
+        <label for="lookupToken">Access Token</label>
+        <input type="text" id="lookupToken" placeholder="token_xxxxxxxxxx" />
+
+        <button class="btn-secondary" onclick="lookupAccounts()">Lookup Accounts</button>
+
+        <div id="accountsList" style="margin-top: 16px; display: none;">
+            <h4>Accounts Found:</h4>
+            <div id="accountsContent"></div>
+        </div>
+
+        <div id="lookupStatus" class="status"></div>
+    </div>
+
     <script src="https://cdn.teller.io/connect/connect.js"></script>
     <script>
         function showStatus(message, type) {
@@ -266,6 +286,60 @@
         if (window.location.protocol === 'file:') {
             showStatus('Note: For best results, serve this file via HTTP. Run: python3 -m http.server 8080', 'info');
         }
+
+        function showLookupStatus(message, type) {
+            const status = document.getElementById('lookupStatus');
+            status.textContent = message;
+            status.className = 'status ' + type;
+        }
+
+        async function lookupAccounts() {
+            const baseUrl = document.getElementById('apiBaseUrl').value.trim();
+            const token = document.getElementById('lookupToken').value.trim();
+
+            if (!baseUrl || !token) {
+                showLookupStatus('Please enter both API URL and Access Token', 'error');
+                return;
+            }
+
+            showLookupStatus('Fetching accounts...', 'info');
+
+            try {
+                const response = await fetch(`${baseUrl}/teller/accounts?token=${encodeURIComponent(token)}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showLookupStatus('Error: ' + (data.error || 'Unknown error'), 'error');
+                    return;
+                }
+
+                const accountsList = document.getElementById('accountsList');
+                const accountsContent = document.getElementById('accountsContent');
+
+                if (Array.isArray(data) && data.length > 0) {
+                    accountsContent.innerHTML = data.map(acc => `
+                        <div style="background: #f5f5f5; padding: 12px; border-radius: 8px; margin-bottom: 8px;">
+                            <strong>${acc.name || 'Unknown'}</strong> (${acc.subtype || acc.type || 'account'})<br/>
+                            <code style="font-size: 12px; color: #666;">Account ID: ${acc.id}</code><br/>
+                            <span style="font-size: 12px; color: #888;">Institution: ${acc.institution?.name || 'N/A'}</span>
+                        </div>
+                    `).join('');
+                    accountsList.style.display = 'block';
+                    showLookupStatus(`Found ${data.length} account(s)`, 'success');
+                } else {
+                    accountsList.style.display = 'none';
+                    showLookupStatus('No accounts found', 'info');
+                }
+            } catch (e) {
+                showLookupStatus('Error: ' + e.message, 'error');
+                console.error(e);
+            }
+        }
+
+        // Auto-populate lookup token from access token field
+        document.getElementById('accessToken').addEventListener('input', function() {
+            document.getElementById('lookupToken').value = this.value;
+        });
     </script>
 </body>
 </html>

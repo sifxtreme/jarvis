@@ -5,6 +5,9 @@ Rails.application.routes.draw do
 
   resources :budgets, only: [:index]
 
+  # Teller API utilities
+  get 'teller/accounts', to: 'teller#accounts'
+
   mount Resque::Server, :at => "resque"
   # For details on the DSL available within this file, see http://guides.rubyonrails.org/routing.html
 end
