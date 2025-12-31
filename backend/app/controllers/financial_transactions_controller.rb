@@ -77,6 +77,7 @@ class FinancialTransactionsController < ApplicationController
     base_scope = FinancialTransaction
       .where('extract(year from transacted_at) = ?', year)
       .where(hidden: false)
+      .where("category NOT ILIKE '%income%' OR category IS NULL")
 
     base_scope = base_scope.where(category: category_filter) if category_filter.present?
 
@@ -107,6 +108,7 @@ class FinancialTransactionsController < ApplicationController
       .where('transacted_at >= ? AND transacted_at <= ?', start_of_period, end_of_last_month)
       .where(hidden: false)
       .where('amount > 0') # expenses only
+      .where("category NOT ILIKE '%income%' OR category IS NULL")
 
     # Group by merchant identifier
     grouped = historical.group_by { |t| merchant_key(t) }
