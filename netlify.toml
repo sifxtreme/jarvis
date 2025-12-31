@@ -1,0 +1,10 @@
+[build]
+  base = "finance-tracker-app"
+  command = "npm run build"
+  publish = "client/dist"
+
+# SPA routing - redirect all requests to index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

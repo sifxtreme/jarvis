@@ -1,131 +1,153 @@
-# jarvis
+# Jarvis
 
-a list of useful services for sifxtreme.
+Personal finance tracking and automation platform.
 
-currently jarvis supports:
+## Features
 
-- syncs all financial transactions daily from credit cards to DB
-- predicts the category of a financial transaction based on previously entered categories
-- sends an email daily with a summary of credit card balances
-- helps search through your financial transactions
-- sends a weekly digest for top 10 posts in given subreddits
+- **Transaction Sync** - Automatically syncs credit card transactions from banks via Teller API (every 3 hours)
+- **Smart Categorization** - ML-based prediction of transaction categories and merchant names based on history
+- **Budget Tracking** - Track spending against budgets with visualizations
+- **Email Summaries** - Daily email with credit card balance summaries
+- **Transaction Search** - Search and filter through financial transactions
 
-## services
+## Architecture
 
-### [teller](docs/teller.md) (primary)
+```
+jarvis/
+├── backend/                 # Rails API + background workers
+├── finance-tracker-app/     # React frontend (SPA)
+├── teller/                  # Teller mTLS credentials (gitignored)
+├── docs/                    # Documentation
+└── docker-compose.yml       # Container orchestration
+```
 
-The primary API for syncing bank transactions. Uses mTLS authentication with certificates.
+| Component | Tech Stack | Deployment |
+|-----------|------------|------------|
+| Backend | Rails 5.2, PostgreSQL 14, Redis, Resque | Docker (self-hosted) |
+| Frontend | React 18, Vite, TailwindCSS, Radix UI | Netlify (auto-deploy) |
 
-See [docs/teller.md](docs/teller.md) for setup, troubleshooting (including the common "enrollment disconnected" error), and adding new banks.
+## Quick Start
 
-### [plaid](docs/plaid.md) (legacy)
+### Prerequisites
+- Docker & Docker Compose
+- Node.js (for frontend development)
 
-a financial api to get all your transactions from credit cards and your balances
-
-needs a [plaid](https://plaid.com/) api token and secret to sync up to plaid. use [plaid docs](https://plaid.com/docs/api/) to get access tokens for your credit cards.
-
-## Setup
-
-### server setup
-
-you need docker and docker-compose installed on your system
-
+### Backend
 ```bash
-
-sudo apt-get update
-sudo true # if you get an error about hostname, you need to edit your /etc/hosts file (https://askubuntu.com/questions/59458/error-message-when-i-run-sudo-unable-to-resolve-host-none)
-sudo vim /etc/hosts
-
-# install docker
-sudo apt-get remove docker docker-engine docker.io
-sudo apt-get install     apt-transport-https     ca-certificates     curl     software-properties-common
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-sudo apt-key fingerprint 0EBFCD88
-sudo add-apt-repository    "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-sudo apt-get update
-sudo apt-get install docker-ce
-docker --version
-sudo curl -L "https://github.com/docker/compose/releases/download/1.23.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
-docker-compose --version
-
-# add github ssh key
-ssh-agent
-ssh-keygen -t rsa -b 4096 -C 'asifahmed2011@gmail.com'
-
-# install app
-git clone git@github.com:sifxtreme/jarvis.git
-cd jarvis/
+# Copy environment file
+cp jarvis.env.example jarvis.env
+# Edit with your secrets
 vim jarvis.env
-cd backend
-sudo docker build . -t jarvis-rails
-cd ..
-sudo docker-compose up -d
-```
 
-### nginx htaccess
+# Start all services
+docker-compose up -d
 
-```
-sudo sh -c "echo -n 'USERNAME:' >> /etc/nginx/.htpasswd"
-
-sudo sh -c "openssl passwd -apr1 >> /etc/nginx/.htpasswd"
-```
-
-### secrets and tokens
-
-create a ./jarvis.env file
-AND...
-
-mimic something like, this is the full list of env variables required for the full Jarvis experience
-
-```
-QUEUE=*
-RAILS_ENV=development
-
-JARVIS_GMAIL_EMAIL=PUT_SECRET_HERE
-JARVIS_GMAIL_PASSWORD=PUT_SECRET_HERE
-
-JARVIS_PLAID_CLIENT_ID=PUT_SECRET_HERE
-JARVIS_PLAID_CLIENT_SECRET=PUT_SECRET_HERE
-```
-
-### docker-compose
-
-```
-cd backend
-docker buildx build --platform linux/amd64 -t jarvis-rails .
-docker-compose up
-
+# Run migrations
 docker-compose run api rake db:migrate
 ```
 
-```
-docker build -t jarvis-rails .
-```
-
-### docker (DEPRECATED)
-
-```
-docker build . -t jarvis-rails
-
-sudo docker run -d -p 5432:5432 --name db -v /var/lib/data/jarvis:/var/lib/postgresql/data -e POSTGRES_USER=jarvis -e POSTGRES_DB=jarvis -e POSTGRES_PASSWORD=jarvis postgres:14.10
-
-docker run -d -p 6379:6379 --name redis redis
-
-docker run --rm -p 3000:3000 --name api --link mysql_dev:db --link redis:redis jarvis-rails
-
-docker run --rm --name worker --link mysql_dev:db --link redis:redis jarvis-rails bundle exec rake resque:work QUEUE=* RAILS_ENV=development
-
-docker run --rm --name scheduler --link mysql_dev:db --link redis:redis jarvis-rails bundle exec rake resque:scheduler
+### Frontend
+```bash
+cd finance-tracker-app
+npm install
+npm run dev  # http://localhost:3001
 ```
 
-### updating on server
+## Services & Integrations
 
-```
-cd jarvis/
+### [Teller](docs/teller.md) (Primary)
+
+Bank transaction sync via Teller API. Uses mTLS authentication.
+
+- **Supported banks:** Chase, Amex, Bank of America, Citi, Capital One, 5000+ others
+- **Troubleshooting:** See [docs/teller.md](docs/teller.md) for fixing "enrollment disconnected" errors
+
+### [Plaid](docs/plaid.md) (Legacy)
+
+Original bank integration, being phased out in favor of Teller.
+
+## Deployment
+
+### Frontend (Netlify)
+
+Auto-deploys on push to `master`.
+
+- **Config:** [`netlify.toml`](netlify.toml)
+- **Build:** `npm run build`
+- **Publish:** `client/dist`
+
+### Backend (Docker)
+
+Self-hosted via Docker Compose. Services:
+- `api` - Rails server (port 3000)
+- `worker` - Resque background job processor
+- `scheduler` - Resque scheduler (cron jobs)
+- `db` - PostgreSQL 14
+- `redis` - Redis (job queue + cache)
+
+```bash
+# Deploy updates
 git pull
-sudo docker build . -t jarvis-rails
-sudo service docker restart
-sudo docker network rm jarvis_default
-sudo docker-compose up -d
+docker-compose build api
+docker-compose up -d
 ```
+
+## Environment Variables
+
+Create `jarvis.env`:
+
+```bash
+QUEUE=*
+RAILS_ENV=development
+
+# Email (for daily summaries)
+JARVIS_GMAIL_EMAIL=your-email@gmail.com
+JARVIS_GMAIL_PASSWORD=app-password
+
+# Plaid (legacy)
+JARVIS_PLAID_CLIENT_ID=xxx
+JARVIS_PLAID_CLIENT_SECRET=xxx
+```
+
+Teller credentials (certificates) go in the `teller/` folder - see [docs/teller.md](docs/teller.md).
+
+## Background Jobs
+
+Jobs run via Resque. View status at `http://localhost:3000/resque`
+
+| Job | Schedule | Description |
+|-----|----------|-------------|
+| `SyncTransactionsForBanks` | Every 3 hours | Fetch new transactions from Teller |
+| `Finances::Predictions` | After sync | Predict categories for new transactions |
+
+## Documentation
+
+- [Teller Integration](docs/teller.md) - Bank sync, troubleshooting, repair tool
+- [Plaid Integration](docs/plaid.md) - Legacy bank integration
+- [Backend README](backend/README.md) - Rails API details
+- [Frontend README](finance-tracker-app/README.md) - React app details
+
+## Development
+
+### Useful Commands
+
+```bash
+# Backend console
+docker-compose run api rails console
+
+# Run specific job manually
+docker-compose run api rails runner "SyncTransactionsForBanks.perform"
+
+# View logs
+docker-compose logs -f api
+docker-compose logs -f worker
+```
+
+### Admin Interfaces
+
+- **Resque:** http://localhost:3000/resque - Job queue monitoring
+- **API:** http://localhost:3000 - Rails API
+
+## License
+
+MIT
