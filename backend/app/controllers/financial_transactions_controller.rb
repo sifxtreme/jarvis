@@ -294,7 +294,16 @@ class FinancialTransactionsController < ApplicationController
   def budget_comparison_processed(processed, year)
     expense_items = processed.select { |p| p[:amount] > 0 && p[:category].present? }
 
-    actuals = expense_items.group_by { |p| p[:category] }
+    # Get budgeted category names to map non-budgeted transactions to "Other"
+    budgeted_categories = Budget.where('amount > 0').pluck(:name).to_set
+
+    # Map transactions to their category (or "Other" if not budgeted) before summing
+    expense_items_mapped = expense_items.map do |item|
+      mapped_category = budgeted_categories.include?(item[:category]) ? item[:category] : "Other"
+      item.merge(mapped_category: mapped_category)
+    end
+
+    actuals = expense_items_mapped.group_by { |p| p[:mapped_category] }
       .transform_values { |items| items.sum { |i| i[:amount] } }
 
     Budget.where(expense_type: 'expense').map do |budget|
@@ -316,8 +325,17 @@ class FinancialTransactionsController < ApplicationController
   def monthly_by_category_processed(processed)
     expense_items = processed.select { |p| p[:amount] > 0 && p[:category].present? }
 
-    # Group by category, then by month
-    by_category = expense_items.group_by { |p| p[:category] }
+    # Get budgeted category names to map non-budgeted transactions to "Other"
+    budgeted_categories = Budget.where('amount > 0').pluck(:name).to_set
+
+    # Map transactions to their category (or "Other" if not budgeted)
+    expense_items_mapped = expense_items.map do |item|
+      mapped_category = budgeted_categories.include?(item[:category]) ? item[:category] : "Other"
+      item.merge(mapped_category: mapped_category)
+    end
+
+    # Group by mapped category, then by month
+    by_category = expense_items_mapped.group_by { |p| p[:mapped_category] }
 
     by_category.map do |category, items|
       months_data = items.group_by { |i| i[:month] }

@@ -1042,60 +1042,6 @@ export default function TrendsPage() {
                     </Card>
                   );
                 })}
-
-              {/* Other (non-budgeted) Card */}
-              {(() => {
-                const otherCategory = trends?.monthly_by_category?.find(c => c.category === OTHER_CATEGORY);
-                if (!otherCategory) return null;
-
-                const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                const actualsByMonth = new Map<string, number>();
-                otherCategory.months.forEach(m => {
-                  actualsByMonth.set(formatMonth(m.month), m.total);
-                });
-
-                const chartData = monthNames.map(monthName => ({
-                  month: monthName,
-                  actual: actualsByMonth.get(monthName) || 0,
-                }));
-
-                const ytdActual = chartData.reduce((sum, d) => sum + d.actual, 0);
-
-                return (
-                  <Card className="border-l-4 border-l-orange-500">
-                    <CardHeader className="py-2 px-3">
-                      <div className="flex justify-between items-center">
-                        <CardTitle className="text-sm font-medium text-orange-600">Other (Non-Budgeted)</CardTitle>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {formatCurrency(ytdActual)} YTD
-                      </div>
-                    </CardHeader>
-                    <CardContent className="py-2 px-3">
-                      <ChartContainer config={chartConfig} className="h-[120px] w-full">
-                        <BarChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
-                          <XAxis dataKey="month" tick={{ fontSize: 9 }} axisLine={false} tickLine={false} />
-                          <YAxis hide />
-                          <Tooltip
-                            cursor={false}
-                            content={({ active, payload }) => {
-                              if (!active || !payload?.length) return null;
-                              const data = payload[0].payload;
-                              return (
-                                <div className="bg-background border rounded-lg p-2 shadow-lg text-xs">
-                                  <p className="font-medium">{data.month}</p>
-                                  <p className="font-mono text-orange-600">Spent: {formatCurrency(data.actual)}</p>
-                                </div>
-                              );
-                            }}
-                          />
-                          <Bar dataKey="actual" fill="#f97316" radius={[2, 2, 0, 0]} />
-                        </BarChart>
-                      </ChartContainer>
-                    </CardContent>
-                  </Card>
-                );
-              })()}
             </div>
           </CardContent>
         </Card>
