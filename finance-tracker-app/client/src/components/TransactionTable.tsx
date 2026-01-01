@@ -34,7 +34,7 @@ import { MdDeliveryDining } from 'react-icons/md';
 import { GiPizzaSlice } from 'react-icons/gi';
 import { HiShoppingCart } from 'react-icons/hi';
 import { RiLeafLine } from 'react-icons/ri';
-import { api, Transaction, OTHER_CATEGORY } from "../lib/api";
+import { api, Transaction } from "../lib/api";
 import { formatCurrency, formatDate } from "../lib/utils";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -56,6 +56,7 @@ interface TransactionTableProps {
   onUpdate?: () => void;
   externalQuickAdd?: Partial<Transaction> | null;
   onExternalQuickAddHandled?: () => void;
+  budgetedCategories?: Set<string>;
 }
 
 type SortField = 'transacted_at' | 'plaid_name' | 'merchant_name' | 'category' | 'amount' | 'source';
@@ -181,7 +182,8 @@ export default function TransactionTable({
   isLoading,
   onUpdate,
   externalQuickAdd,
-  onExternalQuickAddHandled
+  onExternalQuickAddHandled,
+  budgetedCategories = new Set()
 }: TransactionTableProps) {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [duplicatingTransaction, setDuplicatingTransaction] = useState<Transaction | null>(null);
@@ -534,9 +536,16 @@ export default function TransactionTable({
                 </TableCell>
                 <TableCell className={cn(
                   "font-mono",
-                  transaction.category === OTHER_CATEGORY && "text-orange-600 font-medium"
+                  transaction.category &&
+                    !transaction.category.toLowerCase().includes('income') &&
+                    budgetedCategories.size > 0 &&
+                    !budgetedCategories.has(transaction.category) &&
+                    "text-orange-600 font-medium"
                 )}>
-                  {transaction.category === OTHER_CATEGORY ? (
+                  {transaction.category &&
+                   !transaction.category.toLowerCase().includes('income') &&
+                   budgetedCategories.size > 0 &&
+                   !budgetedCategories.has(transaction.category) ? (
                     <span className="inline-flex items-center gap-1">
                       <AlertCircle className="h-3 w-3" />
                       {transaction.category}
@@ -731,9 +740,16 @@ export default function TransactionTable({
             <div className="flex items-center justify-between mt-4">
               <div className={cn(
                 "font-mono text-sm",
-                transaction.category === OTHER_CATEGORY && "text-orange-600 font-medium"
+                transaction.category &&
+                  !transaction.category.toLowerCase().includes('income') &&
+                  budgetedCategories.size > 0 &&
+                  !budgetedCategories.has(transaction.category) &&
+                  "text-orange-600 font-medium"
               )}>
-                {transaction.category === OTHER_CATEGORY ? (
+                {transaction.category &&
+                 !transaction.category.toLowerCase().includes('income') &&
+                 budgetedCategories.size > 0 &&
+                 !budgetedCategories.has(transaction.category) ? (
                   <span className="inline-flex items-center gap-1">
                     <AlertCircle className="h-3 w-3" />
                     {transaction.category}

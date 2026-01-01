@@ -134,6 +134,7 @@ export default function TransactionsPage() {
                 onUpdate={() => refetch()}
                 externalQuickAdd={quickAddTransaction}
                 onExternalQuickAddHandled={() => setQuickAddTransaction(null)}
+                budgetedCategories={new Set(budgets.map(b => b.name))}
               />
 
               {error && (
