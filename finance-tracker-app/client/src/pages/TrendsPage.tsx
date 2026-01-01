@@ -74,6 +74,10 @@ export default function TrendsPage() {
   const [categoryCount, setCategoryCount] = useState<number>(10);
   const [merchantCategoryFilter, setMerchantCategoryFilter] = useState<string>('all');
 
+  // Hover state for precise dot highlighting
+  const [hoveredCategoryDot, setHoveredCategoryDot] = useState<{ dataKey: string; index: number } | null>(null);
+  const [hoveredMerchantDot, setHoveredMerchantDot] = useState<{ dataKey: string; index: number } | null>(null);
+
   // Fetch current year trends
   const { data: trends, isLoading, error } = useQuery({
     queryKey: ['trends', filters],
@@ -356,6 +360,77 @@ export default function TrendsPage() {
           </div>
         ))}
       </div>
+    );
+  };
+
+  // Custom tooltip that only shows when hovering a specific dot
+  const renderCategoryDotTooltip = ({ payload, label }: any) => {
+    if (!hoveredCategoryDot || !payload?.length) return null;
+    const hoveredEntry = payload.find((p: any) => p.dataKey === hoveredCategoryDot.dataKey);
+    if (!hoveredEntry) return null;
+    return (
+      <div className="bg-background border rounded-lg p-3 shadow-lg">
+        <p className="font-medium mb-1">{label}</p>
+        <div className="flex justify-between gap-4 text-sm">
+          <span style={{ color: hoveredEntry.color }}>{hoveredEntry.name}</span>
+          <span className="font-mono">{formatCurrency(hoveredEntry.value as number)}</span>
+        </div>
+      </div>
+    );
+  };
+
+  const renderMerchantDotTooltip = ({ payload, label }: any) => {
+    if (!hoveredMerchantDot || !payload?.length) return null;
+    const hoveredEntry = payload.find((p: any) => p.dataKey === hoveredMerchantDot.dataKey);
+    if (!hoveredEntry) return null;
+    return (
+      <div className="bg-background border rounded-lg p-3 shadow-lg">
+        <p className="font-medium mb-1">{label}</p>
+        <div className="flex justify-between gap-4 text-sm">
+          <span style={{ color: hoveredEntry.color }}>{hoveredEntry.name}</span>
+          <span className="font-mono">{formatCurrency(hoveredEntry.value as number)}</span>
+        </div>
+      </div>
+    );
+  };
+
+  // Custom dot component for category chart
+  const renderCategoryDot = (props: any, dataKey: string, color: string): React.ReactElement<SVGElement> => {
+    const { cx, cy, index } = props;
+    if (cx === undefined || cy === undefined) return <circle r={0} />;
+    const isHovered = hoveredCategoryDot?.dataKey === dataKey && hoveredCategoryDot?.index === index;
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={isHovered ? 8 : 3}
+        fill={isHovered ? 'white' : color}
+        stroke={color}
+        strokeWidth={isHovered ? 2 : 0}
+        style={{ cursor: 'pointer' }}
+        onMouseEnter={() => setHoveredCategoryDot({ dataKey, index })}
+        onMouseLeave={() => setHoveredCategoryDot(null)}
+      />
+    );
+  };
+
+  // Custom dot component for merchant chart
+  const renderMerchantDot = (props: any, dataKey: string, color: string): React.ReactElement<SVGElement> => {
+    const { cx, cy, index } = props;
+    if (cx === undefined || cy === undefined) return <circle r={0} />;
+    const isHovered = hoveredMerchantDot?.dataKey === dataKey && hoveredMerchantDot?.index === index;
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={isHovered ? 8 : 3}
+        fill={isHovered ? 'white' : color}
+        stroke={color}
+        strokeWidth={isHovered ? 2 : 0}
+        style={{ cursor: 'pointer' }}
+        onMouseEnter={() => setHoveredMerchantDot({ dataKey, index })}
+        onMouseLeave={() => setHoveredMerchantDot(null)}
+      />
     );
   };
 
@@ -685,21 +760,24 @@ export default function TrendsPage() {
                   return Math.ceil(visibleMax * 1.1) || 1000; // 10% padding, fallback to 1000
                 }]}
               />
-              <Tooltip cursor={false} content={renderSortedTooltip} />
+              <Tooltip cursor={false} content={renderCategoryDotTooltip} />
               <Legend content={(props) => renderClickableLegend(props, hiddenCategories, toggleCategory)} />
-              {allCategories.map((cat, idx) => (
-                <Line
-                  key={cat.category}
-                  type="linear"
-                  dataKey={cat.category}
-                  stroke={cat.category === OTHER_CATEGORY ? OTHER_COLOR : COLORS[idx % COLORS.length]}
-                  strokeWidth={hiddenCategories.has(cat.category) ? 0 : 2}
-                  dot={{ r: 3 }}
-                  activeDot={{ r: 8, stroke: cat.category === OTHER_CATEGORY ? OTHER_COLOR : COLORS[idx % COLORS.length], strokeWidth: 2, fill: 'white' }}
-                  strokeDasharray={cat.category === OTHER_CATEGORY ? "3 3" : undefined}
-                  opacity={hiddenCategories.has(cat.category) ? 0 : 1}
-                />
-              ))}
+              {allCategories.map((cat, idx) => {
+                const color = cat.category === OTHER_CATEGORY ? OTHER_COLOR : COLORS[idx % COLORS.length];
+                return (
+                  <Line
+                    key={cat.category}
+                    type="linear"
+                    dataKey={cat.category}
+                    stroke={color}
+                    strokeWidth={hiddenCategories.has(cat.category) ? 0 : 2}
+                    dot={(props) => renderCategoryDot(props, cat.category, color)}
+                    activeDot={false}
+                    strokeDasharray={cat.category === OTHER_CATEGORY ? "3 3" : undefined}
+                    opacity={hiddenCategories.has(cat.category) ? 0 : 1}
+                  />
+                );
+              })}
             </LineChart>
           </ChartContainer>
         </CardContent>
@@ -746,20 +824,23 @@ export default function TrendsPage() {
                   return Math.ceil(visibleMax * 1.1) || 1000; // 10% padding, fallback to 1000
                 }]}
               />
-              <Tooltip cursor={false} content={renderSortedTooltip} />
+              <Tooltip cursor={false} content={renderMerchantDotTooltip} />
               <Legend content={(props) => renderClickableLegend(props, hiddenMerchants, toggleMerchant)} />
-              {allMerchants.map((merch, idx) => (
-                <Line
-                  key={merch.merchant}
-                  type="linear"
-                  dataKey={merch.merchant}
-                  stroke={COLORS[idx % COLORS.length]}
-                  strokeWidth={hiddenMerchants.has(merch.merchant) ? 0 : 2}
-                  dot={{ r: 3 }}
-                  activeDot={{ r: 8, stroke: COLORS[idx % COLORS.length], strokeWidth: 2, fill: 'white' }}
-                  opacity={hiddenMerchants.has(merch.merchant) ? 0 : 1}
-                />
-              ))}
+              {allMerchants.map((merch, idx) => {
+                const color = COLORS[idx % COLORS.length];
+                return (
+                  <Line
+                    key={merch.merchant}
+                    type="linear"
+                    dataKey={merch.merchant}
+                    stroke={color}
+                    strokeWidth={hiddenMerchants.has(merch.merchant) ? 0 : 2}
+                    dot={(props) => renderMerchantDot(props, merch.merchant, color)}
+                    activeDot={false}
+                    opacity={hiddenMerchants.has(merch.merchant) ? 0 : 1}
+                  />
+                );
+              })}
             </LineChart>
           </ChartContainer>
         </CardContent>
