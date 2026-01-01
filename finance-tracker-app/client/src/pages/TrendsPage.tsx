@@ -639,7 +639,7 @@ export default function TrendsPage() {
                 stroke="#2563eb"
                 strokeWidth={2}
                 dot={{ r: 4 }}
-                activeDot={{ r: 6 }}
+                activeDot={{ r: 8, stroke: '#2563eb', strokeWidth: 2, fill: 'white' }}
               />
               {showMovingAvg && (
                 <Line
@@ -695,6 +695,7 @@ export default function TrendsPage() {
                   stroke={cat.category === OTHER_CATEGORY ? OTHER_COLOR : COLORS[idx % COLORS.length]}
                   strokeWidth={hiddenCategories.has(cat.category) ? 0 : 2}
                   dot={{ r: 3 }}
+                  activeDot={{ r: 8, stroke: cat.category === OTHER_CATEGORY ? OTHER_COLOR : COLORS[idx % COLORS.length], strokeWidth: 2, fill: 'white' }}
                   strokeDasharray={cat.category === OTHER_CATEGORY ? "3 3" : undefined}
                   opacity={hiddenCategories.has(cat.category) ? 0 : 1}
                 />
@@ -755,6 +756,7 @@ export default function TrendsPage() {
                   stroke={COLORS[idx % COLORS.length]}
                   strokeWidth={hiddenMerchants.has(merch.merchant) ? 0 : 2}
                   dot={{ r: 3 }}
+                  activeDot={{ r: 8, stroke: COLORS[idx % COLORS.length], strokeWidth: 2, fill: 'white' }}
                   opacity={hiddenMerchants.has(merch.merchant) ? 0 : 1}
                 />
               ))}
