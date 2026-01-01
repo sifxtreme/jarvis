@@ -611,6 +611,7 @@ export default function TrendsPage() {
                 tick={{ fontSize: 12 }}
               />
               <Tooltip
+                cursor={false}
                 content={({ active, payload }) => {
                   if (!active || !payload?.length) return null;
                   const data = payload[0].payload;
@@ -684,7 +685,7 @@ export default function TrendsPage() {
                   return Math.ceil(visibleMax * 1.1) || 1000; // 10% padding, fallback to 1000
                 }]}
               />
-              <Tooltip content={renderSortedTooltip} />
+              <Tooltip cursor={false} content={renderSortedTooltip} />
               <Legend content={(props) => renderClickableLegend(props, hiddenCategories, toggleCategory)} />
               {allCategories.map((cat, idx) => (
                 <Line
@@ -744,7 +745,7 @@ export default function TrendsPage() {
                   return Math.ceil(visibleMax * 1.1) || 1000; // 10% padding, fallback to 1000
                 }]}
               />
-              <Tooltip content={renderSortedTooltip} />
+              <Tooltip cursor={false} content={renderSortedTooltip} />
               <Legend content={(props) => renderClickableLegend(props, hiddenMerchants, toggleMerchant)} />
               {allMerchants.map((merch, idx) => (
                 <Line
@@ -795,6 +796,7 @@ export default function TrendsPage() {
                     ))}
                 </Pie>
                 <Tooltip
+                  cursor={false}
                   content={({ active, payload }) => {
                     if (!active || !payload?.length) return null;
                     const data = payload[0].payload;
@@ -830,6 +832,7 @@ export default function TrendsPage() {
                   tickFormatter={(value) => value.length > 15 ? value.slice(0, 15) + '...' : value}
                 />
                 <Tooltip
+                  cursor={false}
                   content={({ active, payload }) => {
                     if (!active || !payload?.length) return null;
                     const data = payload[0].payload;
@@ -919,6 +922,7 @@ export default function TrendsPage() {
                             <XAxis dataKey="month" tick={{ fontSize: 9 }} axisLine={false} tickLine={false} />
                             <YAxis hide />
                             <Tooltip
+                              cursor={false}
                               content={({ active, payload }) => {
                                 if (!active || !payload?.length) return null;
                                 const data = payload[0].payload;
