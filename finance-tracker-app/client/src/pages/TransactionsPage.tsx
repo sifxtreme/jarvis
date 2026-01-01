@@ -78,7 +78,7 @@ export default function TransactionsPage() {
   };
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-full flex flex-col">
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         <ResizablePanel defaultSize={70} minSize={50}>
           <div className="h-full flex flex-col">
