@@ -278,9 +278,8 @@ class FinancialTransactionsController < ApplicationController
   end
 
   def monthly_breakdown_processed(processed)
-    expense_items = processed.select { |p| p[:amount] > 0 }
-
-    expense_items.group_by { |p| p[:month] }
+    # Include all transactions (including negative/refunds to offset expenses)
+    processed.group_by { |p| p[:month] }
       .map do |month, items|
         {
           month: month,
@@ -292,7 +291,8 @@ class FinancialTransactionsController < ApplicationController
   end
 
   def budget_comparison_processed(processed, year)
-    expense_items = processed.select { |p| p[:amount] > 0 && p[:category].present? }
+    # Include all transactions (including negative/refunds to offset expenses)
+    expense_items = processed.select { |p| p[:category].present? }
 
     # Get budgeted category names to map non-budgeted transactions to "Other"
     budgeted_categories = Budget.where('amount > 0').pluck(:name).to_set
@@ -323,7 +323,8 @@ class FinancialTransactionsController < ApplicationController
   end
 
   def monthly_by_category_processed(processed)
-    expense_items = processed.select { |p| p[:amount] > 0 && p[:category].present? }
+    # Include all transactions with categories (including negative/refunds to offset expenses)
+    expense_items = processed.select { |p| p[:category].present? }
 
     # Get budgeted category names to map non-budgeted transactions to "Other"
     budgeted_categories = Budget.where('amount > 0').pluck(:name).to_set
@@ -347,7 +348,8 @@ class FinancialTransactionsController < ApplicationController
   end
 
   def monthly_by_merchant_processed(processed)
-    expense_items = processed.select { |p| p[:amount] > 0 && p[:plaid_name].present? }
+    # Include all transactions (including negative/refunds to offset expenses)
+    expense_items = processed.select { |p| p[:plaid_name].present? }
 
     # Group by merchant (plaid_name), then by month
     by_merchant = expense_items.group_by { |p| p[:plaid_name] }
