@@ -269,7 +269,7 @@ export function TransactionModal({
       <style dangerouslySetInnerHTML={{ __html: diagonalStripesStyle }} />
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <Dialog.Content className="fixed left-[50%] top-[50%] max-h-[85vh] w-[90vw] max-w-[600px] translate-x-[-50%] translate-y-[-50%] rounded-[6px] bg-white p-[25px] overflow-y-auto shadow-[hsl(206_22%_7%_/_35%)_0px_10px_38px_-10px,_hsl(206_22%_7%_/_20%)_0px_10px_20px_-15px] focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]">
+        <Dialog.Content className="fixed left-[50%] top-[50%] max-h-[85vh] w-[90vw] max-w-[600px] translate-x-[-50%] translate-y-[-50%] rounded-[6px] bg-background text-foreground p-[25px] overflow-y-auto shadow-[hsl(206_22%_7%_/_35%)_0px_10px_38px_-10px,_hsl(206_22%_7%_/_20%)_0px_10px_20px_-15px] focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]">
           <Dialog.Title className="m-0 text-[17px] font-medium mb-4">
             {title}
           </Dialog.Title>
@@ -318,7 +318,7 @@ export function TransactionModal({
                     type="date"
                     name="transacted_at"
                     defaultValue={isDuplicating ? today : (transaction?.transacted_at.split('T')[0] || today)}
-                    className="w-full p-2 border rounded font-mono"
+                    className="w-full p-2 border rounded font-mono bg-background text-foreground"
                   />
                 </div>
 
@@ -332,7 +332,7 @@ export function TransactionModal({
                     name="amount"
                     defaultValue={transaction?.amount}
                     step="0.01"
-                    className={`w-full p-2 border rounded text-right font-mono ${validationErrors.amount ? 'border-red-500 outline-red-500' : ''}`}
+                    className={`w-full p-2 border rounded text-right font-mono bg-background text-foreground ${validationErrors.amount ? 'border-red-500 outline-red-500' : ''}`}
                     onChange={() => setValidationErrors(prev => ({ ...prev, amount: false }))}
                   />
                 </div>
@@ -348,7 +348,7 @@ export function TransactionModal({
                       type="text"
                       name="plaid_name"
                       defaultValue={transaction?.plaid_name}
-                      className="w-full p-2 border rounded bg-gray-200 text-gray-700 cursor-not-allowed"
+                      className="w-full p-2 border rounded bg-muted text-muted-foreground cursor-not-allowed"
                       disabled
                     />
                     <div className="absolute inset-0 bg-stripes rounded pointer-events-none"></div>
@@ -364,7 +364,7 @@ export function TransactionModal({
                     type="text"
                     name="merchant_name"
                     defaultValue={transaction?.merchant_name}
-                    className={`w-full p-2 border rounded ${validationErrors.merchant_name ? 'border-red-500 outline-red-500' : ''}`}
+                    className={`w-full p-2 border rounded bg-background text-foreground ${validationErrors.merchant_name ? 'border-red-500 outline-red-500' : ''}`}
                     onChange={() => setValidationErrors(prev => ({ ...prev, merchant_name: false }))}
                   />
                 </div>
@@ -383,17 +383,17 @@ export function TransactionModal({
                     onFocus={() => setShowCategorySuggestions(true)}
                     onKeyDown={handleCategoryKeyDown}
                     ref={categoryInputRef}
-                    className="w-full p-2 border rounded"
+                    className="w-full p-2 border rounded bg-background text-foreground"
                     autoComplete="off"
                   />
                   {showCategorySuggestions && filteredCategories.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border rounded shadow-lg z-10 category-dropdown">
+                    <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-popover border rounded shadow-lg z-10 category-dropdown">
                       {filteredCategories.map((category, index) => (
                         <div
                           key={index}
-                          className={`p-3 cursor-pointer border-b border-gray-100 last:border-b-0 ${selectedCategoryIndex === index
-                            ? 'bg-blue-100 font-medium'
-                            : 'hover:bg-gray-100'
+                          className={`p-3 cursor-pointer border-b border-border last:border-b-0 ${selectedCategoryIndex === index
+                            ? 'bg-accent font-medium'
+                            : 'hover:bg-muted'
                             }`}
                           onClick={(e) => {
                             e.preventDefault();
@@ -426,17 +426,17 @@ export function TransactionModal({
                     onFocus={() => setShowSourceSuggestions(true)}
                     onKeyDown={handleSourceKeyDown}
                     ref={sourceInputRef}
-                    className={`w-full p-2 border rounded ${validationErrors.source ? 'border-red-500 outline-red-500' : ''}`}
+                    className={`w-full p-2 border rounded bg-background text-foreground ${validationErrors.source ? 'border-red-500 outline-red-500' : ''}`}
                     autoComplete="off"
                   />
                   {showSourceSuggestions && filteredSources.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border rounded shadow-lg z-10 source-dropdown">
+                    <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-popover border rounded shadow-lg z-10 source-dropdown">
                       {filteredSources.map((source, index) => (
                         <div
                           key={index}
-                          className={`p-3 cursor-pointer border-b border-gray-100 last:border-b-0 ${selectedSourceIndex === index
-                            ? 'bg-blue-100 font-medium'
-                            : 'hover:bg-gray-100'
+                          className={`p-3 cursor-pointer border-b border-border last:border-b-0 ${selectedSourceIndex === index
+                            ? 'bg-accent font-medium'
+                            : 'hover:bg-muted'
                             }`}
                           onClick={(e) => {
                             e.preventDefault();
@@ -488,13 +488,13 @@ export function TransactionModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex items-center justify-center rounded px-4 py-2 text-sm font-medium border border-gray-200 bg-white text-gray-900 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
+                className="inline-flex items-center justify-center rounded px-4 py-2 text-sm font-medium border border-border bg-background text-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="inline-flex items-center justify-center rounded px-4 py-2 text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                className="inline-flex items-center justify-center rounded px-4 py-2 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 Save
               </button>
@@ -503,7 +503,7 @@ export function TransactionModal({
 
           <Dialog.Close asChild>
             <button
-              className="absolute right-[10px] top-[10px] inline-flex h-[25px] w-[25px] appearance-none items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 focus:outline-none"
+              className="absolute right-[10px] top-[10px] inline-flex h-[25px] w-[25px] appearance-none items-center justify-center rounded-full text-muted-foreground hover:bg-muted focus:outline-none"
               aria-label="Close"
             >
               <Cross2Icon />

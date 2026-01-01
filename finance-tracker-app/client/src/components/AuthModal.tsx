@@ -48,7 +48,7 @@ export function AuthModal({ isOpen, onAuthenticate }: AuthModalProps) {
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="text-sm text-red-500 p-2 bg-red-50 rounded">
+            <div className="text-sm text-destructive p-2 bg-destructive/10 rounded">
               {error}
             </div>
           )}
@@ -64,7 +64,7 @@ export function AuthModal({ isOpen, onAuthenticate }: AuthModalProps) {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               disabled={isLoading}
             >
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
