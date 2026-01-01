@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getTrends, getTransactions, getBudgets, type TrendsFilters, OTHER_CATEGORY } from "../lib/api";
+import { getTrends, getTransactions, getBudgets, type TrendsFilters, OTHER_CATEGORY, type Transaction } from "../lib/api";
 import { useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ChartContainer } from "@/components/ui/chart";
 import { formatCurrency, cn, YEARS } from "@/lib/utils";
 import { Download, TrendingUp, TrendingDown, Target } from "lucide-react";
+import { CategoryDrilldownModal } from "@/components/CategoryDrilldownModal";
 import {
   LineChart,
   Line,
@@ -78,6 +79,10 @@ export default function TrendsPage() {
   const [hoveredCategoryDot, setHoveredCategoryDot] = useState<{ dataKey: string; index: number } | null>(null);
   const [hoveredMerchantDot, setHoveredMerchantDot] = useState<{ dataKey: string; index: number } | null>(null);
 
+  // Category drill-down modal state
+  const [drilldownCategory, setDrilldownCategory] = useState<string | null>(null);
+  const [drilldownTransactions, setDrilldownTransactions] = useState<Transaction[]>([]);
+
   // Fetch current year trends
   const { data: trends, isLoading, error } = useQuery({
     queryKey: ['trends', filters],
@@ -113,6 +118,33 @@ export default function TrendsPage() {
     });
     return Array.from(sources).sort();
   }, [transactions]);
+
+  // Get budgeted categories for mapping non-budgeted to "Other"
+  const budgetedCategoryNames = useMemo(() => {
+    if (!budgets) return new Set<string>();
+    return new Set(budgets.filter(b => b.amount > 0).map(b => b.name));
+  }, [budgets]);
+
+  // Open category drill-down modal
+  const openCategoryDrilldown = (category: string) => {
+    if (!transactions) return;
+
+    // Filter transactions for this category (expenses only)
+    const categoryTransactions = transactions.filter(t => {
+      // Skip income
+      if (t.category?.toLowerCase()?.includes('income')) return false;
+
+      if (category === OTHER_CATEGORY) {
+        // "Other" category includes transactions with non-budgeted categories
+        return !budgetedCategoryNames.has(t.category || '');
+      }
+
+      return t.category === category;
+    });
+
+    setDrilldownCategory(category);
+    setDrilldownTransactions(categoryTransactions);
+  };
 
   const handleYearChange = (year: string) => {
     const newFilters = { ...filters, year: parseInt(year) };
@@ -867,6 +899,8 @@ export default function TrendsPage() {
                   outerRadius={100}
                   label={({ category, percent }) => `${category} (${(percent * 100).toFixed(0)}%)`}
                   labelLine={false}
+                  onClick={(data) => openCategoryDrilldown(data.category)}
+                  style={{ cursor: 'pointer' }}
                 >
                   {(trends?.by_category || [])
                     .filter(c => hideOther ? c.category !== OTHER_CATEGORY : true)
@@ -875,6 +909,7 @@ export default function TrendsPage() {
                       <Cell
                         key={idx}
                         fill={entry.category === OTHER_CATEGORY ? OTHER_COLOR : COLORS[idx % COLORS.length]}
+                        style={{ cursor: 'pointer' }}
                       />
                     ))}
                 </Pie>
@@ -888,6 +923,7 @@ export default function TrendsPage() {
                         <p className="font-medium">{data.category}</p>
                         <p className="font-mono">{formatCurrency(data.total)}</p>
                         <p className="text-sm text-muted-foreground">{data.transaction_count} transactions</p>
+                        <p className="text-xs text-primary mt-1">Click to view transactions</p>
                       </div>
                     );
                   }}
@@ -981,10 +1017,14 @@ export default function TrendsPage() {
                   const isOverBudget = ytdActual > ytdBudget;
 
                   return (
-                    <Card key={budget.id} className={cn(
-                      "border-l-4",
-                      isOverBudget ? "border-l-red-500" : "border-l-green-500"
-                    )}>
+                    <Card
+                      key={budget.id}
+                      className={cn(
+                        "border-l-4 cursor-pointer hover:bg-muted/50 transition-colors",
+                        isOverBudget ? "border-l-red-500" : "border-l-green-500"
+                      )}
+                      onClick={() => openCategoryDrilldown(budget.name)}
+                    >
                       <CardHeader className="py-2 px-3">
                         <div className="flex justify-between items-center">
                           <CardTitle className="text-sm font-medium">{budget.name}</CardTitle>
@@ -1056,7 +1096,11 @@ export default function TrendsPage() {
           <CardContent>
             <div className="space-y-4">
               {trends.budget_comparison.filter(b => b.budget > 0).map((item) => (
-                <div key={item.category} className="space-y-1">
+                <div
+                  key={item.category}
+                  className="space-y-1 cursor-pointer hover:bg-muted/50 p-2 -mx-2 rounded-md transition-colors"
+                  onClick={() => openCategoryDrilldown(item.category)}
+                >
                   <div className="flex justify-between text-sm">
                     <span className={item.category === OTHER_CATEGORY ? 'italic text-muted-foreground' : ''}>
                       {item.category}
@@ -1087,6 +1131,14 @@ export default function TrendsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Category Drill-down Modal */}
+      <CategoryDrilldownModal
+        isOpen={drilldownCategory !== null}
+        onClose={() => setDrilldownCategory(null)}
+        category={drilldownCategory || ''}
+        transactions={drilldownTransactions}
+      />
     </div>
   );
 }

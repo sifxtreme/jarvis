@@ -173,7 +173,7 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
               </DialogHeader>
 
               {selectedCategory === 'Other' && (
-                <div className="mb-4 mt-2 p-3 bg-gray-50 rounded-md border">
+                <div className="mb-4 mt-2 p-3 bg-muted/50 rounded-md border">
                   <div className="grid gap-1 max-h-[150px] overflow-y-auto pr-1">
                     {Object.entries(
                       selectedTransactions.reduce((acc, transaction) => {
@@ -195,7 +195,7 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
               )}
 
               {selectedCategory !== 'Other' && selectedTransactions.length > 5 && (
-                <div className="mb-4 mt-2 p-3 bg-gray-50 rounded-md border">
+                <div className="mb-4 mt-2 p-3 bg-muted/50 rounded-md border">
                   <div className="grid gap-1 max-h-[150px] overflow-y-auto pr-1">
                     {Object.entries(
                       selectedTransactions.reduce((acc, transaction) => {
@@ -307,7 +307,7 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
                       return (
                         <TableRow
                           key={category}
-                          className={`${rowClassName} cursor-pointer hover:bg-gray-50`}
+                          className={`${rowClassName} cursor-pointer hover:bg-muted/50`}
                           onClick={() => {
                             setSelectedTransactions(transactions);
                             setSelectedCategory(category);

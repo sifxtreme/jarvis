@@ -1,7 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { TrendingUp, DollarSign, Calendar, Menu, Wrench } from "lucide-react";
+import { TrendingUp, DollarSign, Calendar, Menu, Wrench, Sun, Moon } from "lucide-react";
 import { useState } from "react";
+import { useTheme } from "@/hooks/useTheme";
 
 const navItems = [
   { path: "/", label: "Transactions", icon: DollarSign },
@@ -13,6 +14,7 @@ const navItems = [
 export function Navbar() {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -43,6 +45,15 @@ export function Navbar() {
             );
           })}
         </div>
+
+        {/* Theme Toggle */}
+        <button
+          onClick={toggleTheme}
+          className="ml-auto hidden md:flex p-1.5 hover:bg-muted rounded-md text-muted-foreground hover:text-foreground transition-colors"
+          title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+        >
+          {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+        </button>
 
         {/* Mobile Menu Button */}
         <button
@@ -75,6 +86,13 @@ export function Navbar() {
               </Link>
             );
           })}
+          <button
+            onClick={toggleTheme}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted w-full"
+          >
+            {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+            {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+          </button>
         </div>
       )}
     </nav>
