@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { cn, YEARS } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -21,7 +21,6 @@ interface FilterControlsProps {
 
 // This is the original inline desktop version
 export default function FilterControls({ onSearch, initialFilters, className }: FilterControlsProps) {
-  const currentYear = new Date().getFullYear();
 
   const handlePreviousMonth = () => {
     const currentMonth = initialFilters?.month ?? new Date().getMonth() + 1;
@@ -78,7 +77,7 @@ export default function FilterControls({ onSearch, initialFilters, className }: 
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Years</SelectItem>
-          {[currentYear + 1, currentYear, currentYear - 1, currentYear - 2].map((year) => (
+          {YEARS.map((year) => (
             <SelectItem key={year} value={year.toString()}>
               {year}
             </SelectItem>

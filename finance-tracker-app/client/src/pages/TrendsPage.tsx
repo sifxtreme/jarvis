@@ -6,8 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { ChartContainer } from "@/components/ui/chart";
-import { formatCurrency } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { formatCurrency, cn, YEARS } from "@/lib/utils";
 import { Download, TrendingUp, TrendingDown, Target } from "lucide-react";
 import {
   LineChart,
@@ -447,7 +446,7 @@ export default function TrendsPage() {
               <SelectValue placeholder="Year" />
             </SelectTrigger>
             <SelectContent>
-              {[2026, 2025, 2024, 2023, 2022].map(year => (
+              {YEARS.map(year => (
                 <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
               ))}
             </SelectContent>
