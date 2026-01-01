@@ -213,12 +213,7 @@ export default function TrendsPage() {
       return dataPoint;
     });
 
-    // Calculate 3-month moving average on total
-    return data.map((item, idx) => {
-      if (idx < 2) return { ...item, movingAvg: null };
-      const sum = data.slice(idx - 2, idx + 1).reduce((acc, d) => acc + (d._total as number), 0);
-      return { ...item, movingAvg: sum / 3 };
-    });
+    return data;
   };
 
   // Get merchant-to-category mapping from by_merchant data (which has categories array)
@@ -275,12 +270,7 @@ export default function TrendsPage() {
       return dataPoint;
     });
 
-    // Calculate 3-month moving average on total
-    return data.map((item, idx) => {
-      if (idx < 2) return { ...item, movingAvg: null };
-      const sum = data.slice(idx - 2, idx + 1).reduce((acc, d) => acc + (d._total as number), 0);
-      return { ...item, movingAvg: sum / 3 };
-    });
+    return data;
   };
 
   // Calculate YoY change
@@ -668,12 +658,8 @@ export default function TrendsPage() {
 
       {/* Category Trends */}
       <Card className="mb-8">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader>
           <CardTitle>Spending by Category (Month over Month)</CardTitle>
-          <div className="text-xs text-muted-foreground flex items-center gap-2">
-            <span className="inline-block w-4 h-0.5 bg-orange-500" style={{ borderTop: '2px dashed #f97316' }}></span>
-            <span>3-Mo Avg</span>
-          </div>
         </CardHeader>
         <CardContent>
           <ChartContainer config={chartConfig} className="h-[400px] w-full">
@@ -712,19 +698,6 @@ export default function TrendsPage() {
                   opacity={hiddenCategories.has(cat.category) ? 0 : 1}
                 />
               ))}
-              {showMovingAvg && (
-                <Line
-                  type="linear"
-                  dataKey="movingAvg"
-                  stroke="#f97316"
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                  dot={false}
-                  connectNulls
-                  name="3-Mo Avg"
-                  legendType="none"
-                />
-              )}
             </LineChart>
           </ChartContainer>
         </CardContent>
@@ -735,10 +708,6 @@ export default function TrendsPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Spending by Merchant (Month over Month)</CardTitle>
           <div className="flex items-center gap-4">
-            <div className="text-xs text-muted-foreground flex items-center gap-2">
-              <span className="inline-block w-4 h-0.5 bg-orange-500" style={{ borderTop: '2px dashed #f97316' }}></span>
-              <span>3-Mo Avg</span>
-            </div>
             <Select value={merchantCategoryFilter} onValueChange={setMerchantCategoryFilter}>
               <SelectTrigger className="w-[160px]">
                 <SelectValue placeholder="Filter by Category" />
@@ -788,19 +757,6 @@ export default function TrendsPage() {
                   opacity={hiddenMerchants.has(merch.merchant) ? 0 : 1}
                 />
               ))}
-              {showMovingAvg && (
-                <Line
-                  type="linear"
-                  dataKey="movingAvg"
-                  stroke="#f97316"
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                  dot={false}
-                  connectNulls
-                  name="3-Mo Avg"
-                  legendType="none"
-                />
-              )}
             </LineChart>
           </ChartContainer>
         </CardContent>
