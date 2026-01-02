@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2024_12_25_211107) do
+ActiveRecord::Schema.define(version: 2025_01_15_000001) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -24,6 +24,21 @@ ActiveRecord::Schema.define(version: 2024_12_25_211107) do
     t.datetime "created_at", default: -> { "now()" }, null: false
     t.datetime "updated_at", default: -> { "now()" }, null: false
     t.integer "display_order", default: 0, null: false
+  end
+
+  create_table "chat_messages", force: :cascade do |t|
+    t.string "transport", null: false
+    t.string "external_id", null: false
+    t.string "thread_id"
+    t.string "message_ts"
+    t.string "sender_id"
+    t.text "text"
+    t.boolean "has_image", default: false, null: false
+    t.jsonb "raw_payload", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["message_ts"], name: "index_chat_messages_on_message_ts"
+    t.index ["transport", "external_id", "thread_id"], name: "index_chat_messages_on_transport_external_thread"
   end
 
   create_table "chat", id: :serial, force: :cascade do |t|
@@ -63,6 +78,25 @@ ActiveRecord::Schema.define(version: 2024_12_25_211107) do
     t.index ["plaid_name"], name: "index_financial_transactions_on_plaid_name"
     t.index ["reviewed"], name: "financial_transactions_reviewed_idx"
     t.index ["transacted_at"], name: "index_financial_transactions_on_transacted_at"
+  end
+
+  create_table "ai_requests", force: :cascade do |t|
+    t.bigint "chat_message_id"
+    t.string "transport", null: false
+    t.string "model", null: false
+    t.string "request_kind", null: false
+    t.integer "prompt_tokens"
+    t.integer "output_tokens"
+    t.integer "total_tokens"
+    t.decimal "cost_usd", precision: 12, scale: 6
+    t.string "status", default: "success", null: false
+    t.string "error_message"
+    t.jsonb "usage_metadata", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["model"], name: "index_ai_requests_on_model"
+    t.index ["transport"], name: "index_ai_requests_on_transport"
+    t.index ["chat_message_id"], name: "index_ai_requests_on_chat_message_id"
   end
 
   create_table "message", id: :serial, force: :cascade do |t|
@@ -126,4 +160,5 @@ ActiveRecord::Schema.define(version: 2024_12_25_211107) do
   add_foreign_key "chat", "\"user\"", column: "user_id", name: "chat_user_id_fkey"
   add_foreign_key "message", "chat", name: "message_chat_id_fkey"
   add_foreign_key "subtitles", "subtitle_sets", column: "set_id", name: "subtitles_set_id_fkey"
+  add_foreign_key "ai_requests", "chat_messages"
 end

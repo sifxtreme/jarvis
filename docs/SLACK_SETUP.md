@@ -29,6 +29,7 @@ Add these to `jarvis.env` (or `.env`) using `jarvis.env.template`:
 ```
 SLACK_BOT_TOKEN=...
 SLACK_SIGNING_SECRET=...
+GEMINI_API_KEY=...
 ```
 
 ## Run App Setup
@@ -41,5 +42,7 @@ docker-compose run api rake db:migrate
 
 Slack events are handled by `SlackEventsController`, which inherits from
 `WebhookController` so webhooks rely on Slack signatures (not the auth header).
+
+Gemini is used to extract event details from both text and images.
 
 Then restart your backend services and test by DMing or @mentioning the Slack bot.
