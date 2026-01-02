@@ -1,6 +1,4 @@
-class SlackEventsController < ApplicationController
-  skip_before_action :verify_authenticity_token
-  skip_before_action :validate_header
+class SlackEventsController < WebhookController
   before_action :verify_slack_request
 
   def events
