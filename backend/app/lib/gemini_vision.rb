@@ -11,7 +11,7 @@ class GeminiVision
   def extract_event_from_image(image_base64, mime_type: 'image/png')
     parts = [
       { inlineData: { mimeType: mime_type, data: image_base64 } },
-      { text: extraction_prompt }
+      { text: extraction_prompt(today: Date.current) }
     ]
 
     response = make_request(parts: parts)
@@ -52,16 +52,43 @@ class GeminiVision
   def parse_json_response(response_body)
     text = response_body.dig('candidates', 0, 'content', 'parts', 0, 'text').to_s
     event = JSON.parse(text)
+    event = adjust_event_date(event)
     { event: event, usage: response_body['usageMetadata'] || {} }
   rescue JSON::ParserError
     json_text = extract_json(text)
     event = JSON.parse(json_text)
+    event = adjust_event_date(event)
     { event: event, usage: response_body['usageMetadata'] || {} }
   rescue StandardError => e
     {
       event: { 'error' => 'parse_error', 'message' => "Failed to parse Gemini response: #{e.message}" },
       usage: response_body['usageMetadata'] || {}
     }
+  end
+
+  def adjust_event_date(event)
+    return event unless event.is_a?(Hash)
+    return event if event['date'].to_s.empty?
+
+    date = Date.parse(event['date'])
+    today = Date.current
+    return event if date >= today && date <= today + 365
+
+    adjusted = Date.new(today.year, date.month, date.day) rescue nil
+    return event unless adjusted
+
+    if adjusted < today
+      adjusted = Date.new(today.year + 1, date.month, date.day) rescue nil
+    end
+
+    if adjusted && adjusted <= today + 365
+      event = event.dup
+      event['date'] = adjusted.iso8601
+    end
+
+    event
+  rescue ArgumentError
+    event
   end
 
   def extract_json(text)
@@ -72,8 +99,10 @@ class GeminiVision
     text[start_idx..end_idx]
   end
 
-  def extraction_prompt
+  def extraction_prompt(today:)
     <<~PROMPT
+      Today is #{today}.
+
       Extract calendar event details from this image. Return JSON:
       {
         "title": "Event name",
@@ -95,6 +124,8 @@ class GeminiVision
 
   def text_prompt(text)
     <<~PROMPT
+      Today is #{Date.current}.
+
       Extract calendar event details from the text below. Return JSON:
       {
         "title": "Event name",
