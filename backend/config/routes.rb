@@ -13,6 +13,8 @@ Rails.application.routes.draw do
   # Teller API utilities
   get 'teller/accounts', to: 'teller#accounts'
 
+  post 'slack/events', to: 'slack_events#events'
+
   mount Resque::Server, :at => "resque"
   # For details on the DSL available within this file, see http://guides.rubyonrails.org/routing.html
 end
