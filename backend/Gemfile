@@ -27,4 +27,3 @@ gem 'resque-scheduler', '~> 4.3.1'
 
 # app specific gems
 gem 'paper_trail', '~> 10.2.0' # keep track of versioning
-gem 'plaid', '~> 6.2.0' # communicate with plaid api
