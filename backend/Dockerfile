@@ -4,6 +4,7 @@ RUN mkdir /jarvis
 WORKDIR /jarvis
 ADD Gemfile /jarvis/Gemfile
 ADD Gemfile.lock /jarvis/Gemfile.lock
+RUN gem install bundler -v 2.4.22
 RUN bundle install
 ADD . /jarvis
 
