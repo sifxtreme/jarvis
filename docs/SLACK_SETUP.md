@@ -39,4 +39,7 @@ bundle install
 docker-compose run api rake db:migrate
 ```
 
+Slack events are handled by `SlackEventsController`, which inherits from
+`WebhookController` so webhooks rely on Slack signatures (not the auth header).
+
 Then restart your backend services and test by DMing or @mentioning the Slack bot.
