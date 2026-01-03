@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { Fragment, useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getBudgets, getTransactions, type TransactionFilters, type Budget, type Transaction, OTHER_CATEGORY } from "../lib/api";
 import {
@@ -221,6 +221,12 @@ export default function YearlyBudgetPage() {
     const initialVisibility: ColumnVisibility = { avgActual: false };
     return initialVisibility;
   });
+  const [currentMonthOnly, setCurrentMonthOnly] = useState(false);
+  const [savedVisibility, setSavedVisibility] = useState<ColumnVisibility | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<"income" | "expense", boolean>>({
+    income: false,
+    expense: false,
+  });
 
   // Update URL when year changes
   useEffect(() => {
@@ -390,10 +396,20 @@ export default function YearlyBudgetPage() {
     });
   });
 
+  const categoryTypes: Record<string, Budget["expense_type"]> = {};
+  Object.values(yearBudgets).forEach(monthBudgets => {
+    monthBudgets.forEach(budget => {
+      if (!categoryTypes[budget.name]) {
+        categoryTypes[budget.name] = budget.expense_type;
+      }
+    });
+  });
+
   // Set a high display_order for OTHER_CATEGORY to make it appear at the end
   // But only if it's not a legitimate budget category
   if (allCategories.has(OTHER_CATEGORY) && !budgetedCategories.has(OTHER_CATEGORY)) {
     categoryDisplayOrder[OTHER_CATEGORY] = 999;
+    categoryTypes[OTHER_CATEGORY] = "expense";
   }
 
   // Sort categories by display_order first, then by type (income first, then expenses)
@@ -416,6 +432,11 @@ export default function YearlyBudgetPage() {
     // If both are income or both are expenses, sort alphabetically
     return a.localeCompare(b);
   });
+
+  const groupedCategories = {
+    income: sortedCategories.filter(category => (categoryTypes[category] || (category.toLowerCase().includes('income') ? 'income' : 'expense')) === 'income'),
+    expense: sortedCategories.filter(category => (categoryTypes[category] || (category.toLowerCase().includes('income') ? 'income' : 'expense')) === 'expense'),
+  };
 
   // Calculate summary data for each month
   // Include current month if past 20th (with special flag for styling)
@@ -497,6 +518,24 @@ export default function YearlyBudgetPage() {
     }));
   };
 
+  const toggleCurrentMonthOnly = () => {
+    if (!currentMonthOnly) {
+      setSavedVisibility(columnVisibility);
+      const next: ColumnVisibility = { ...columnVisibility };
+      months.forEach(month => {
+        next[`month-${month.month}`] = month.isCurrentMonth;
+      });
+      setColumnVisibility(next);
+      setCurrentMonthOnly(true);
+      return;
+    }
+    if (savedVisibility) {
+      setColumnVisibility(savedVisibility);
+    }
+    setSavedVisibility(null);
+    setCurrentMonthOnly(false);
+  };
+
   const isLoading = isLoadingBudgets || isLoadingTransactions;
 
   if (isLoading) {
@@ -518,6 +557,11 @@ export default function YearlyBudgetPage() {
   const visibleMonths = months.filter(month =>
     columnVisibility[`month-${month.month}`] !== false
   );
+
+  const categoryGroups = [
+    { key: "income" as const, label: "Income", items: groupedCategories.income },
+    { key: "expense" as const, label: "Expenses", items: groupedCategories.expense },
+  ];
 
   return (
     <div className="h-full overflow-auto p-4 md:p-6">
@@ -657,6 +701,15 @@ export default function YearlyBudgetPage() {
               </SelectContent>
             </Select>
 
+            <Button
+              variant={currentMonthOnly ? "default" : "outline"}
+              size="sm"
+              className="h-8"
+              onClick={toggleCurrentMonthOnly}
+            >
+              Current Month Only
+            </Button>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="h-8 gap-1">
@@ -723,9 +776,28 @@ export default function YearlyBudgetPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedCategories.map((category, rowIndex) => {
-                  const isIncome = category.toLowerCase().includes('income');
-                  const isLastRow = rowIndex === sortedCategories.length - 1;
+                {categoryGroups.map((group) => (
+                  <Fragment key={group.key}>
+                    <TableRow className="bg-muted/40">
+                      <TableCell colSpan={2 + (columnVisibility.avgActual ? 1 : 0) + visibleMonths.length} className="p-0">
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold"
+                          onClick={() =>
+                            setCollapsedGroups((prev) => ({ ...prev, [group.key]: !prev[group.key] }))
+                          }
+                        >
+                          <span>{group.label}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {collapsedGroups[group.key] ? "Show" : "Hide"}
+                          </span>
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                    {!collapsedGroups[group.key] &&
+                      group.items.map((category, rowIndex) => {
+                        const isIncome = (categoryTypes[category] || (category.toLowerCase().includes('income') ? 'income' : 'expense')) === 'income';
+                        const isLastRow = rowIndex === group.items.length - 1;
 
                   // Calculate average budget for the category
                   const budgetValues = Object.values(categoryBudgets[category] || {});
@@ -764,14 +836,14 @@ export default function YearlyBudgetPage() {
                     ? avgActual >= avgBudget
                     : avgActual <= avgBudget;
 
-                  return (
-                    <TableRow
-                      key={category}
-                      className={`
-                        hover:bg-muted/80 transition-colors
-                        ${isLastRow ? 'border-b border-border' : ''}
-                      `}
-                    >
+                        return (
+                          <TableRow
+                            key={category}
+                            className={`
+                              hover:bg-muted/80 transition-colors
+                              ${isLastRow ? 'border-b border-border' : ''}
+                            `}
+                          >
                       <TableCell className="font-mono border border-border p-0">
                         <div className="px-2 py-1 text-sm">{category}</div>
                       </TableCell>
@@ -893,9 +965,11 @@ export default function YearlyBudgetPage() {
                           </TableCell>
                         );
                       })}
-                    </TableRow>
-                  );
-                })}
+                          </TableRow>
+                        );
+                      })}
+                  </Fragment>
+                ))}
               </TableBody>
             </Table>
           </div>

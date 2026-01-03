@@ -43,7 +43,17 @@ function App() {
 
   // Don't render anything while checking authentication
   if (isLoading) {
-    return null; // Or a loading spinner if preferred
+    return (
+      <div className="flex h-screen items-center justify-center px-6">
+        <div className="w-full max-w-sm rounded-xl border border-border/60 bg-background/70 p-6 shadow-sm">
+          <div className="h-4 w-32 rounded bg-muted animate-pulse" />
+          <div className="mt-4 space-y-2">
+            <div className="h-3 w-full rounded bg-muted animate-pulse" />
+            <div className="h-3 w-2/3 rounded bg-muted animate-pulse" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -72,8 +82,11 @@ function App() {
       ) : (
         // Show login prompt only if not authenticated and modal not already showing
         <div className="flex h-screen items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold mb-4">Sign in to Jarvis</h1>
+          <div className="text-center max-w-sm px-6">
+            <h1 className="text-2xl font-bold mb-2">Sign in to Jarvis</h1>
+            <p className="text-sm text-muted-foreground mb-4">
+              Your session expired or this device isn’t signed in yet.
+            </p>
             <button
               onClick={() => setShowAuthModal(true)}
               className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"

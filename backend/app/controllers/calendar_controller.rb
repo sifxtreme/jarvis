@@ -33,6 +33,7 @@ class CalendarController < ApplicationController
                                         .distinct
 
     events = CalendarEvent.where(user: users)
+                          .where.not(status: 'cancelled')
                           .where(start_at: start_time..end_time)
                           .order(:start_at)
                           .map { |event| serialize_event(event, connections) }

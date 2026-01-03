@@ -229,6 +229,20 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
       </div>
 
       <form onSubmit={handleSend} className="border-t border-border/60 p-3">
+        {isSending && (
+          <div className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
+            <span>Jarvis is typing</span>
+            <span className="flex items-center gap-1">
+              {["0ms", "150ms", "300ms"].map((delay) => (
+                <span
+                  key={delay}
+                  className="h-2 w-2 rounded-full bg-current/70 animate-pulse"
+                  style={{ animationDelay: delay }}
+                />
+              ))}
+            </span>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <Textarea
             value={draft}

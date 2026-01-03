@@ -20,7 +20,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -29,6 +28,7 @@ import {
   PanelResizeHandle as ResizeHandle,
 } from "react-resizable-panels";
 import { ChatPanel } from "@/components/ChatPanel";
+import { StateCard } from "@/components/StateCard";
 
 type ViewMode = "day" | "week" | "2weeks" | "month";
 
@@ -651,82 +651,56 @@ export default function CalendarPage() {
                   {">"}
                 </Button>
               </div>
-              <span className="text-sm text-muted-foreground whitespace-nowrap">{headerRange}</span>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button size="sm" variant="outline">
-                    Filters
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent align="end" className="w-80">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
-                    Filters
-                  </div>
-                  <div className="mt-3 grid gap-2">
-                    {data?.users.map((user) => {
-                      const label = userMap.get(user.id) || user.email;
-                      const email = user.email;
-                      const palette = USER_PALETTE[email] || DEFAULT_PALETTE;
-                      const personalActive = userFilters[user.id] ?? true;
-                      return (
-                        <div key={`filters-${user.id}`} className="flex items-center justify-between gap-4">
-                          <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">{label}</div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setUserFilters((prev) => ({ ...prev, [user.id]: !personalActive }))}
-                              className={cn(
-                                "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
-                                personalActive
-                                  ? "border-slate-300 bg-slate-900 text-white"
-                                : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300"
-                              )}
-                            >
-                              <span className={cn("h-2 w-2 rounded-full", palette.dotPersonal)} />
-                              Personal
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    <div className="pt-2">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
-                        Work calendars
-                      </div>
-                      <div className="mt-2 grid gap-2">
-                        {(data?.work_calendars || []).map((cal) => {
-                          const label =
-                            cal.calendar_id === "asif@sevensevensix.com"
-                              ? "Asif (Work)"
-                              : cal.calendar_id === "hafsa.sayyeda@goodrx.com"
-                                ? "Hafsa (Work)"
-                                : cal.summary || cal.calendar_id;
-                          const palette = USER_PALETTE[cal.calendar_id] || DEFAULT_PALETTE;
-                          const workActive = workFilters[cal.calendar_id] ?? true;
-                          return (
-                            <div key={`work-${cal.calendar_id}`} className="flex items-center justify-between gap-4">
-                              <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">{label}</div>
-                              <button
-                                type="button"
-                                onClick={() => setWorkFilters((prev) => ({ ...prev, [cal.calendar_id]: !workActive }))}
-                                className={cn(
-                                  "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
-                                  workActive
-                                    ? "border-slate-300 bg-slate-900 text-white"
-                                    : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300"
-                                )}
-                              >
-                                <span className={cn("h-2 w-2 rounded-full", palette.dotWork)} />
-                                Work
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
+              <div className="flex flex-wrap items-center gap-2">
+                {data?.users.map((user) => {
+                  const label = userMap.get(user.id) || user.email;
+                  const email = user.email;
+                  const palette = USER_PALETTE[email] || DEFAULT_PALETTE;
+                  const personalActive = userFilters[user.id] ?? true;
+                  return (
+                    <button
+                      key={`filters-${user.id}`}
+                      type="button"
+                      onClick={() => setUserFilters((prev) => ({ ...prev, [user.id]: !personalActive }))}
+                      className={cn(
+                        "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
+                        personalActive
+                          ? "border-slate-300 bg-slate-900 text-white"
+                          : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300"
+                      )}
+                    >
+                      <span className={cn("h-2 w-2 rounded-full", palette.dotPersonal)} />
+                      {label}
+                    </button>
+                  );
+                })}
+                {(data?.work_calendars || []).map((cal) => {
+                  const label =
+                    cal.calendar_id === "asif@sevensevensix.com"
+                      ? "Asif (Work)"
+                      : cal.calendar_id === "hafsa.sayyeda@goodrx.com"
+                        ? "Hafsa (Work)"
+                        : cal.summary || cal.calendar_id;
+                  const palette = USER_PALETTE[cal.calendar_id] || DEFAULT_PALETTE;
+                  const workActive = workFilters[cal.calendar_id] ?? true;
+                  return (
+                    <button
+                      key={`work-${cal.calendar_id}`}
+                      type="button"
+                      onClick={() => setWorkFilters((prev) => ({ ...prev, [cal.calendar_id]: !workActive }))}
+                      className={cn(
+                        "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
+                        workActive
+                          ? "border-slate-300 bg-slate-900 text-white"
+                          : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300"
+                      )}
+                    >
+                      <span className={cn("h-2 w-2 rounded-full", palette.dotWork)} />
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
           <ToggleGroup
@@ -763,10 +737,14 @@ export default function CalendarPage() {
           </div>
         )}
 
-        {loading && <div className="text-sm text-muted-foreground">Loading calendar…</div>}
-        {error && <div className="text-sm text-destructive">{error}</div>}
+        {loading && (
+          <StateCard title="Loading calendar" description="Hang tight while we pull your events." variant="loading" />
+        )}
+        {error && (
+          <StateCard title="Calendar error" description={error} variant="error" />
+        )}
         {!loading && !error && filteredEntries.length === 0 && (
-          <div className="text-sm text-muted-foreground">No items in this window.</div>
+          <StateCard title="No items in this window" description="Try another date range or adjust filters." />
         )}
 
         {!loading && !error && !isMobile && view === "month" && (

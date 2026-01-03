@@ -66,17 +66,19 @@ class SyncCalendarEvents
       time_max: time_max
     )
 
-    CalendarEvent.where(user_id: connection.user_id, calendar_id: connection.calendar_id)
-                 .where("start_at < ? OR start_at > ?", time_min, time_max)
-                 .delete_all
-
-    existing = CalendarEvent.where(user_id: connection.user_id)
+    existing = CalendarEvent.where(user_id: connection.user_id, calendar_id: connection.calendar_id)
                             .index_by(&:event_id)
 
     seen_ids = []
 
     events.each do |event|
-      next if event.status == 'cancelled'
+      if event.status == 'cancelled'
+        if existing_event = existing[event.id]
+          existing_event.update(status: 'cancelled')
+        end
+        seen_ids << event.id
+        next
+      end
 
       start_at = parse_time(event.start.date_time || event.start.date)
       end_at = parse_time(event.end.date_time || event.end.date)
@@ -90,7 +92,8 @@ class SyncCalendarEvents
         end_at: end_at,
         attendees: (event.attendees || []).map { |a| { email: a.email, response_status: a.response_status } },
         raw_event: event.to_h,
-        source: 'google_sync'
+        source: 'google_sync',
+        status: 'active'
       }
 
       if existing_event = existing[event.id]
@@ -109,7 +112,7 @@ class SyncCalendarEvents
     CalendarEvent.where(user_id: connection.user_id, calendar_id: connection.calendar_id)
                  .where(start_at: time_min..time_max)
                  .where.not(event_id: seen_ids)
-                 .delete_all
+                 .update_all(status: 'cancelled')
 
     connection.update(last_synced_at: Time.current)
   end

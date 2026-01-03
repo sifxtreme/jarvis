@@ -193,6 +193,7 @@ export default function TransactionTable({
   const [isCreating, setIsCreating] = useState(false);
   const [sortField, setSortField] = useState<SortField>('transacted_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
 
   // Handle external quick add requests
   useEffect(() => {
@@ -252,6 +253,27 @@ export default function TransactionTable({
       onUpdate?.();
     } catch (error) {
       console.error('Failed to update transaction:', error);
+    }
+  };
+
+  const updateTransactionFlags = async (transaction: Transaction, updates: Partial<Pick<Transaction, "hidden" | "reviewed">>) => {
+    try {
+      setActionLoadingId(transaction.id);
+      await api.updateTransaction(transaction.id, {
+        transacted_at: transaction.transacted_at,
+        plaid_name: transaction.plaid_name || '',
+        merchant_name: transaction.merchant_name || '',
+        category: transaction.category || '',
+        source: transaction.source || '',
+        amount: Number(transaction.amount),
+        hidden: updates.hidden ?? transaction.hidden,
+        reviewed: updates.reviewed ?? transaction.reviewed,
+      });
+      onUpdate?.();
+    } catch (error) {
+      console.error('Failed to update transaction flags:', error);
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
@@ -493,7 +515,7 @@ export default function TransactionTable({
               <TableRow
                 key={transaction.id}
                 className={cn(
-                  "transition-colors",
+                  "group transition-colors",
                   editingTransaction?.id === transaction.id
                     ? "bg-yellow-50 dark:bg-yellow-900/20"
                     : "hover:bg-muted/50"
@@ -576,12 +598,23 @@ export default function TransactionTable({
                   <TooltipProvider>
                     <div className="flex items-center space-x-2">
                       <Tooltip>
-                        <TooltipTrigger className="flex items-center justify-center w-6 h-6">
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="flex items-center justify-center w-6 h-6 rounded-md opacity-70 transition group-hover:opacity-100 hover:bg-muted"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updateTransactionFlags(transaction, { hidden: !transaction.hidden });
+                            }}
+                            disabled={actionLoadingId === transaction.id}
+                            aria-label={transaction.hidden ? 'Unhide transaction' : 'Hide transaction'}
+                          >
                           {transaction.hidden ? (
                             <EyeOff className="h-4 w-4 text-gray-500" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
                           ) : (
                             <Eye className="h-4 w-4 text-gray-400" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
                           )}
+                          </button>
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>{transaction.hidden ? 'Hidden Transaction' : 'Visible Transaction'}</p>
@@ -589,12 +622,23 @@ export default function TransactionTable({
                       </Tooltip>
 
                       <Tooltip>
-                        <TooltipTrigger className="flex items-center justify-center w-6 h-6">
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="flex items-center justify-center w-6 h-6 rounded-md opacity-70 transition group-hover:opacity-100 hover:bg-muted"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updateTransactionFlags(transaction, { reviewed: !transaction.reviewed });
+                            }}
+                            disabled={actionLoadingId === transaction.id}
+                            aria-label={transaction.reviewed ? 'Mark as needs review' : 'Mark as reviewed'}
+                          >
                           {transaction.reviewed ? (
                             <CheckCircle className="h-4 w-4 text-green-500" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
                           ) : (
                             <AlertCircle className="h-4 w-4 text-yellow-500" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
                           )}
+                          </button>
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>{transaction.reviewed ? 'Reviewed' : 'Needs Review'}</p>

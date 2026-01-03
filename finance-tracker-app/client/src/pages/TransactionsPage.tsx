@@ -3,12 +3,7 @@ import { getTransactions, getBudgets, type TransactionFilters, type Transaction 
 import TransactionTable from "../components/TransactionTable";
 import TransactionStats from "../components/TransactionStats";
 import { RecurringStatusCard } from "../components/RecurringStatusCard";
-import { useState, useEffect, useMemo } from "react";
-import {
-  Panel as ResizablePanel,
-  PanelGroup as ResizablePanelGroup,
-  PanelResizeHandle as ResizeHandle,
-} from "react-resizable-panels";
+import { useEffect, useRef, useState } from "react";
 import FilterControls from "@/components/FilterControls";
 import SheetFilterControls from "@/components/SheetFilterControls";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -16,13 +11,16 @@ import { Button } from "@/components/ui/button";
 import { FilterIcon, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSearchParams } from 'react-router-dom'
+import { StateCard } from "@/components/StateCard";
 
 export default function TransactionsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams()
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(true);
   const [quickAddTransaction, setQuickAddTransaction] = useState<Partial<Transaction> | null>(null);
-  const [panelGroupWidth, setPanelGroupWidth] = useState(0);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [rightPanelWidth, setRightPanelWidth] = useState(400);
+  const resizingRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   // Initialize filters from URL or defaults
   const [filters, setFilters] = useState<TransactionFilters>(() => {
@@ -79,24 +77,10 @@ export default function TransactionsPage() {
     setIsFilterOpen(false);
   };
 
-  const rightPanelDefaultSize = useMemo(() => {
-    if (!panelGroupWidth) return 22;
-    const percent = (400 / panelGroupWidth) * 100;
-    return Math.max(15, Math.min(35, percent));
-  }, [panelGroupWidth]);
-
   return (
-    <div className="h-full flex flex-col" id="transactions-panel-group">
-      <ResizablePanelGroup
-        direction="horizontal"
-        className="flex-1"
-        onLayout={() => {
-          const container = document.getElementById("transactions-panel-group");
-          if (!container) return;
-          setPanelGroupWidth(container.clientWidth);
-        }}
-      >
-        <ResizablePanel defaultSize={75} minSize={55}>
+    <div className="h-full flex flex-col">
+      <div className="flex-1 min-h-0 flex" ref={containerRef}>
+        <div className="min-w-0 flex-1">
           <div className="h-full flex flex-col">
             <div className="p-4 flex-shrink-0">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -156,31 +140,43 @@ export default function TransactionsPage() {
               />
 
               {error && (
-                <div className="mt-4 p-4 bg-red-50 text-red-800 rounded-md flex items-center justify-between">
-                  <div className="flex-1">
-                    <h4 className="font-semibold mb-1">Error Loading Transactions</h4>
-                    <p className="text-sm">
-                      {error instanceof Error ? error.message : "An error occurred while fetching transactions"}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      window.location.reload();
-                    }}
-                    className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-800 rounded-md text-sm font-medium transition-colors"
-                  >
-                    Retry
-                  </button>
+                <div className="mt-4">
+                  <StateCard
+                    title="Error loading transactions"
+                    description={error instanceof Error ? error.message : "An error occurred while fetching transactions"}
+                    variant="error"
+                    actionLabel="Retry"
+                    onAction={() => window.location.reload()}
+                  />
                 </div>
               )}
             </div>
           </div>
-        </ResizablePanel>
+        </div>
 
         {!!filters?.year && !!filters?.month && (
           <>
-            <ResizeHandle
-              className="bg-border w-2 hover:bg-primary/10 transition-colors relative cursor-col-resize"
+            <div
+              className="relative hidden md:block w-2 bg-border hover:bg-primary/10 transition-colors cursor-col-resize"
+              onPointerDown={(event) => {
+                if (!isSidePanelOpen) return;
+                resizingRef.current = { startX: event.clientX, startWidth: rightPanelWidth };
+                const handleMove = (moveEvent: PointerEvent) => {
+                  if (!resizingRef.current) return;
+                  const delta = moveEvent.clientX - resizingRef.current.startX;
+                  const next = resizingRef.current.startWidth - delta;
+                  const containerWidth = containerRef.current?.clientWidth || 0;
+                  const maxWidth = Math.max(320, containerWidth - 320);
+                  setRightPanelWidth(Math.min(Math.max(200, next), maxWidth));
+                };
+                const handleUp = () => {
+                  resizingRef.current = null;
+                  window.removeEventListener("pointermove", handleMove);
+                  window.removeEventListener("pointerup", handleUp);
+                };
+                window.addEventListener("pointermove", handleMove);
+                window.addEventListener("pointerup", handleUp);
+              }}
             >
               <div className="absolute inset-y-3 left-1/2 w-px -translate-x-1/2 bg-border/80" />
               <button
@@ -195,15 +191,10 @@ export default function TransactionsPage() {
                   <PanelRightOpen className="h-4 w-4 text-muted-foreground" />
                 )}
               </button>
-            </ResizeHandle>
-            <ResizablePanel
-              defaultSize={rightPanelDefaultSize}
-              minSize={isSidePanelOpen ? 5 : 0}
-              className={cn(
-                "hidden md:block h-full overflow-hidden",
-                !isSidePanelOpen && "w-0 !min-w-0 !max-w-0"
-              )}
-              style={{ flexBasis: isSidePanelOpen ? undefined : "0px" }}
+            </div>
+            <div
+              className={cn("hidden md:block h-full overflow-hidden", !isSidePanelOpen && "w-0")}
+              style={{ width: isSidePanelOpen ? `${rightPanelWidth}px` : "0px" }}
             >
               {isSidePanelOpen && (
                 <TransactionStats
@@ -213,10 +204,10 @@ export default function TransactionsPage() {
                   query={filters?.query}
                 />
               )}
-            </ResizablePanel>
+            </div>
           </>
         )}
-      </ResizablePanelGroup>
+      </div>
     </div>
   );
 }

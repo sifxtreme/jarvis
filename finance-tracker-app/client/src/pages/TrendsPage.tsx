@@ -7,8 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { ChartContainer } from "@/components/ui/chart";
 import { formatCurrency, cn, YEARS } from "@/lib/utils";
-import { Download, TrendingUp, TrendingDown, Target } from "lucide-react";
+import { Copy as CopyIcon, Download, TrendingUp, TrendingDown, Target, X } from "lucide-react";
 import { CategoryDrilldownModal } from "@/components/CategoryDrilldownModal";
+import { StateCard } from "@/components/StateCard";
 import {
   LineChart,
   Line,
@@ -75,6 +76,8 @@ export default function TrendsPage() {
   const [showMovingAvg, setShowMovingAvg] = useState(true);
   const [categoryCount, setCategoryCount] = useState<number>(10);
   const [merchantCategoryFilter, setMerchantCategoryFilter] = useState<string>('all');
+  const [pinnedCategoryDot, setPinnedCategoryDot] = useState<{ dataKey: string; index: number } | null>(null);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
 
   // Hover state for precise dot highlighting
   const [hoveredCategoryDot, setHoveredCategoryDot] = useState<{ dataKey: string; index: number } | null>(null);
@@ -367,7 +370,16 @@ export default function TrendsPage() {
           return (
             <button
               key={`legend-${index}`}
-              onClick={() => toggleFn(entry.value)}
+              onClick={(event) => {
+                if (event.shiftKey) {
+                  setPinnedCategoryDot((current) => {
+                    if (current?.dataKey === entry.value) return null;
+                    return { dataKey: entry.value, index: 0 };
+                  });
+                  return;
+                }
+                toggleFn(entry.value);
+              }}
               className={cn(
                 "flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-all",
                 isHidden ? "opacity-40 line-through" : "opacity-100",
@@ -407,8 +419,9 @@ export default function TrendsPage() {
 
   // Custom tooltip that only shows when hovering a specific dot
   const renderCategoryDotTooltip = ({ payload, label }: any) => {
-    if (!hoveredCategoryDot || !payload?.length) return null;
-    const hoveredEntry = payload.find((p: any) => p.dataKey === hoveredCategoryDot.dataKey);
+    const activeDot = hoveredCategoryDot || pinnedCategoryDot;
+    if (!activeDot || !payload?.length) return null;
+    const hoveredEntry = payload.find((p: any) => p.dataKey === activeDot.dataKey);
     if (!hoveredEntry) return null;
     return (
       <div className="bg-background border rounded-lg p-3 shadow-lg">
@@ -441,17 +454,24 @@ export default function TrendsPage() {
     const { cx, cy, index } = props;
     if (cx === undefined || cy === undefined) return <circle r={0} />;
     const isHovered = hoveredCategoryDot?.dataKey === dataKey && hoveredCategoryDot?.index === index;
+    const isPinned = pinnedCategoryDot?.dataKey === dataKey && pinnedCategoryDot?.index === index;
     return (
       <circle
         cx={cx}
         cy={cy}
-        r={isHovered ? 8 : 3}
-        fill={isHovered ? 'white' : color}
+        r={isHovered || isPinned ? 8 : 3}
+        fill={isHovered || isPinned ? 'white' : color}
         stroke={color}
-        strokeWidth={isHovered ? 2 : 0}
+        strokeWidth={isHovered || isPinned ? 2 : 0}
         style={{ cursor: 'pointer' }}
         onMouseEnter={() => setHoveredCategoryDot({ dataKey, index })}
         onMouseLeave={() => setHoveredCategoryDot(null)}
+        onClick={() => {
+          setPinnedCategoryDot((current) => {
+            if (current?.dataKey === dataKey && current.index === index) return null;
+            return { dataKey, index };
+          });
+        }}
       />
     );
   };
@@ -478,16 +498,16 @@ export default function TrendsPage() {
 
   if (isLoading) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="h-full overflow-auto p-4 md:p-6">
+        <StateCard title="Loading trends" description="Crunching your latest spending data." variant="loading" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-red-500">Error loading trends: {error.message}</div>
+      <div className="h-full overflow-auto p-4 md:p-6">
+        <StateCard title="Error loading trends" description={error.message} variant="error" />
       </div>
     );
   }
@@ -528,6 +548,55 @@ export default function TrendsPage() {
     trends?.period?.net_savings || 0,
     prevYearTrends?.period?.net_savings || 0
   );
+
+  const activeFilters = [
+    monthRange !== 'all' && {
+      label: MONTH_RANGES[monthRange].label,
+      onRemove: () => setMonthRange('all'),
+    },
+    selectedSources.size > 0 && {
+      label: `${selectedSources.size} source${selectedSources.size > 1 ? 's' : ''}`,
+      onRemove: () => setSelectedSources(new Set()),
+    },
+    hideOther && {
+      label: "Hide Other",
+      onRemove: () => setHideOther(false),
+    },
+    merchantCategoryFilter !== 'all' && {
+      label: `Merchants: ${merchantCategoryFilter}`,
+      onRemove: () => setMerchantCategoryFilter('all'),
+    },
+    hiddenCategories.size > 0 && {
+      label: `${hiddenCategories.size} hidden category${hiddenCategories.size > 1 ? 's' : ''}`,
+      onRemove: () => setHiddenCategories(new Set()),
+    },
+    hiddenMerchants.size > 0 && {
+      label: `${hiddenMerchants.size} hidden merchant${hiddenMerchants.size > 1 ? 's' : ''}`,
+      onRemove: () => setHiddenMerchants(new Set()),
+    },
+    categoryCount !== 10 && {
+      label: `Top ${categoryCount}`,
+      onRemove: () => setCategoryCount(10),
+    },
+  ].filter(Boolean) as { label: string; onRemove: () => void }[];
+
+  const copySummary = async () => {
+    if (!trends) return;
+    const lines = [
+      `Spending Trends (${filters.year})`,
+      `Total Spent: ${formatCurrency(trends.period.total_spent)}`,
+      `Total Income: ${formatCurrency(trends.period.total_income)}`,
+      `Net Savings: ${formatCurrency(trends.period.net_savings)}`,
+      `Transactions: ${trends.period.total_transactions}`,
+    ];
+    try {
+      await navigator.clipboard.writeText(lines.join("\n"));
+      setCopyStatus("copied");
+      setTimeout(() => setCopyStatus("idle"), 1500);
+    } catch (error) {
+      console.error("Failed to copy summary", error);
+    }
+  };
 
   return (
     <div className="h-full overflow-auto p-4 md:p-6">
@@ -623,12 +692,32 @@ export default function TrendsPage() {
           </Button>
 
           {/* Export Button */}
+          <Button variant="outline" size="sm" onClick={copySummary}>
+            <CopyIcon className="h-4 w-4 mr-1" />
+            {copyStatus === "copied" ? "Copied" : "Copy"}
+          </Button>
           <Button variant="outline" size="sm" onClick={exportToCSV}>
             <Download className="h-4 w-4 mr-1" />
             CSV
           </Button>
         </div>
       </div>
+
+      {activeFilters.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 mb-6">
+          {activeFilters.map((filter) => (
+            <button
+              key={filter.label}
+              type="button"
+              className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/70 px-3 py-1 text-xs text-muted-foreground hover:text-foreground"
+              onClick={filter.onRemove}
+            >
+              {filter.label}
+              <X className="h-3 w-3" />
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Summary Cards with YoY */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
@@ -778,6 +867,7 @@ export default function TrendsPage() {
       <Card className="mb-8">
         <CardHeader>
           <CardTitle className="text-base font-semibold">Spending by Category (Month over Month)</CardTitle>
+          <div className="text-xs text-muted-foreground">Shift-click a legend item or dot to pin a category.</div>
         </CardHeader>
         <CardContent>
           <ChartContainer config={chartConfig} className="h-[400px] w-full">
@@ -806,17 +896,19 @@ export default function TrendsPage() {
               <Legend content={(props) => renderClickableLegend(props, hiddenCategories, toggleCategory)} />
               {allCategories.map((cat, idx) => {
                 const color = cat.category === OTHER_CATEGORY ? OTHER_COLOR : COLORS[idx % COLORS.length];
+                const isPinned = pinnedCategoryDot?.dataKey === cat.category;
+                const dimmed = pinnedCategoryDot && !isPinned;
                 return (
                   <Line
                     key={cat.category}
                     type="linear"
                     dataKey={cat.category}
                     stroke={color}
-                    strokeWidth={hiddenCategories.has(cat.category) ? 0 : 2}
+                    strokeWidth={hiddenCategories.has(cat.category) ? 0 : isPinned ? 3 : 2}
                     dot={(props) => renderCategoryDot(props, cat.category, color)}
                     activeDot={false}
                     strokeDasharray={cat.category === OTHER_CATEGORY ? "3 3" : undefined}
-                    opacity={hiddenCategories.has(cat.category) ? 0 : 1}
+                    opacity={hiddenCategories.has(cat.category) ? 0 : dimmed ? 0.2 : 1}
                   />
                 );
               })}
