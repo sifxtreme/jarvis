@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
 type ViewMode = "day" | "week" | "2weeks" | "month";
 
@@ -26,6 +27,8 @@ type CalendarEntry = {
   title: string;
   startAt: Date;
   endAt: Date;
+  description?: string | null;
+  location?: string | null;
   calendarSummary?: string | null;
   calendarId: string;
   userIds: number[];
@@ -303,6 +306,8 @@ export default function CalendarPage() {
             title: item.title || "Untitled event",
             startAt,
             endAt,
+            description: item.description,
+            location: item.location,
             calendarSummary: item.calendar_summary,
             calendarId: item.calendar_id,
             userIds,
@@ -319,6 +324,8 @@ export default function CalendarPage() {
         title: "Busy",
         startAt,
         endAt,
+        description: null,
+        location: null,
         calendarSummary: item.calendar_summary,
         calendarId: item.calendar_id,
         userIds,
@@ -524,115 +531,111 @@ export default function CalendarPage() {
   return (
     <div className="h-full overflow-auto p-4 md:p-6">
       <div className="max-w-5xl mx-auto space-y-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-6">
             <h1 className="text-2xl font-bold">Calendar</h1>
+            <div className="flex flex-wrap items-center gap-2 md:flex-nowrap">
+              <Button size="sm" variant="outline" onClick={() => (view === "month" ? handleMonth("prev") : handleNavigate("prev"))}>
+                Prev
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleToday}>
+                Today
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => (view === "month" ? handleMonth("next") : handleNavigate("next"))}>
+                Next
+              </Button>
+              <span className="text-sm text-muted-foreground">{headerRange}</span>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    Filters
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-80">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Filters
+                  </div>
+                  <div className="mt-3 grid gap-2">
+                    {data?.users.map((user) => {
+                      const label = userMap.get(user.id) || user.email;
+                      const email = user.email;
+                      const palette = USER_PALETTE[email] || DEFAULT_PALETTE;
+                      const personalActive = userFilters[user.id] ?? true;
+                      return (
+                        <div key={`filters-${user.id}`} className="flex items-center justify-between gap-4">
+                          <div className="text-sm font-semibold text-slate-700">{label}</div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setUserFilters((prev) => ({ ...prev, [user.id]: !personalActive }))}
+                              className={cn(
+                                "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
+                                personalActive
+                                  ? "border-slate-300 bg-slate-900 text-white"
+                                  : "border-slate-200 text-slate-500 hover:border-slate-300"
+                              )}
+                            >
+                              <span className={cn("h-2 w-2 rounded-full", palette.dotPersonal)} />
+                              Personal
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="pt-2">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                        Work calendars
+                      </div>
+                      <div className="mt-2 grid gap-2">
+                        {(data?.work_calendars || []).map((cal) => {
+                          const label =
+                            cal.calendar_id === "asif@sevensevensix.com"
+                              ? "Asif (Work)"
+                              : cal.calendar_id === "hafsa.sayyeda@goodrx.com"
+                                ? "Hafsa (Work)"
+                                : cal.summary || cal.calendar_id;
+                          const palette = USER_PALETTE[cal.calendar_id] || DEFAULT_PALETTE;
+                          const workActive = workFilters[cal.calendar_id] ?? true;
+                          return (
+                            <div key={`work-${cal.calendar_id}`} className="flex items-center justify-between gap-4">
+                              <div className="text-sm font-semibold text-slate-700">{label}</div>
+                              <button
+                                type="button"
+                                onClick={() => setWorkFilters((prev) => ({ ...prev, [cal.calendar_id]: !workActive }))}
+                                className={cn(
+                                  "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
+                                  workActive
+                                    ? "border-slate-300 bg-slate-900 text-white"
+                                    : "border-slate-200 text-slate-500 hover:border-slate-300"
+                                )}
+                              >
+                                <span className={cn("h-2 w-2 rounded-full", palette.dotWork)} />
+                                Work
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {viewOptions
               .filter((option) => (isMobile ? option.value === "day" || option.value === "month" : true))
               .map((option) => (
-              <Button
-                key={option.value}
-                size="sm"
-                variant={view === option.value ? "default" : "outline"}
-                onClick={() => setView(option.value)}
-              >
-                {option.label}
-              </Button>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => (view === "month" ? handleMonth("prev") : handleNavigate("prev"))}>
-              Prev
-            </Button>
-            <Button size="sm" variant="outline" onClick={handleToday}>
-              Today
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => (view === "month" ? handleMonth("next") : handleNavigate("next"))}>
-              Next
-            </Button>
-            <span className="text-sm text-muted-foreground">{headerRange}</span>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button size="sm" variant="outline">
-                  Filters
+                <Button
+                  key={option.value}
+                  size="sm"
+                  variant={view === option.value ? "default" : "outline"}
+                  onClick={() => setView(option.value)}
+                >
+                  {option.label}
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-80">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                  Filters
-                </div>
-                <div className="mt-3 grid gap-2">
-                  {data?.users.map((user) => {
-                    const label = userMap.get(user.id) || user.email;
-                    const email = user.email;
-                    const palette = USER_PALETTE[email] || DEFAULT_PALETTE;
-                    const personalActive = userFilters[user.id] ?? true;
-                    return (
-                      <div key={`filters-${user.id}`} className="flex items-center justify-between gap-4">
-                        <div className="text-sm font-semibold text-slate-700">{label}</div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setUserFilters((prev) => ({ ...prev, [user.id]: !personalActive }))}
-                            className={cn(
-                              "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
-                              personalActive
-                                ? "border-slate-300 bg-slate-900 text-white"
-                                : "border-slate-200 text-slate-500 hover:border-slate-300"
-                            )}
-                          >
-                            <span className={cn("h-2 w-2 rounded-full", palette.dotPersonal)} />
-                            Personal
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div className="pt-2">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                      Work calendars
-                    </div>
-                    <div className="mt-2 grid gap-2">
-                      {(data?.work_calendars || []).map((cal) => {
-                        const label =
-                          cal.calendar_id === "asif@sevensevensix.com"
-                            ? "Asif (Work)"
-                            : cal.calendar_id === "hafsa.sayyeda@goodrx.com"
-                              ? "Hafsa (Work)"
-                              : cal.summary || cal.calendar_id;
-                        const palette = USER_PALETTE[cal.calendar_id] || DEFAULT_PALETTE;
-                        const workActive = workFilters[cal.calendar_id] ?? true;
-                        return (
-                          <div key={`work-${cal.calendar_id}`} className="flex items-center justify-between gap-4">
-                            <div className="text-sm font-semibold text-slate-700">{label}</div>
-                            <button
-                              type="button"
-                              onClick={() => setWorkFilters((prev) => ({ ...prev, [cal.calendar_id]: !workActive }))}
-                              className={cn(
-                                "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
-                                workActive
-                                  ? "border-slate-300 bg-slate-900 text-white"
-                                  : "border-slate-200 text-slate-500 hover:border-slate-300"
-                              )}
-                            >
-                              <span className={cn("h-2 w-2 rounded-full", palette.dotWork)} />
-                              Work
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
+              ))}
           </div>
-
         </div>
 
         {!geo && (
