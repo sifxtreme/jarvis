@@ -260,14 +260,6 @@ export default function CalendarPage() {
   }, [isMobile, view]);
 
   useEffect(() => {
-    if (!isMobile) return;
-    const today = startOfDay(new Date());
-    if (!isSameDay(anchorDate, today)) {
-      setAnchorDate(today);
-    }
-  }, [anchorDate, isMobile]);
-
-  useEffect(() => {
     const measure = () => {
       if (!scrollRef.current) return;
       const width = scrollRef.current.offsetWidth - scrollRef.current.clientWidth;
@@ -638,7 +630,10 @@ export default function CalendarPage() {
             <div className="space-y-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-6">
-            <h1 className="text-2xl font-bold">Calendar</h1>
+            <div className="flex items-baseline gap-2">
+              <h1 className="text-2xl font-bold">Calendar</h1>
+              {isMobile && <span className="text-sm text-muted-foreground">{headerRange}</span>}
+            </div>
             <div className="flex flex-wrap items-center gap-2 md:flex-nowrap">
               <div className="inline-flex scale-[0.92] origin-left md:scale-100">
                 <Button
@@ -668,7 +663,7 @@ export default function CalendarPage() {
                   {">"}
                 </Button>
               </div>
-              <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
+              <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 md:mx-0 md:px-0 md:overflow-visible">
                 {data?.users
                   .slice()
                   .sort((a, b) => {
@@ -693,8 +688,8 @@ export default function CalendarPage() {
                         key={`filters-${user.id}`}
                         type="button"
                         onClick={() => setUserFilters((prev) => ({ ...prev, [user.id]: !personalActive }))}
-                        className={cn(
-                          "flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition md:px-3 md:text-xs",
+                      className={cn(
+                        "flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition whitespace-nowrap md:px-3 md:text-xs",
                           personalActive
                             ? "border-slate-300 bg-slate-900 text-white"
                             : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300"
@@ -734,8 +729,8 @@ export default function CalendarPage() {
                         key={`work-${cal.calendar_id}`}
                         type="button"
                         onClick={() => setWorkFilters((prev) => ({ ...prev, [cal.calendar_id]: !workActive }))}
-                        className={cn(
-                          "flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition md:px-3 md:text-xs",
+                      className={cn(
+                        "flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition whitespace-nowrap md:px-3 md:text-xs",
                           workActive
                             ? "border-slate-300 bg-slate-900 text-white"
                             : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300"
@@ -750,15 +745,14 @@ export default function CalendarPage() {
               </div>
             </div>
           </div>
-          <ToggleGroup
-            type="single"
-            value={view}
-            onValueChange={(value) => value && setView(value as ViewMode)}
-            className="flex flex-wrap items-center gap-1"
-          >
-            {viewOptions
-              .filter((option) => (isMobile ? option.value === "day" : true))
-              .map((option) => (
+          {!isMobile && (
+            <ToggleGroup
+              type="single"
+              value={view}
+              onValueChange={(value) => value && setView(value as ViewMode)}
+              className="flex flex-wrap items-center gap-1"
+            >
+              {viewOptions.map((option) => (
                 <ToggleGroupItem
                   key={option.value}
                   value={option.value}
@@ -768,7 +762,8 @@ export default function CalendarPage() {
                   {option.label}
                 </ToggleGroupItem>
               ))}
-          </ToggleGroup>
+            </ToggleGroup>
+          )}
         </div>
 
         {!geo && (
