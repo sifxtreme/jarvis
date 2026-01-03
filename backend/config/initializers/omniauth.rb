@@ -13,3 +13,4 @@ Rails.application.config.middleware.use OmniAuth::Builder do
 end
 
 OmniAuth.config.allowed_request_methods = %i[get]
+OmniAuth.config.full_host = ENV.fetch('OMNIAUTH_FULL_HOST', 'https://sifxtre.me/api')
