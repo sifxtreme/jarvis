@@ -31,22 +31,22 @@ class ChatMessagesController < ApplicationController
       raw_payload: { text: text }
     )
 
-    response_text = WebChatMessageHandler.new(user: user, message: user_message, text: text).process!
+    response = WebChatMessageHandler.new(user: user, message: user_message, text: text).process!
     assistant_message = ChatMessage.create!(
       transport: 'web',
       external_id: user.id.to_s,
       thread_id: thread_id,
       sender_id: 'assistant',
       sender_email: nil,
-      text: response_text,
+      text: response[:text],
       has_image: false,
       role: 'assistant',
-      raw_payload: { response_to: user_message.id }
+      raw_payload: { response_to: user_message.id, event_created: response[:event_created] }
     )
 
     render json: {
       message: serialize(user_message),
-      reply: serialize(assistant_message)
+      reply: serialize(assistant_message).merge(event_created: response[:event_created])
     }
   rescue StandardError => e
     Rails.logger.error "[Chat] Failed to process message: #{e.message}"

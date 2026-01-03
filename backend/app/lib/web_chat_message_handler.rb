@@ -10,14 +10,14 @@ class WebChatMessageHandler
 
     case intent['intent']
     when 'list_events'
-      "I can list upcoming events soon. (Calendar querying comes next.)"
+      build_response("I can list upcoming events soon. (Calendar querying comes next.)")
     when 'digest'
-      "I can send daily/weekly digests soon. (Calendar querying comes next.)"
+      build_response("I can send daily/weekly digests soon. (Calendar querying comes next.)")
     when 'help'
-      "Send event details and I’ll add it to your calendar."
+      build_response("Send event details and I’ll add it to your calendar.")
     else
       if @text.strip.empty?
-        "Send event details and I’ll add it to your calendar."
+        build_response("Send event details and I’ll add it to your calendar.")
       else
         extract_from_text
       end
@@ -32,18 +32,21 @@ class WebChatMessageHandler
     handle_event_creation(result[:event])
   rescue StandardError => e
     log_ai_request(@message, {}, request_kind: 'text', model: gemini_extract_model, status: 'error', error_message: e.message)
-    "Text extraction error: #{e.message}"
+    build_response("Text extraction error: #{e.message}")
   end
 
   def handle_event_creation(event)
-    return render_extraction_result(event) if event['error']
-    return "Please connect your calendar at https://finances.sifxtre.me first." if @user.google_refresh_token.to_s.empty?
+    if event['error']
+      log_action(@message, calendar_event_id: nil, calendar_id: 'primary', status: 'error', metadata: { error: event['message'] })
+      return build_response(render_extraction_result(event))
+    end
+    return build_response("Please connect your calendar at https://finances.sifxtre.me first.") if @user.google_refresh_token.to_s.empty?
 
     calendar = GoogleCalendarClient.new(@user)
     attendees = (spouse_emails(@user) + [@user.email]).uniq
     result = calendar.create_event(event, attendees: attendees, guests_can_modify: true)
 
-    CalendarEvent.create!(
+    calendar_event = CalendarEvent.create!(
       user: @user,
       calendar_id: 'primary',
       event_id: result.id,
@@ -57,15 +60,18 @@ class WebChatMessageHandler
       source: 'web'
     )
 
-    [
+    log_action(@message, calendar_event_id: calendar_event.id, calendar_id: calendar_event.calendar_id, status: 'success')
+
+    build_response([
       "Added to your calendar! ✅",
       "Title: #{result.summary}",
       "Date: #{event_date(result)}",
       "Time: #{event_time(result)}",
       "Link: #{result.html_link}"
-    ].compact.join("\n")
+    ].compact.join("\n"), event_created: true)
   rescue GoogleCalendarClient::CalendarError => e
-    "Calendar error: #{e.message}"
+    log_action(@message, calendar_event_id: nil, calendar_id: 'primary', status: 'error', metadata: { error: e.message })
+    build_response("Calendar error: #{e.message}")
   end
 
   def render_extraction_result(event)
@@ -166,5 +172,21 @@ class WebChatMessageHandler
     return nil if result.start&.date
 
     result.start&.date_time&.strftime('%H:%M')
+  end
+
+  def log_action(message, calendar_event_id:, calendar_id:, status:, metadata: {})
+    ChatAction.create!(
+      chat_message: message,
+      calendar_event_id: calendar_event_id,
+      calendar_id: calendar_id,
+      transport: 'web',
+      action_type: 'create_calendar_event',
+      status: status,
+      metadata: metadata
+    )
+  end
+
+  def build_response(text, event_created: false)
+    { text: text, event_created: event_created }
   end
 end

@@ -88,7 +88,10 @@ class SlackMessageHandler
   end
 
   def handle_event_creation(message, event)
-    return render_extraction_result(event) if event['error']
+    if event['error']
+      log_action(message, calendar_event: nil, status: 'error', metadata: { error: event['message'] })
+      return render_extraction_result(event)
+    end
 
     user = resolve_user(message)
     unless user
@@ -110,7 +113,7 @@ class SlackMessageHandler
     attendees = (spouse_emails(user) + [user.email]).uniq
     result = calendar.create_event(event, attendees: attendees, guests_can_modify: true)
 
-    CalendarEvent.create!(
+    calendar_event = CalendarEvent.create!(
       user: user,
       calendar_id: 'primary',
       event_id: result.id,
@@ -124,6 +127,8 @@ class SlackMessageHandler
       source: 'slack'
     )
 
+    log_action(message, calendar_event: calendar_event, status: 'success')
+
     [
       "Added to your calendar! ✅",
       "Title: #{result.summary}",
@@ -132,6 +137,7 @@ class SlackMessageHandler
       "Link: #{result.html_link}"
     ].compact.join("\n")
   rescue GoogleCalendarClient::CalendarError => e
+    log_action(message, calendar_event: nil, status: 'error', metadata: { error: e.message })
     "Calendar error: #{e.message}"
   end
 
@@ -289,5 +295,17 @@ class SlackMessageHandler
     return nil if result.start&.date
 
     result.start&.date_time&.strftime('%H:%M')
+  end
+
+  def log_action(message, calendar_event:, status:, metadata: {})
+    ChatAction.create!(
+      chat_message: message,
+      calendar_event_id: calendar_event&.id,
+      calendar_id: calendar_event&.calendar_id || 'primary',
+      transport: 'slack',
+      action_type: 'create_calendar_event',
+      status: status,
+      metadata: metadata
+    )
   end
 end

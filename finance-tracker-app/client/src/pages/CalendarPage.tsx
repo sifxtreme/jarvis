@@ -17,11 +17,12 @@ import {
 } from "date-fns";
 import { CalendarOverviewResponse, CalendarItem, getCalendarOverview } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Panel as ResizablePanel,
   PanelGroup as ResizablePanelGroup,
@@ -165,9 +166,11 @@ export default function CalendarPage() {
   const [workFilters, setWorkFilters] = useState<Record<string, boolean>>({});
   const [geo, setGeo] = useState<GeoPoint | null>(null);
   const [geoDenied, setGeoDenied] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const isMobile = useIsMobile();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [scrollbarWidth, setScrollbarWidth] = useState(0);
+  const pendingDayRef = useRef<Date | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -184,7 +187,7 @@ export default function CalendarPage() {
       }
     };
     load();
-  }, [view, anchorDate]);
+  }, [view, anchorDate, refreshKey]);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 60 * 1000);
@@ -231,6 +234,16 @@ export default function CalendarPage() {
       setAnchorDate((current) => startOfMonth(current));
       return;
     }
+    if (view === "day") {
+      if (pendingDayRef.current) {
+        const selected = pendingDayRef.current;
+        pendingDayRef.current = null;
+        setAnchorDate(startOfDay(selected));
+      } else {
+        setAnchorDate(startOfDay(new Date()));
+      }
+      return;
+    }
     if (view === "week" || view === "2weeks") {
       setAnchorDate((current) => startOfWeek(current, { weekStartsOn: 0 }));
     }
@@ -261,6 +274,32 @@ export default function CalendarPage() {
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
   }, [view, anchorDate, isMobile]);
+
+  useEffect(() => {
+    if (isMobile) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const active = document.activeElement as HTMLElement | null;
+      if (active && (active.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(active.tagName))) {
+        return;
+      }
+      const key = event.key.toLowerCase();
+      if (key === "d") {
+        setView("day");
+      } else if (key === "w") {
+        setView("week");
+      } else if (key === "m") {
+        setView("month");
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isMobile]);
+
+  const openDayView = (day: Date) => {
+    pendingDayRef.current = day;
+    setAnchorDate(startOfDay(day));
+    setView("day");
+  };
 
   useEffect(() => {
     if (!data) return;
@@ -582,25 +621,34 @@ export default function CalendarPage() {
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-6">
             <h1 className="text-2xl font-bold">Calendar</h1>
             <div className="flex flex-wrap items-center gap-2 md:flex-nowrap">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => (view === "month" ? handleMonth("prev") : handleNavigate("prev"))}
-                aria-label="Previous"
-              >
-                {"<"}
-              </Button>
-              <Button size="sm" variant="outline" onClick={handleToday}>
-                Today
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => (view === "month" ? handleMonth("next") : handleNavigate("next"))}
-                aria-label="Next"
-              >
-                {">"}
-              </Button>
+              <div className="inline-flex">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => (view === "month" ? handleMonth("prev") : handleNavigate("prev"))}
+                  aria-label="Previous"
+                  className="rounded-none rounded-l-md border-r-0"
+                >
+                  {"<"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleToday}
+                  className="rounded-none border-r-0"
+                >
+                  Today
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => (view === "month" ? handleMonth("next") : handleNavigate("next"))}
+                  aria-label="Next"
+                  className="rounded-none rounded-r-md"
+                >
+                  {">"}
+                </Button>
+              </div>
               <span className="text-sm text-muted-foreground whitespace-nowrap">{headerRange}</span>
               <Popover>
                 <PopoverTrigger asChild>
@@ -679,20 +727,25 @@ export default function CalendarPage() {
               </Popover>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <ToggleGroup
+            type="single"
+            value={view}
+            onValueChange={(value) => value && setView(value as ViewMode)}
+            className="flex flex-wrap items-center gap-1"
+          >
             {viewOptions
               .filter((option) => (isMobile ? option.value === "day" : true))
               .map((option) => (
-                <Button
+                <ToggleGroupItem
                   key={option.value}
+                  value={option.value}
                   size="sm"
-                  variant={view === option.value ? "default" : "outline"}
-                  onClick={() => setView(option.value)}
+                  className="px-3"
                 >
                   {option.label}
-                </Button>
+                </ToggleGroupItem>
               ))}
-          </div>
+          </ToggleGroup>
         </div>
 
         {!geo && (
@@ -733,8 +786,17 @@ export default function CalendarPage() {
                 return (
                   <div
                     key={dayKey}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openDayView(day)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openDayView(day);
+                      }
+                    }}
                     className={cn(
-                      "min-h-[120px] bg-background/80 px-3 py-2 text-xs",
+                      "min-h-[120px] bg-background/80 px-3 py-2 text-xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       !isCurrentMonth && "text-muted-foreground/70",
                       isToday(day) && "ring-1 ring-blue-400/50"
                     )}
@@ -788,8 +850,17 @@ export default function CalendarPage() {
                     {days.map((day) => (
                       <div
                         key={`header-${format(day, "yyyy-MM-dd")}`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => openDayView(day)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            openDayView(day);
+                          }
+                        }}
                         className={cn(
-                          "border-l border-slate-200/70 px-3 py-2 dark:border-slate-700/70",
+                          "border-l border-slate-200/70 px-3 py-2 dark:border-slate-700/70 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                           isToday(day) && "bg-slate-50 text-slate-900 dark:bg-slate-900/60 dark:text-slate-100"
                         )}
                       >
@@ -1081,7 +1152,7 @@ export default function CalendarPage() {
               <div className="h-full overflow-hidden p-4">
                 <Card className="flex h-full flex-col">
                   <CardContent className="flex-1 overflow-hidden p-0">
-                    <ChatPanel />
+                    <ChatPanel onEventCreated={() => setRefreshKey((current) => current + 1)} />
                   </CardContent>
                 </Card>
               </div>

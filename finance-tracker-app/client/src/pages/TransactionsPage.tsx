@@ -182,8 +182,8 @@ export default function TransactionsPage() {
               </button>
             </ResizeHandle>
             <ResizablePanel
-              defaultSize={30}
-              minSize={isSidePanelOpen ? 20 : 0}
+              defaultSize={25}
+              minSize={isSidePanelOpen ? 10 : 0}
               className={cn(
                 "hidden md:block h-full overflow-hidden",
                 !isSidePanelOpen && "w-0 !min-w-0 !max-w-0"

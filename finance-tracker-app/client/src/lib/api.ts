@@ -144,6 +144,7 @@ export type ChatMessage = {
   role: "user" | "assistant";
   text: string | null;
   created_at: string;
+  event_created?: boolean;
 };
 
 // Category used for transactions that don't match any budget category
@@ -195,8 +196,8 @@ export const getChatMessages = async (): Promise<ChatMessage[]> => {
 
 export const createChatMessage = async (
   text: string
-): Promise<{ message: ChatMessage; reply: ChatMessage }> => {
-  const response = await axiosInstance.post<{ message: ChatMessage; reply: ChatMessage }>(
+): Promise<{ message: ChatMessage; reply: ChatMessage & { event_created?: boolean } }> => {
+  const response = await axiosInstance.post<{ message: ChatMessage; reply: ChatMessage & { event_created?: boolean } }>(
     '/chat/messages',
     { text }
   );
