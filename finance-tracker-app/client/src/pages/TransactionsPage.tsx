@@ -14,6 +14,7 @@ import SheetFilterControls from "@/components/SheetFilterControls";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { FilterIcon, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useSearchParams } from 'react-router-dom'
 
 export default function TransactionsPage() {

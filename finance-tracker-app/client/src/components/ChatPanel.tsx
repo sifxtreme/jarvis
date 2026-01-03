@@ -2,167 +2,194 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { ImagePlus, Send } from "lucide-react";
+import { Send } from "lucide-react";
+import { createChatMessage, getChatMessages, type ChatMessage as ChatMessageDTO } from "@/lib/api";
 
 type ChatMessage = {
-  id: string;
+  id: number | string;
   role: "user" | "assistant";
-  text?: string;
-  imageUrl?: string;
+  text: string;
+  createdAt: string;
+  pending?: boolean;
 };
 
-const readFileAsDataUrl = (file: File) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
+const mapMessage = (message: ChatMessageDTO): ChatMessage => ({
+  id: message.id,
+  role: message.role,
+  text: message.text || "",
+  createdAt: message.created_at,
+});
 
 export function ChatPanel() {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      text: "Drop an image, paste a screenshot, or type a message to get started.",
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSending, setIsSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const shouldAutoScrollRef = useRef(true);
 
   useEffect(() => {
-    const handlePaste = async (event: ClipboardEvent) => {
-      const items = event.clipboardData?.items;
-      if (!items) return;
-      for (let index = 0; index < items.length; index += 1) {
-        const item = items[index];
-        if (item.type.startsWith("image/")) {
-          const file = item.getAsFile();
-          if (file) await addImageMessage(file);
-        }
+    let mounted = true;
+    const loadMessages = async () => {
+      try {
+        const response = await getChatMessages();
+        if (!mounted) return;
+        setMessages(response.map(mapMessage));
+      } catch (error) {
+        console.error("Failed to load chat messages", error);
+      } finally {
+        if (mounted) setIsLoading(false);
       }
     };
-
-    document.addEventListener("paste", handlePaste);
-    return () => document.removeEventListener("paste", handlePaste);
+    loadMessages();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {
-    if (!scrollRef.current) return;
-    scrollRef.current.scrollTo({
-      top: scrollRef.current.scrollHeight,
+    const container = scrollRef.current;
+    if (!container || !shouldAutoScrollRef.current) return;
+    container.scrollTo({
+      top: container.scrollHeight,
       behavior: "smooth",
     });
-  }, [messages.length]);
+  }, [messages.length, isSending]);
 
-  const addImageMessage = async (file: File) => {
-    const imageUrl = await readFileAsDataUrl(file);
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `${Date.now()}-image`,
-        role: "user",
-        imageUrl,
-      },
-    ]);
+  const handleScroll = () => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    shouldAutoScrollRef.current = distanceFromBottom < 80;
   };
 
-  const handleSend = (event?: FormEvent) => {
+  const handleSend = async (event?: FormEvent) => {
     event?.preventDefault();
     const trimmed = draft.trim();
-    if (!trimmed) return;
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `${Date.now()}-text`,
-        role: "user",
-        text: trimmed,
-      },
-    ]);
+    if (!trimmed || isSending) return;
+
+    const now = new Date().toISOString();
+    const pendingUserId = `pending-user-${Date.now()}`;
+    const pendingAssistantId = `pending-assistant-${Date.now()}`;
+    const pendingUserMessage: ChatMessage = {
+      id: pendingUserId,
+      role: "user",
+      text: trimmed,
+      createdAt: now,
+      pending: true,
+    };
+    const pendingAssistantMessage: ChatMessage = {
+      id: pendingAssistantId,
+      role: "assistant",
+      text: "…",
+      createdAt: now,
+      pending: true,
+    };
+
+    setMessages((prev) => [...prev, pendingUserMessage, pendingAssistantMessage]);
     setDraft("");
+    setIsSending(true);
+
+    try {
+      const response = await createChatMessage(trimmed);
+      setMessages((prev) => {
+        const withoutPending = prev.filter(
+          (message) => message.id !== pendingUserId && message.id !== pendingAssistantId
+        );
+        return [...withoutPending, mapMessage(response.message), mapMessage(response.reply)];
+      });
+    } catch (error) {
+      console.error("Failed to send chat message", error);
+      setMessages((prev) => {
+        const withoutPending = prev.filter(
+          (message) => message.id !== pendingUserId && message.id !== pendingAssistantId
+        );
+        return [
+          ...withoutPending,
+          {
+            id: `error-${Date.now()}`,
+            role: "assistant",
+            text: "Sorry, I couldn't send that message. Try again.",
+            createdAt: new Date().toISOString(),
+          },
+        ];
+      });
+    } finally {
+      setIsSending(false);
+    }
   };
 
-  const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const file = event.dataTransfer.files?.[0];
-    if (file && file.type.startsWith("image/")) {
-      await addImageMessage(file);
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      void handleSend();
     }
   };
 
   return (
-    <div
-      className="flex h-full flex-col"
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={handleDrop}
-    >
-      <div ref={scrollRef} className="flex-1 overflow-auto px-4 py-3">
-        <div className="space-y-4">
-          {messages.map((message) => {
-            const isUser = message.role === "user";
-            return (
-              <div
-                key={message.id}
-                className={cn("flex", isUser ? "justify-end" : "justify-start")}
-              >
+    <div className="flex h-full flex-col">
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto px-4 py-3">
+        {isLoading ? (
+          <div className="text-sm text-muted-foreground">Loading chat…</div>
+        ) : messages.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border/70 bg-muted/30 px-4 py-6 text-sm text-muted-foreground">
+            Send an event and I’ll add it to your calendar.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {messages.map((message) => {
+              const isUser = message.role === "user";
+              const timeLabel = new Date(message.createdAt).toLocaleTimeString([], {
+                hour: "numeric",
+                minute: "2-digit",
+              });
+              return (
                 <div
-                  className={cn(
-                    "max-w-[80%] rounded-2xl px-3 py-2 text-sm shadow-sm",
-                    isUser
-                      ? "bg-slate-900 text-white"
-                      : "bg-slate-100 text-slate-900 dark:bg-slate-900 dark:text-slate-100"
-                  )}
+                  key={message.id}
+                  className={cn("flex", isUser ? "justify-end" : "justify-start")}
                 >
-                  {message.text && <div className="whitespace-pre-wrap">{message.text}</div>}
-                  {message.imageUrl && (
-                    <img
-                      src={message.imageUrl}
-                      alt="Uploaded"
-                      className="mt-2 max-h-48 rounded-lg object-cover"
-                    />
-                  )}
+                  <div className="max-w-[80%]">
+                    <div
+                      className={cn(
+                        "rounded-2xl px-3 py-2 text-sm shadow-sm",
+                        isUser
+                          ? "bg-blue-600 text-white"
+                          : "bg-slate-100 text-slate-900 dark:bg-slate-900 dark:text-slate-100",
+                        message.pending && "opacity-70"
+                      )}
+                    >
+                      <div className="whitespace-pre-wrap">{message.text}</div>
+                    </div>
+                    <div
+                      className={cn(
+                        "mt-1 text-[11px] text-muted-foreground",
+                        isUser ? "text-right" : "text-left"
+                      )}
+                    >
+                      {timeLabel}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <form onSubmit={handleSend} className="border-t border-border/60 p-3">
-        <div className="flex items-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={() => fileInputRef.current?.click()}
-            className="shrink-0"
-          >
-            <ImagePlus className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center gap-2">
           <Textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Type a message…"
-            rows={1}
-            className="min-h-[44px] resize-none"
+            rows={2}
+            className="min-h-[56px] flex-1 resize-none"
           />
-          <Button type="submit" size="sm" className="shrink-0">
-            <Send className="mr-2 h-4 w-4" />
-            Send
+          <Button type="submit" size="icon" className="shrink-0" disabled={isSending}>
+            <Send className="h-4 w-4" />
           </Button>
         </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={async (event) => {
-            const file = event.target.files?.[0];
-            if (file) await addImageMessage(file);
-            event.target.value = "";
-          }}
-        />
       </form>
     </div>
   );

@@ -318,7 +318,7 @@ export function TransactionModal({
                     type="date"
                     name="transacted_at"
                     defaultValue={isDuplicating ? today : (transaction?.transacted_at.split('T')[0] || today)}
-                    className="w-full p-2 border rounded font-mono bg-background text-foreground"
+                    className="w-full p-2 border rounded font-mono bg-background text-foreground dark:bg-slate-950 dark:border-slate-700 dark:text-slate-100"
                   />
                 </div>
 
@@ -332,7 +332,7 @@ export function TransactionModal({
                     name="amount"
                     defaultValue={transaction?.amount}
                     step="0.01"
-                    className={`w-full p-2 border rounded text-right font-mono bg-background text-foreground ${validationErrors.amount ? 'border-red-500 outline-red-500' : ''}`}
+                    className={`w-full p-2 border rounded text-right font-mono bg-background text-foreground dark:bg-slate-950 dark:border-slate-700 dark:text-slate-100 ${validationErrors.amount ? 'border-red-500 outline-red-500' : ''}`}
                     onChange={() => setValidationErrors(prev => ({ ...prev, amount: false }))}
                   />
                 </div>
@@ -348,7 +348,7 @@ export function TransactionModal({
                       type="text"
                       name="plaid_name"
                       defaultValue={transaction?.plaid_name}
-                      className="w-full p-2 border rounded bg-muted text-muted-foreground cursor-not-allowed"
+                      className="w-full p-2 border rounded bg-muted text-muted-foreground cursor-not-allowed dark:bg-slate-900/60 dark:border-slate-700 dark:text-slate-400"
                       disabled
                     />
                     <div className="absolute inset-0 bg-stripes rounded pointer-events-none"></div>
@@ -364,7 +364,7 @@ export function TransactionModal({
                     type="text"
                     name="merchant_name"
                     defaultValue={transaction?.merchant_name}
-                    className={`w-full p-2 border rounded bg-background text-foreground ${validationErrors.merchant_name ? 'border-red-500 outline-red-500' : ''}`}
+                    className={`w-full p-2 border rounded bg-background text-foreground dark:bg-slate-950 dark:border-slate-700 dark:text-slate-100 ${validationErrors.merchant_name ? 'border-red-500 outline-red-500' : ''}`}
                     onChange={() => setValidationErrors(prev => ({ ...prev, merchant_name: false }))}
                   />
                 </div>
@@ -383,11 +383,11 @@ export function TransactionModal({
                     onFocus={() => setShowCategorySuggestions(true)}
                     onKeyDown={handleCategoryKeyDown}
                     ref={categoryInputRef}
-                    className="w-full p-2 border rounded bg-background text-foreground"
+                    className="w-full p-2 border rounded bg-background text-foreground dark:bg-slate-950 dark:border-slate-700 dark:text-slate-100"
                     autoComplete="off"
                   />
                   {showCategorySuggestions && filteredCategories.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-popover border rounded shadow-lg z-10 category-dropdown">
+                    <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-popover border rounded shadow-lg z-10 category-dropdown dark:bg-slate-950 dark:border-slate-700">
                       {filteredCategories.map((category, index) => (
                         <div
                           key={index}
@@ -426,11 +426,11 @@ export function TransactionModal({
                     onFocus={() => setShowSourceSuggestions(true)}
                     onKeyDown={handleSourceKeyDown}
                     ref={sourceInputRef}
-                    className={`w-full p-2 border rounded bg-background text-foreground ${validationErrors.source ? 'border-red-500 outline-red-500' : ''}`}
+                    className={`w-full p-2 border rounded bg-background text-foreground dark:bg-slate-950 dark:border-slate-700 dark:text-slate-100 ${validationErrors.source ? 'border-red-500 outline-red-500' : ''}`}
                     autoComplete="off"
                   />
                   {showSourceSuggestions && filteredSources.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-popover border rounded shadow-lg z-10 source-dropdown">
+                    <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-popover border rounded shadow-lg z-10 source-dropdown dark:bg-slate-950 dark:border-slate-700">
                       {filteredSources.map((source, index) => (
                         <div
                           key={index}

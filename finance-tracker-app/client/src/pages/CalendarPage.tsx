@@ -582,14 +582,24 @@ export default function CalendarPage() {
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-6">
             <h1 className="text-2xl font-bold">Calendar</h1>
             <div className="flex flex-wrap items-center gap-2 md:flex-nowrap">
-              <Button size="sm" variant="outline" onClick={() => (view === "month" ? handleMonth("prev") : handleNavigate("prev"))}>
-                Prev
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => (view === "month" ? handleMonth("prev") : handleNavigate("prev"))}
+                aria-label="Previous"
+              >
+                {"<"}
               </Button>
               <Button size="sm" variant="outline" onClick={handleToday}>
                 Today
               </Button>
-              <Button size="sm" variant="outline" onClick={() => (view === "month" ? handleMonth("next") : handleNavigate("next"))}>
-                Next
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => (view === "month" ? handleMonth("next") : handleNavigate("next"))}
+                aria-label="Next"
+              >
+                {">"}
               </Button>
               <span className="text-sm text-muted-foreground whitespace-nowrap">{headerRange}</span>
               <Popover>
@@ -1070,9 +1080,6 @@ export default function CalendarPage() {
             <ResizablePanel defaultSize={30} minSize={20} className="hidden md:block h-full overflow-hidden">
               <div className="h-full overflow-hidden p-4">
                 <Card className="flex h-full flex-col">
-                  <CardHeader className="py-2 px-3">
-                    <CardTitle className="text-lg">Jarvis Chat</CardTitle>
-                  </CardHeader>
                   <CardContent className="flex-1 overflow-hidden p-0">
                     <ChatPanel />
                   </CardContent>

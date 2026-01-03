@@ -139,6 +139,13 @@ export interface Budget {
   display_order: number;
 }
 
+export type ChatMessage = {
+  id: number;
+  role: "user" | "assistant";
+  text: string | null;
+  created_at: string;
+};
+
 // Category used for transactions that don't match any budget category
 export const OTHER_CATEGORY = "Other" as const;
 export type OtherCategory = typeof OTHER_CATEGORY;
@@ -179,6 +186,21 @@ export const api = {
     const response = await axiosInstance.put<Transaction>(`/financial_transactions/${id}`, data);
     return response.data;
   }
+};
+
+export const getChatMessages = async (): Promise<ChatMessage[]> => {
+  const response = await axiosInstance.get<{ messages: ChatMessage[] }>('/chat/messages');
+  return response.data.messages || [];
+};
+
+export const createChatMessage = async (
+  text: string
+): Promise<{ message: ChatMessage; reply: ChatMessage }> => {
+  const response = await axiosInstance.post<{ message: ChatMessage; reply: ChatMessage }>(
+    '/chat/messages',
+    { text }
+  );
+  return response.data;
 };
 
 export const getTransactions = async (filters: TransactionFilters): Promise<Transaction[]> => {

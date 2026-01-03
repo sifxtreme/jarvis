@@ -13,6 +13,9 @@ Rails.application.routes.draw do
   # Teller API utilities
   get 'teller/accounts', to: 'teller#accounts'
 
+  get 'chat/messages', to: 'chat_messages#index'
+  post 'chat/messages', to: 'chat_messages#create'
+
   post 'slack/events', to: 'slack_events#events'
 
   get 'auth/google_oauth2/callback', to: 'google_calendar_auth#callback'
