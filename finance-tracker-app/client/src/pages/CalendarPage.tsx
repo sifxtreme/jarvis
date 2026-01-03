@@ -57,33 +57,33 @@ const USER_PALETTE: Record<
   { blockPersonal: string; blockWork: string; dotPersonal: string; dotWork: string }
 > = {
   "asif.h.ahmed@gmail.com": {
-    blockPersonal: "border-l-purple-400 bg-purple-50/70 text-slate-900",
-    blockWork: "border-l-sky-400 bg-sky-50/70 text-slate-900",
+    blockPersonal: "border-l-purple-400 bg-purple-50/70 text-slate-900 dark:bg-purple-500/20 dark:text-slate-100",
+    blockWork: "border-l-sky-400 bg-sky-50/70 text-slate-900 dark:bg-sky-500/20 dark:text-slate-100",
     dotPersonal: "bg-purple-400",
     dotWork: "bg-sky-400",
   },
   "hsayyeda@gmail.com": {
-    blockPersonal: "border-l-amber-400 bg-amber-50/70 text-slate-900",
-    blockWork: "border-l-emerald-400 bg-emerald-50/70 text-slate-900",
+    blockPersonal: "border-l-amber-400 bg-amber-50/70 text-slate-900 dark:bg-amber-500/20 dark:text-slate-100",
+    blockWork: "border-l-emerald-400 bg-emerald-50/70 text-slate-900 dark:bg-emerald-500/20 dark:text-slate-100",
     dotPersonal: "bg-amber-400",
     dotWork: "bg-emerald-400",
   },
   "asif@sevensevensix.com": {
-    blockPersonal: "border-l-sky-400 bg-sky-50/70 text-slate-900",
-    blockWork: "border-l-sky-400 bg-sky-50/70 text-slate-900",
+    blockPersonal: "border-l-sky-400 bg-sky-50/70 text-slate-900 dark:bg-sky-500/20 dark:text-slate-100",
+    blockWork: "border-l-sky-400 bg-sky-50/70 text-slate-900 dark:bg-sky-500/20 dark:text-slate-100",
     dotPersonal: "bg-sky-400",
     dotWork: "bg-sky-400",
   },
   "hafsa.sayyeda@goodrx.com": {
-    blockPersonal: "border-l-emerald-400 bg-emerald-50/70 text-slate-900",
-    blockWork: "border-l-emerald-400 bg-emerald-50/70 text-slate-900",
+    blockPersonal: "border-l-emerald-400 bg-emerald-50/70 text-slate-900 dark:bg-emerald-500/20 dark:text-slate-100",
+    blockWork: "border-l-emerald-400 bg-emerald-50/70 text-slate-900 dark:bg-emerald-500/20 dark:text-slate-100",
     dotPersonal: "bg-emerald-400",
     dotWork: "bg-emerald-400",
   },
 };
 const DEFAULT_PALETTE = {
-  blockPersonal: "border-l-slate-300 bg-slate-50/70 text-slate-900",
-  blockWork: "border-l-slate-300 bg-slate-50/70 text-slate-900",
+  blockPersonal: "border-l-slate-300 bg-slate-50/70 text-slate-900 dark:bg-slate-800/70 dark:text-slate-100",
+  blockWork: "border-l-slate-300 bg-slate-50/70 text-slate-900 dark:bg-slate-800/70 dark:text-slate-100",
   dotPersonal: "bg-slate-300",
   dotWork: "bg-slate-300",
 };
@@ -581,7 +581,7 @@ export default function CalendarPage() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent align="end" className="w-80">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
                     Filters
                   </div>
                   <div className="mt-3 grid gap-2">
@@ -592,7 +592,7 @@ export default function CalendarPage() {
                       const personalActive = userFilters[user.id] ?? true;
                       return (
                         <div key={`filters-${user.id}`} className="flex items-center justify-between gap-4">
-                          <div className="text-sm font-semibold text-slate-700">{label}</div>
+                          <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">{label}</div>
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
@@ -601,7 +601,7 @@ export default function CalendarPage() {
                                 "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
                                 personalActive
                                   ? "border-slate-300 bg-slate-900 text-white"
-                                  : "border-slate-200 text-slate-500 hover:border-slate-300"
+                                : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300"
                               )}
                             >
                               <span className={cn("h-2 w-2 rounded-full", palette.dotPersonal)} />
@@ -612,7 +612,7 @@ export default function CalendarPage() {
                       );
                     })}
                     <div className="pt-2">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
                         Work calendars
                       </div>
                       <div className="mt-2 grid gap-2">
@@ -627,7 +627,7 @@ export default function CalendarPage() {
                           const workActive = workFilters[cal.calendar_id] ?? true;
                           return (
                             <div key={`work-${cal.calendar_id}`} className="flex items-center justify-between gap-4">
-                              <div className="text-sm font-semibold text-slate-700">{label}</div>
+                              <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">{label}</div>
                               <button
                                 type="button"
                                 onClick={() => setWorkFilters((prev) => ({ ...prev, [cal.calendar_id]: !workActive }))}
@@ -635,7 +635,7 @@ export default function CalendarPage() {
                                   "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
                                   workActive
                                     ? "border-slate-300 bg-slate-900 text-white"
-                                    : "border-slate-200 text-slate-500 hover:border-slate-300"
+                                    : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300"
                                 )}
                               >
                                 <span className={cn("h-2 w-2 rounded-full", palette.dotWork)} />
@@ -743,10 +743,10 @@ export default function CalendarPage() {
             {weekSections.map((days, sectionIndex) => {
               const stickyHeader = view !== "2weeks";
               return (
-                <div key={`week-${sectionIndex}`} className="rounded-xl border border-slate-200/70 bg-white shadow-sm overflow-hidden">
+                <div key={`week-${sectionIndex}`} className="rounded-xl border border-slate-200/70 bg-white shadow-sm overflow-hidden dark:border-slate-700/70 dark:bg-slate-950">
                   <div
                     className={cn(
-                      "grid border-b border-slate-200/70 bg-white text-xs text-slate-500",
+                      "grid border-b border-slate-200/70 bg-white text-xs text-slate-500 dark:border-slate-700/70 dark:bg-slate-950 dark:text-slate-300",
                       stickyHeader && "sticky top-0 z-20"
                     )}
                     style={{
@@ -755,22 +755,24 @@ export default function CalendarPage() {
                     }}
                   >
                     <div className="px-3 py-2">
-                      <div className="text-[11px] font-semibold text-slate-500 whitespace-nowrap">GMT-08</div>
+                      <div className="text-[11px] font-semibold text-slate-500 whitespace-nowrap dark:text-slate-300">GMT-08</div>
                     </div>
                     {days.map((day) => (
                       <div
                         key={`header-${format(day, "yyyy-MM-dd")}`}
                         className={cn(
-                          "border-l border-slate-200/70 px-3 py-2",
-                          isToday(day) && "bg-slate-50 text-slate-900"
+                          "border-l border-slate-200/70 px-3 py-2 dark:border-slate-700/70",
+                          isToday(day) && "bg-slate-50 text-slate-900 dark:bg-slate-900/60 dark:text-slate-100"
                         )}
                       >
-                        <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
+                        <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-600 dark:text-slate-200">
                           <span className="uppercase tracking-[0.2em]">{format(day, "EEE")}</span>
                           <div
                             className={cn(
                               "flex h-7 w-7 items-center justify-center rounded-full border text-[11px] font-semibold",
-                              isToday(day) ? "border-slate-800 bg-slate-900 text-white" : "border-slate-200"
+                              isToday(day)
+                                ? "border-slate-800 bg-slate-900 text-white dark:border-slate-200 dark:bg-slate-100 dark:text-slate-900"
+                                : "border-slate-200 dark:border-slate-700 dark:text-slate-200"
                             )}
                           >
                             {format(day, "d")}
@@ -782,21 +784,21 @@ export default function CalendarPage() {
                   </div>
 
                   <div
-                    className="border-b border-slate-200/70"
+                    className="border-b border-slate-200/70 dark:border-slate-700/70"
                     style={{ paddingRight: scrollbarWidth ? `${scrollbarWidth}px` : undefined }}
                   >
                     <div
-                      className="grid text-xs text-slate-500"
+                      className="grid text-xs text-slate-500 dark:text-slate-300"
                       style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(${days.length}, minmax(0, 1fr))` }}
                     >
-                      <div className="px-3 py-2 text-[11px] font-medium uppercase tracking-[0.2em] text-slate-400">
+                      <div className="px-3 py-2 text-[11px] font-medium uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
                         All day
                       </div>
                       {days.map((day) => {
                         const dayKey = format(day, "yyyy-MM-dd");
                         const items = allDayByDay.get(dayKey) || [];
                         return (
-                          <div key={`allday-${dayKey}`} className="border-l border-slate-200/70 px-3 py-2">
+                          <div key={`allday-${dayKey}`} className="border-l border-slate-200/70 px-3 py-2 dark:border-slate-700/70">
                             <div className="flex flex-col gap-1">
                               {items.slice(0, 3).map((item) => {
                                 const primaryUserId = item.userIds[0];
@@ -812,7 +814,7 @@ export default function CalendarPage() {
                                   <div
                                     key={`allday-${item.key}`}
                                     className={cn(
-                                      "rounded-md border border-slate-200/70 px-2 py-1 text-[11px] font-semibold border-l-[3px] truncate",
+                                      "rounded-md border border-slate-200/70 px-2 py-1 text-[11px] font-semibold border-l-[3px] truncate dark:border-slate-700/70",
                                       paletteClass,
                                       muted
                                     )}
@@ -822,7 +824,7 @@ export default function CalendarPage() {
                                 );
                               })}
                               {items.length > 3 && (
-                                <div className="text-[10px] text-slate-400">+{items.length - 3} more</div>
+                                <div className="text-[10px] text-slate-400 dark:text-slate-500">+{items.length - 3} more</div>
                               )}
                             </div>
                           </div>
@@ -839,7 +841,7 @@ export default function CalendarPage() {
                       }}
                     >
                       <div
-                        className="relative border-r border-slate-200/70 bg-white sticky left-0 z-10"
+                        className="relative border-r border-slate-200/70 bg-white sticky left-0 z-10 dark:border-slate-700/70 dark:bg-slate-950"
                         style={{ height: HOUR_HEIGHT * hours.length }}
                       >
                         {hours.map((hour) => {
@@ -850,9 +852,9 @@ export default function CalendarPage() {
                               className="absolute left-0 flex w-full items-start gap-2"
                               style={{ top: (hour - visibleRange.startHour) * HOUR_HEIGHT }}
                             >
-                              <div className="absolute left-0 right-0 top-0 border-t border-slate-200/60" />
-                              <div className="w-full px-3 text-[11px] font-medium text-slate-500 whitespace-nowrap">
-                                {format(labelTime, "h:mm a")}
+                              <div className="absolute left-0 right-0 top-0 border-t border-slate-200/60 dark:border-slate-700/60" />
+                              <div className="w-full px-3 text-[11px] font-medium text-slate-500 whitespace-nowrap dark:text-slate-300">
+                                {format(labelTime, "h a")}
                               </div>
                             </div>
                           );
@@ -890,7 +892,7 @@ export default function CalendarPage() {
                                   style={{ top, height: SUN_LINE_HEIGHT }}
                                 />
                                 <div
-                                  className="absolute left-4 -translate-y-1/2 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500 opacity-0 shadow-sm transition group-hover:opacity-100"
+                                  className="absolute left-4 -translate-y-1/2 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500 opacity-0 shadow-sm transition group-hover:opacity-100 dark:bg-slate-950 dark:text-slate-300"
                                   style={{ top }}
                                 >
                                   {label}
@@ -903,15 +905,15 @@ export default function CalendarPage() {
                           <div
                             key={dayKey}
                             className={cn(
-                              "relative border-l border-slate-200/70 bg-white",
-                              isToday(day) && "bg-slate-50/70"
+                              "relative border-l border-slate-200/70 bg-white dark:border-slate-700/70 dark:bg-slate-950",
+                              isToday(day) && "bg-slate-50/70 dark:bg-slate-900/40"
                             )}
                             style={{ height: HOUR_HEIGHT * hours.length }}
                           >
                             {hours.map((hour) => (
                               <div
                                 key={`${dayKey}-line-${hour}`}
-                                className="absolute left-0 right-0 border-t border-slate-200/60"
+                                className="absolute left-0 right-0 border-t border-slate-200/60 dark:border-slate-700/60"
                                 style={{ top: (hour - visibleRange.startHour) * HOUR_HEIGHT }}
                               />
                             ))}
@@ -924,7 +926,7 @@ export default function CalendarPage() {
                                 <div className="group absolute left-0 right-0" style={{ top: nowTop }}>
                                   <div className="absolute left-4 h-3 w-3 -translate-y-1/2 rounded-full bg-red-500" />
                                   <div className="absolute left-4 right-4 h-px -translate-y-1/2 bg-red-500/80" />
-                                  <div className="absolute left-8 -translate-y-1/2 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-red-600 opacity-0 shadow-sm transition group-hover:opacity-100">
+                                  <div className="absolute left-8 -translate-y-1/2 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-red-600 opacity-0 shadow-sm transition group-hover:opacity-100 dark:bg-slate-950 dark:text-red-400">
                                     {format(now, "h:mm a")}
                                   </div>
                                 </div>
@@ -960,7 +962,7 @@ export default function CalendarPage() {
                                   <HoverCardTrigger asChild>
                                     <div
                                       className={cn(
-                                        "absolute overflow-hidden rounded-md border border-slate-200/70 px-2 py-1 text-[11px] shadow-sm border-l-[3px]",
+                                        "absolute overflow-hidden rounded-md border border-slate-200/70 px-2 py-1 text-[11px] shadow-sm border-l-[3px] dark:border-slate-700/70",
                                         paletteClass,
                                         muted
                                       )}
@@ -968,30 +970,32 @@ export default function CalendarPage() {
                                     >
                                       <div className="truncate text-[11px] font-semibold">{entry.title}</div>
                                       {durationMinutes >= 30 && (
-                                        <div className="truncate text-[10px] text-slate-500">
+                                        <div className="truncate text-[10px] text-slate-500 dark:text-slate-400">
                                           {format(entry.startAt, "h:mm a")}–{format(entry.endAt, "h:mm a")}
                                         </div>
                                       )}
                                       {durationMinutes >= 60 && label && (
-                                        <div className="truncate text-[10px] text-slate-500">{label}</div>
+                                        <div className="truncate text-[10px] text-slate-500 dark:text-slate-400">{label}</div>
                                       )}
                                     </div>
                                   </HoverCardTrigger>
-                                  <HoverCardContent align="start" className="w-72">
+                                  <HoverCardContent align="start" className="w-72 dark:bg-slate-950 dark:border-slate-700">
                                     <div className="space-y-2 text-sm">
-                                      <div className="text-sm font-semibold text-slate-900">{entry.title}</div>
-                                      <div className="text-xs text-slate-500">
+                                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{entry.title}</div>
+                                      <div className="text-xs text-slate-500 dark:text-slate-400">
                                         {format(entry.startAt, "EEE, MMM d • h:mm a")} – {format(entry.endAt, "h:mm a")}
                                       </div>
                                       {entry.location && (
-                                        <div className="text-xs text-slate-600">Location: {entry.location}</div>
+                                        <div className="text-xs text-slate-600 dark:text-slate-300">Location: {entry.location}</div>
                                       )}
                                       {entry.calendarSummary && (
-                                        <div className="text-xs text-slate-500">Calendar: {entry.calendarSummary}</div>
+                                        <div className="text-xs text-slate-500 dark:text-slate-400">Calendar: {entry.calendarSummary}</div>
                                       )}
-                                      {label && <div className="text-xs text-slate-500">People: {label}</div>}
+                                      {!entry.isWork && label && (
+                                        <div className="text-xs text-slate-500 dark:text-slate-400">People: {label}</div>
+                                      )}
                                       {entry.description && (
-                                        <div className="text-xs text-slate-600 line-clamp-4">{entry.description}</div>
+                                        <div className="text-xs text-slate-600 dark:text-slate-300 line-clamp-4">{entry.description}</div>
                                       )}
                                     </div>
                                   </HoverCardContent>
@@ -1009,7 +1013,7 @@ export default function CalendarPage() {
           </div>
         )}
         {!loading && !error && isMobile && view === "day" && (
-          <div className="rounded-xl border border-border/60 bg-white px-4 py-3 shadow-sm">
+          <div className="rounded-xl border border-border/60 bg-white px-4 py-3 shadow-sm dark:border-slate-700/70 dark:bg-slate-950">
             <div className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               Agenda
             </div>
