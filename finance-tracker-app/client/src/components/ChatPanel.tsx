@@ -35,7 +35,8 @@ export function ChatPanel() {
     const handlePaste = async (event: ClipboardEvent) => {
       const items = event.clipboardData?.items;
       if (!items) return;
-      for (const item of items) {
+      for (let index = 0; index < items.length; index += 1) {
+        const item = items[index];
         if (item.type.startsWith("image/")) {
           const file = item.getAsFile();
           if (file) await addImageMessage(file);

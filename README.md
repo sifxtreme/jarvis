@@ -220,9 +220,30 @@ docker-compose logs -f worker
 
 ## Documentation
 
-- [Teller Integration](docs/teller.md) - Bank sync, troubleshooting
+### General
 - [Backend README](backend/README.md) - Rails API details
 - [Frontend README](finance-tracker-app/README.md) - React app details
+- [Teller Integration](docs/teller.md) - Bank sync, troubleshooting
+- [Future Vision](docs/FUTURE_VISION.md) - Product direction and roadmap
+- [Layout Standards](docs/LAYOUTS.md) - `split-panel` and `full-width` patterns
+- [Progress Log](docs/progress.md) - Ongoing development notes
+
+### Config & Setup
+- [Google Auth (Overview)](docs/GOOGLE_AUTH.md) - High-level auth setup
+- [Slack Setup](docs/SLACK_SETUP.md) - Slack app and event wiring
+- [Calendar Sync (Overview)](docs/CALENDAR_SYNC.md) - High-level sync notes
+- [Gemini Config + Testing](docs/GEMINI_CONFIGURATION_AND_TESTING.md) - Local setup and validation
+
+### Features
+- [Feature: Google Auth](docs/features/GOOGLE_AUTH.md)
+- [Feature: Finance Trends](docs/features/FINANCE_TRENDS.md)
+- [Feature: Calendar Sync](docs/features/CALENDAR_SYNC.md)
+- [Feature: Slack Data Agent](docs/features/SLACK_DATA_AGENT.md)
+- [Feature: Jarvis Chat](docs/features/JARVIS_CHAT.md)
+- [Feature: Calendar Future](docs/features/CALENDAR_FUTURE.md)
+- [Feature: Slack Bot](docs/features/SLACK_BOT.md)
+- [Feature: Gemini Extraction](docs/features/GEMINI_EXTRACTION.md)
+- [Feature: Calendar UI](docs/features/CALENDAR_UI.md)
 
 ## License
 
