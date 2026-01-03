@@ -76,24 +76,45 @@ class CalendarController < ApplicationController
     event = CalendarEvent.find_by(id: params[:id])
     return render json: { msg: 'Event not found' }, status: :not_found unless event
 
-    owner = event.user || user
-    if owner.google_refresh_token.to_s.empty?
-      Rails.logger.warn("[CalendarDelete] Missing refresh token for owner_id=#{owner.id} event_id=#{event.id} calendar_id=#{event.calendar_id}")
-      return render json: {
-        msg: 'Calendar not connected',
-        debug: {
-          event_id: event.id,
-          calendar_id: event.calendar_id,
-          owner_id: owner.id
+    related_events = related_calendar_events(event)
+    failures = []
+
+    related_events.each do |related|
+      owner = related.user || user
+      if owner.google_refresh_token.to_s.empty?
+        Rails.logger.warn("[CalendarDelete] Missing refresh token for owner_id=#{owner.id} event_id=#{related.id} calendar_id=#{related.calendar_id}")
+        failures << {
+          event_id: related.id,
+          calendar_id: related.calendar_id,
+          owner_id: owner.id,
+          error: 'Calendar not connected'
         }
-      }, status: :unprocessable_entity
+        next
+      end
+
+      client = GoogleCalendarClient.new(owner)
+      client.delete_event(calendar_id: related.calendar_id, event_id: related.event_id)
+      related.update(status: 'cancelled')
+    rescue GoogleCalendarClient::CalendarError => e
+      Rails.logger.error("[CalendarDelete] Failed owner_id=#{owner&.id} event_id=#{related&.id} calendar_id=#{related&.calendar_id} error=#{e.message}")
+      failures << {
+        event_id: related&.id,
+        calendar_id: related&.calendar_id,
+        owner_id: owner&.id,
+        error: e.message
+      }
     end
 
-    client = GoogleCalendarClient.new(owner)
-    client.delete_event(calendar_id: event.calendar_id, event_id: event.event_id)
-    event.update(status: 'cancelled')
+    if failures.any?
+      return render json: {
+        msg: 'One or more deletes failed',
+        debug: {
+          failures: failures
+        }
+      }, status: :bad_gateway
+    end
 
-    render json: { success: true }
+    render json: { success: true, deleted: related_events.size }
   rescue GoogleCalendarClient::CalendarError => e
     Rails.logger.error("[CalendarDelete] Failed owner_id=#{owner&.id} event_id=#{event&.id} calendar_id=#{event&.calendar_id} error=#{e.message}")
     render json: {
@@ -104,6 +125,13 @@ class CalendarController < ApplicationController
         owner_id: owner&.id
       }
     }, status: :bad_gateway
+  end
+
+  def related_calendar_events(event)
+    uid = event.raw_event&.dig('i_cal_uid') || event.raw_event&.dig('iCalUID')
+    return CalendarEvent.where(event_id: event.event_id) if uid.to_s.empty?
+
+    CalendarEvent.where("raw_event ->> 'i_cal_uid' = ? OR raw_event ->> 'iCalUID' = ?", uid, uid)
   end
 
   private
