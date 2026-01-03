@@ -24,12 +24,23 @@ class FinancialTransactionsController < ApplicationController
       end
       db_query = db_query.where('transacted_at >= ? AND transacted_at <= ?', start_date, end_date)
     else
-      if year && year != 'null'
-        db_query = db_query.where('extract(year from transacted_at) = ?', year)
-      end
-      if month && month != 'null'
+      if month && month != 'null' && year && year != 'null'
         current_year_month = "#{year}-#{month.rjust(2, '0')}"
-        db_query = db_query.where('extract(month from transacted_at) = ? OR ? = ANY(amortized_months)', month, current_year_month)
+        db_query = db_query.where(
+          '(extract(year from transacted_at) = ? AND extract(month from transacted_at) = ?) OR ? = ANY(amortized_months)',
+          year, month, current_year_month
+        )
+      else
+        if year && year != 'null'
+          db_query = db_query.where(
+            'extract(year from transacted_at) = ? OR EXISTS (SELECT 1 FROM unnest(amortized_months) AS m WHERE m LIKE ?)',
+            year, "#{year}-%"
+          )
+        end
+        if month && month != 'null'
+          current_year_month = "#{year}-#{month.rjust(2, '0')}"
+          db_query = db_query.where('extract(month from transacted_at) = ? OR ? = ANY(amortized_months)', month, current_year_month)
+        end
       end
     end
 
