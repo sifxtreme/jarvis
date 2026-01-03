@@ -20,13 +20,17 @@ Personal finance tracker with automatic bank sync and spending insights.
 - **Supported Banks** - Chase, Amex, Bank of America, Citi, Capital One, 5000+ others
 
 ### Jarvis Extensions (2026-01-02)
-- **Slack Bot** — Screenshot + text ingestion for calendar events. See docs/features/SLACK_BOT.md.
-- **Gemini Extraction** — Intent + extraction with cost logging. See docs/features/GEMINI_EXTRACTION.md.
-- **Google Auth** — Google Sign-In + session auth for the API. See docs/features/GOOGLE_AUTH.md.
-- **Calendar Sync** — Personal events + busy-only work calendars. See docs/features/CALENDAR_SYNC.md.
-- **Calendar UI** — New /calendar page with day/week/2-week/month views. See docs/features/CALENDAR_UI.md.
-- **Calendar Chat (Web)** — In-app chat to create events (text only). See docs/features/JARVIS_CHAT.md.
-- **Calendar Delete** — Delete calendar events from the UI (syncs to Google).
+- **Slack Bot** [Live] — Screenshot + text ingestion for calendar events. See docs/features/SLACK_BOT.md.
+- **Gemini Extraction** [Live] — Intent + extraction with cost logging. See docs/features/GEMINI_EXTRACTION.md.
+- **Google Auth** [Live] — Google Sign-In + session auth for the API. See docs/features/GOOGLE_AUTH.md.
+- **Calendar Sync** [Live] — Personal events + busy-only work calendars. See docs/features/CALENDAR_SYNC.md.
+- **Calendar UI** [Live] — New /calendar page with day/week/2-week/month views. See docs/features/CALENDAR_UI.md.
+- **Calendar Chat (Web)** [Live] — In-app chat to create events (text only). See docs/features/JARVIS_CHAT.md.
+- **Calendar Delete** [Live] — Delete calendar events from the UI (syncs to Google).
+- **Calendar Future** [Planned] — Bulk actions + chat panel improvements. See docs/features/CALENDAR_FUTURE.md.
+
+### Planned / Not Live Yet
+- **Slack Data Agent** [Planned] — Ask finance questions in Slack with read-only SQL. See docs/features/SLACK_DATA_AGENT.md.
 
 ## Architecture
 
@@ -53,7 +57,7 @@ jarvis/
 ### Backend
 ```bash
 # Copy environment file
-cp jarvis.env.example jarvis.env
+cp jarvis.env.template jarvis.env
 # Edit with your secrets
 vim jarvis.env
 
@@ -77,6 +81,7 @@ npm run dev  # http://localhost:3001
 |-------|-------------|
 | `/` | Transaction list with filters and search |
 | `/trends` | Spending trends with charts (MoM by category/merchant) |
+| `/calendar` | Calendar with day/week/2-week/month views |
 | `/yearly-budget` | Annual budget overview |
 | `/teller-repair` | Fix disconnected bank enrollments |
 
@@ -238,15 +243,29 @@ docker-compose logs -f worker
 - [Gemini Config + Testing](docs/GEMINI_CONFIGURATION_AND_TESTING.md) - Local setup and validation
 
 ### Features
-- [Feature: Google Auth](docs/features/GOOGLE_AUTH.md)
-- [Feature: Finance Trends](docs/features/FINANCE_TRENDS.md)
-- [Feature: Calendar Sync](docs/features/CALENDAR_SYNC.md)
-- [Feature: Slack Data Agent](docs/features/SLACK_DATA_AGENT.md)
-- [Feature: Jarvis Chat](docs/features/JARVIS_CHAT.md)
-- [Feature: Calendar Future](docs/features/CALENDAR_FUTURE.md)
-- [Feature: Slack Bot](docs/features/SLACK_BOT.md)
-- [Feature: Gemini Extraction](docs/features/GEMINI_EXTRACTION.md)
-- [Feature: Calendar UI](docs/features/CALENDAR_UI.md)
+- [Feature: Google Auth] [Live](docs/features/GOOGLE_AUTH.md)
+- [Feature: Finance Trends] [Live](docs/features/FINANCE_TRENDS.md)
+- [Feature: Calendar Sync] [Live](docs/features/CALENDAR_SYNC.md)
+- [Feature: Slack Data Agent] [Planned](docs/features/SLACK_DATA_AGENT.md)
+- [Feature: Jarvis Chat] [Live](docs/features/JARVIS_CHAT.md)
+- [Feature: Calendar Future] [Planned](docs/features/CALENDAR_FUTURE.md)
+- [Feature: Slack Bot] [Live](docs/features/SLACK_BOT.md)
+- [Feature: Gemini Extraction] [Live](docs/features/GEMINI_EXTRACTION.md)
+- [Feature: Calendar UI] [Live](docs/features/CALENDAR_UI.md)
+
+### Feature Status
+
+| Feature Doc | Status |
+|-------------|--------|
+| [Google Auth](docs/features/GOOGLE_AUTH.md) | Live |
+| [Finance Trends](docs/features/FINANCE_TRENDS.md) | Live |
+| [Calendar Sync](docs/features/CALENDAR_SYNC.md) | Live |
+| [Slack Data Agent](docs/features/SLACK_DATA_AGENT.md) | Planned |
+| [Jarvis Chat](docs/features/JARVIS_CHAT.md) | Live |
+| [Calendar Future](docs/features/CALENDAR_FUTURE.md) | Planned |
+| [Slack Bot](docs/features/SLACK_BOT.md) | Live |
+| [Gemini Extraction](docs/features/GEMINI_EXTRACTION.md) | Live |
+| [Calendar UI](docs/features/CALENDAR_UI.md) | Live |
 
 ## License
 
