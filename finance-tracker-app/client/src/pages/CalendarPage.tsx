@@ -225,7 +225,7 @@ export default function CalendarPage() {
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [view, viewDays.length, isMobile]);
+  }, [view, anchorDate, isMobile]);
 
   useEffect(() => {
     if (!data) return;
