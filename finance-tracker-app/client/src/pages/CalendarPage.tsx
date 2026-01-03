@@ -799,7 +799,9 @@ export default function CalendarPage() {
                         )}
                       >
                         <span className={cn("h-2 w-2 rounded-full", palette.dotWork)} />
-                        <span className="md:hidden">{mobileLabel} W</span>
+                        <span className="md:hidden">
+                          {mobileLabel} 💼
+                        </span>
                         <span className="hidden md:inline">{label}</span>
                       </button>
                     );

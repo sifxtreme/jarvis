@@ -380,9 +380,29 @@ export interface TrendsData {
   monthly_by_merchant: MonthlyMerchantData[];
 }
 
+export interface MerchantTrendPoint {
+  month: string;
+  total: number;
+}
+
+export interface MerchantTrendsData {
+  merchant: string | null;
+  months: MerchantTrendPoint[];
+  start_month: string;
+  end_month: string;
+  total_spent: number;
+}
+
 export interface TrendsFilters {
   year?: number;
   category?: string;
+}
+
+export interface MerchantTrendsFilters {
+  query: string;
+  exact?: boolean;
+  start_month?: string;
+  end_month?: string;
 }
 
 export const getTrends = async (filters: TrendsFilters = {}): Promise<TrendsData> => {
@@ -398,6 +418,24 @@ export const getTrends = async (filters: TrendsFilters = {}): Promise<TrendsData
     console.error('[API] Trends error details:', error);
     const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch trends';
     throw new Error(`Failed to fetch trends: ${errorMessage}`);
+  }
+};
+
+export const getMerchantTrends = async (filters: MerchantTrendsFilters): Promise<MerchantTrendsData> => {
+  const params = new URLSearchParams();
+
+  if (filters.query) params.append('query', filters.query);
+  if (filters.exact !== undefined) params.append('exact', filters.exact.toString());
+  if (filters.start_month) params.append('start_month', filters.start_month);
+  if (filters.end_month) params.append('end_month', filters.end_month);
+
+  try {
+    const response = await axiosInstance.get<MerchantTrendsData>('/financial_transactions/merchant_trends', { params });
+    return response.data;
+  } catch (error: any) {
+    console.error('[API] Merchant trends error details:', error);
+    const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch merchant trends';
+    throw new Error(`Failed to fetch merchant trends: ${errorMessage}`);
   }
 };
 

@@ -106,6 +106,76 @@ class FinancialTransactionsController < ApplicationController
     }
   end
 
+  def merchant_trends
+    query = params[:query].to_s.strip
+    exact = params[:exact] == 'true'
+    start_month = params[:start_month].presence
+    end_month = params[:end_month].presence
+
+    if start_month.blank? || end_month.blank?
+      default_end = Date.current.beginning_of_month
+      default_start = (default_end << 11)
+      start_month = default_start.strftime('%Y-%m')
+      end_month = default_end.strftime('%Y-%m')
+    end
+
+    start_date = Date.parse("#{start_month}-01")
+    end_date = Date.parse("#{end_month}-01").end_of_month
+    if start_date > end_date
+      start_date, end_date = end_date, start_date
+      start_month = start_date.strftime('%Y-%m')
+      end_month = end_date.strftime('%Y-%m')
+    end
+
+    if query.blank?
+      render json: { merchant: nil, months: [], start_month: start_month, end_month: end_month, total_spent: 0 }
+      return
+    end
+
+    scope = FinancialTransaction.where(hidden: false)
+    scope = scope.where("transacted_at >= ? AND transacted_at <= ?", start_date, end_date)
+
+    if exact
+      lowered = query.downcase
+      scope = scope.where("lower(plaid_name) = ? OR lower(merchant_name) = ?", lowered, lowered)
+    else
+      like = "%#{query}%"
+      scope = scope.where("plaid_name ILIKE ? OR merchant_name ILIKE ?", like, like)
+    end
+
+    scope = scope.where("category NOT ILIKE '%income%' OR category IS NULL")
+    scope = scope.where('amount > 0')
+
+    months = scope
+      .group("to_char(transacted_at, 'YYYY-MM')")
+      .select("to_char(transacted_at, 'YYYY-MM') as month", "SUM(amount) as total")
+      .order('month')
+      .map { |row| { month: row.month, total: row.total.to_f.round(2) } }
+
+    sample = scope
+      .where.not(plaid_name: [nil, ''])
+      .select(:plaid_name, :merchant_name)
+      .order('transacted_at DESC, id DESC')
+      .first
+    if sample.nil?
+      sample = scope
+        .where.not(merchant_name: [nil, ''])
+        .select(:plaid_name, :merchant_name)
+        .order('transacted_at DESC, id DESC')
+        .first
+    end
+    merchant_name = sample&.plaid_name.presence || sample&.merchant_name.presence
+    total_spent = months.sum { |m| m[:total] }.round(2)
+
+    render json: {
+      merchant: merchant_name || query,
+      months: months,
+      start_month: start_month,
+      end_month: end_month,
+      total_spent: total_spent
+    }
+  end
+
   def recurring_status
     year = (params[:year] || Date.current.year).to_i
     month = (params[:month] || Date.current.month).to_i
@@ -260,6 +330,7 @@ class FinancialTransactionsController < ApplicationController
 
     result
   end
+
 
   def period_summary_processed(processed, year)
     income_items = processed.select { |p| p[:category]&.downcase&.include?('income') }

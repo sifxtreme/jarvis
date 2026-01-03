@@ -1,10 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
-import { getTrends, getTransactions, getBudgets, type TrendsFilters, OTHER_CATEGORY, type Transaction } from "../lib/api";
+import {
+  getTrends,
+  getTransactions,
+  getBudgets,
+  getMerchantTrends,
+  type TrendsFilters,
+  OTHER_CATEGORY,
+  type Transaction,
+} from "../lib/api";
 import { useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { ChartContainer } from "@/components/ui/chart";
 import { formatCurrency, cn, YEARS } from "@/lib/utils";
 import { Copy as CopyIcon, Download, TrendingUp, TrendingDown, Target, X } from "lucide-react";
@@ -78,6 +89,17 @@ export default function TrendsPage() {
   const [merchantCategoryFilter, setMerchantCategoryFilter] = useState<string>('all');
   const [pinnedCategoryDot, setPinnedCategoryDot] = useState<{ dataKey: string; index: number } | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
+  const [merchantQuery, setMerchantQuery] = useState("");
+  const [merchantExact, setMerchantExact] = useState(false);
+  const [merchantStartMonth, setMerchantStartMonth] = useState(() => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    return `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [merchantEndMonth, setMerchantEndMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
 
   // Hover state for precise dot highlighting
   const [hoveredCategoryDot, setHoveredCategoryDot] = useState<{ dataKey: string; index: number } | null>(null);
@@ -111,6 +133,19 @@ export default function TrendsPage() {
   const { data: budgets } = useQuery({
     queryKey: ['budgets-for-trends', filters.year],
     queryFn: () => getBudgets({ year: filters.year, show_hidden: false, show_needs_review: false }),
+  });
+
+  const { data: merchantTrends, isLoading: merchantTrendsLoading, error: merchantTrendsError } = useQuery({
+    queryKey: ['merchant-trends', merchantQuery, merchantExact, merchantStartMonth, merchantEndMonth],
+    queryFn: () =>
+      getMerchantTrends({
+        query: merchantQuery.trim(),
+        exact: merchantExact,
+        start_month: merchantStartMonth,
+        end_month: merchantEndMonth,
+      }),
+    enabled: merchantQuery.trim().length > 0,
+    retry: 1,
   });
 
   // Get unique sources from transactions
@@ -197,6 +232,25 @@ export default function TrendsPage() {
     const [, month] = monthStr.split('-');
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return monthNames[parseInt(month) - 1] || month;
+  };
+
+  const formatMonthWithYear = (monthStr: string) => {
+    const [year, month] = monthStr.split("-");
+    const monthLabel = formatMonth(monthStr);
+    return `${monthLabel} '${year.slice(-2)}`;
+  };
+
+  const getMonthRange = (startMonth: string, endMonth: string): string[] => {
+    const [startYear, startMon] = startMonth.split("-").map(Number);
+    const [endYear, endMon] = endMonth.split("-").map(Number);
+    const months: string[] = [];
+    let cursor = new Date(startYear, startMon - 1, 1);
+    const end = new Date(endYear, endMon - 1, 1);
+    while (cursor <= end) {
+      months.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`);
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+    }
+    return months;
   };
 
   const getMonthNumber = (monthStr: string): number => {
@@ -514,6 +568,12 @@ export default function TrendsPage() {
 
   const categoryChartData = getCategoryChartData();
   const merchantChartData = getMerchantChartData();
+  const merchantTrendSeries = useMemo(() => {
+    if (!merchantTrends) return [];
+    const months = getMonthRange(merchantTrends.start_month, merchantTrends.end_month);
+    const totals = new Map(merchantTrends.months.map(item => [item.month, item.total]));
+    return months.map(month => ({ month, total: totals.get(month) || 0 }));
+  }, [merchantTrends]);
   const allCategories = (trends?.monthly_by_category || [])
     .filter(cat => hideOther ? cat.category !== OTHER_CATEGORY : true)
     .slice(0, categoryCount);
@@ -914,6 +974,106 @@ export default function TrendsPage() {
               })}
             </LineChart>
           </ChartContainer>
+        </CardContent>
+      </Card>
+
+      {/* Merchant Search */}
+      <Card className="mb-8">
+        <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <CardTitle className="text-base font-semibold">Merchant Search (Last 12 Months)</CardTitle>
+          {merchantTrends?.merchant && (
+            <div className="text-sm text-muted-foreground">
+              {merchantTrends.merchant} · {formatCurrency(merchantTrends.total_spent)}
+            </div>
+          )}
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-end gap-3 pb-4">
+            <div className="min-w-[220px] flex-1">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Merchant search</Label>
+              <Input
+                type="search"
+                placeholder="Search merchants..."
+                value={merchantQuery}
+                onChange={(event) => setMerchantQuery(event.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-2 pt-5">
+              <Switch checked={merchantExact} onCheckedChange={setMerchantExact} />
+              <Label className="text-sm">Exact match</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-muted-foreground">Start</Label>
+              <Input
+                type="month"
+                value={merchantStartMonth}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  setMerchantStartMonth(next);
+                  if (next > merchantEndMonth) setMerchantEndMonth(next);
+                }}
+                className="w-[150px]"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-muted-foreground">End</Label>
+              <Input
+                type="month"
+                value={merchantEndMonth}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  setMerchantEndMonth(next);
+                  if (next < merchantStartMonth) setMerchantStartMonth(next);
+                }}
+                className="w-[150px]"
+              />
+            </div>
+          </div>
+
+          {merchantQuery.trim().length === 0 && (
+            <StateCard title="Search for a merchant" description="Type a merchant name to see monthly spend." />
+          )}
+          {merchantQuery.trim().length > 0 && merchantTrendsLoading && (
+            <StateCard title="Loading merchant trend" description="Pulling monthly spend data." variant="loading" />
+          )}
+          {merchantQuery.trim().length > 0 && merchantTrendsError && (
+            <StateCard title="Error loading merchant trend" description={merchantTrendsError.message} variant="error" />
+          )}
+          {merchantQuery.trim().length > 0 && !merchantTrendsLoading && !merchantTrendsError && (
+            <>
+              {merchantTrendSeries.length === 0 ? (
+                <StateCard title="No matching transactions" description="Try a different merchant name or range." />
+              ) : (
+                <ChartContainer config={chartConfig} className="h-[320px] w-full">
+                  <LineChart data={merchantTrendSeries}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="month" tickFormatter={formatMonthWithYear} tick={{ fontSize: 12 }} />
+                    <YAxis
+                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                      tick={{ fontSize: 12 }}
+                      domain={[0, () => {
+                        const max = Math.max(...merchantTrendSeries.map(d => d.total));
+                        return Math.ceil(max * 1.1) || 1000;
+                      }]}
+                    />
+                    <Tooltip
+                      cursor={false}
+                      formatter={(value: number) => formatCurrency(value)}
+                      labelFormatter={(label) => formatMonthWithYear(label)}
+                    />
+                    <Line
+                      type="linear"
+                      dataKey="total"
+                      stroke={COLORS[0]}
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      activeDot={{ r: 4 }}
+                    />
+                  </LineChart>
+                </ChartContainer>
+              )}
+            </>
+          )}
         </CardContent>
       </Card>
 
