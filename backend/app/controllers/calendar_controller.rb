@@ -48,6 +48,7 @@ class CalendarController < ApplicationController
         start_at: start_time.iso8601,
         end_at: end_time.iso8601
       },
+      current_user_id: current_user&.id,
       users: users.map { |u| { id: u.id, email: u.email } },
       work_calendars: work_calendars.map { |cal| { calendar_id: cal.calendar_id, summary: cal.summary } },
       items: (events + busy_blocks).sort_by { |item| item[:start_at] }

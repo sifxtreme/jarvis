@@ -29,6 +29,7 @@ import {
 } from "react-resizable-panels";
 import { ChatPanel } from "@/components/ChatPanel";
 import { StateCard } from "@/components/StateCard";
+import { PanelRightClose, PanelRightOpen } from "lucide-react";
 
 type ViewMode = "day" | "week" | "2weeks" | "month";
 
@@ -174,6 +175,7 @@ export default function CalendarPage() {
   const [scrollbarWidth, setScrollbarWidth] = useState(0);
   const pendingDayRef = useRef<Date | null>(null);
   const [deletingEventId, setDeletingEventId] = useState<number | null>(null);
+  const [isChatPanelOpen, setIsChatPanelOpen] = useState(true);
 
   useEffect(() => {
     const load = async () => {
@@ -1202,12 +1204,31 @@ export default function CalendarPage() {
           <>
             <ResizeHandle className="bg-border w-2 hover:bg-primary/10 transition-colors relative cursor-col-resize">
               <div className="absolute inset-y-3 left-1/2 w-px -translate-x-1/2 bg-border/80" />
+              <button
+                type="button"
+                onClick={() => setIsChatPanelOpen((current) => !current)}
+                className="absolute left-1/2 top-1/2 flex h-10 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background shadow-sm"
+                aria-label={isChatPanelOpen ? "Hide chat panel" : "Show chat panel"}
+              >
+                {isChatPanelOpen ? (
+                  <PanelRightClose className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <PanelRightOpen className="h-4 w-4 text-muted-foreground" />
+                )}
+              </button>
             </ResizeHandle>
-            <ResizablePanel defaultSize={30} minSize={20} className="hidden md:block h-full overflow-hidden">
+            <ResizablePanel
+              defaultSize={30}
+              minSize={isChatPanelOpen ? 20 : 0}
+              className={cn("hidden md:block h-full overflow-hidden", !isChatPanelOpen && "w-0 !min-w-0 !max-w-0")}
+              style={{ flexBasis: isChatPanelOpen ? undefined : "0px" }}
+            >
               <div className="h-full overflow-hidden p-4">
                 <Card className="flex h-full flex-col">
                   <CardContent className="flex-1 overflow-hidden p-0">
-                    <ChatPanel onEventCreated={() => setRefreshKey((current) => current + 1)} />
+                    {isChatPanelOpen && (
+                      <ChatPanel onEventCreated={() => setRefreshKey((current) => current + 1)} />
+                    )}
                   </CardContent>
                 </Card>
               </div>
