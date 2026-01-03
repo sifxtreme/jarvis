@@ -96,20 +96,6 @@ export default function TransactionsPage() {
                     />
                   </div>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="hidden md:inline-flex"
-                    onClick={() => setIsSidePanelOpen((current) => !current)}
-                  >
-                    {isSidePanelOpen ? (
-                      <PanelRightClose className="h-4 w-4 mr-2" />
-                    ) : (
-                      <PanelRightOpen className="h-4 w-4 mr-2" />
-                    )}
-                    {isSidePanelOpen ? "Hide Panel" : "Show Panel"}
-                  </Button>
-
                   {/* Mobile sheet filters */}
                   <div className="md:hidden flex items-center gap-2">
                     <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
@@ -175,24 +161,42 @@ export default function TransactionsPage() {
           </div>
         </ResizablePanel>
 
-        {!!filters?.year && !!filters?.month && isSidePanelOpen && (
+        {!!filters?.year && !!filters?.month && (
           <>
             <ResizeHandle
               className="bg-border w-2 hover:bg-primary/10 transition-colors relative cursor-col-resize"
             >
               <div className="absolute inset-y-3 left-1/2 w-px -translate-x-1/2 bg-border/80" />
+              <button
+                type="button"
+                onClick={() => setIsSidePanelOpen((current) => !current)}
+                className="absolute left-1/2 top-1/2 flex h-10 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background shadow-sm"
+                aria-label={isSidePanelOpen ? "Hide right panel" : "Show right panel"}
+              >
+                {isSidePanelOpen ? (
+                  <PanelRightClose className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <PanelRightOpen className="h-4 w-4 text-muted-foreground" />
+                )}
+              </button>
             </ResizeHandle>
             <ResizablePanel
               defaultSize={30}
-              minSize={20}
-              className="hidden md:block h-full overflow-hidden"
+              minSize={isSidePanelOpen ? 20 : 0}
+              className={cn(
+                "hidden md:block h-full overflow-hidden",
+                !isSidePanelOpen && "w-0 !min-w-0 !max-w-0"
+              )}
+              style={{ flexBasis: isSidePanelOpen ? undefined : "0px" }}
             >
-              <TransactionStats
-                transactions={transactions}
-                budgets={budgets}
-                isLoading={isLoading}
-                query={filters?.query}
-              />
+              {isSidePanelOpen && (
+                <TransactionStats
+                  transactions={transactions}
+                  budgets={budgets}
+                  isLoading={isLoading}
+                  query={filters?.query}
+                />
+              )}
             </ResizablePanel>
           </>
         )}
