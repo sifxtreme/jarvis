@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { AlertCircle, CheckCircle, Info, Wrench, Plus, Search } from "lucide-react";
-import { API_BASE_URL, GOOGLE_ID_TOKEN_KEY } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/api";
 
 declare global {
   interface Window {
@@ -172,15 +172,9 @@ export default function TellerRepairPage() {
     setLookupStatus({ message: "Fetching accounts...", type: "info" });
 
     try {
-      const idToken = localStorage.getItem(GOOGLE_ID_TOKEN_KEY);
-      const headers: Record<string, string> = {};
-      if (idToken) {
-        headers["Authorization"] = `Bearer ${idToken}`;
-      }
-
       const response = await fetch(
         `${API_BASE_URL}/teller/accounts?token=${encodeURIComponent(lookupToken)}`,
-        { headers }
+        { credentials: "include" }
       );
       const data = await response.json();
 

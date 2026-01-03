@@ -15,6 +15,7 @@ import {
 import { CalendarOverviewResponse, CalendarItem, getCalendarOverview } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type ViewMode = "day" | "week" | "2weeks" | "month";
 
@@ -113,6 +114,7 @@ export default function CalendarPage() {
   const [workFilters, setWorkFilters] = useState<Record<number, boolean>>({});
   const [geo, setGeo] = useState<GeoPoint | null>(null);
   const [geoDenied, setGeoDenied] = useState(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const load = async () => {
@@ -180,6 +182,13 @@ export default function CalendarPage() {
       setAnchorDate((current) => startOfWeek(current, { weekStartsOn: 1 }));
     }
   }, [view]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    if (view === "week" || view === "2weeks") {
+      setView("day");
+    }
+  }, [isMobile, view]);
 
   useEffect(() => {
     if (!data) return;
@@ -420,7 +429,9 @@ export default function CalendarPage() {
             <p className="text-muted-foreground">Upcoming events and busy blocks</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {viewOptions.map((option) => (
+            {viewOptions
+              .filter((option) => (isMobile ? option.value === "day" || option.value === "month" : true))
+              .map((option) => (
               <Button
                 key={option.value}
                 size="sm"
@@ -553,7 +564,7 @@ export default function CalendarPage() {
         {!loading && !error && view !== "month" && (
           <div className="rounded-xl border border-border/60 bg-background/90 shadow-sm overflow-hidden">
             <div
-              className="grid border-b border-border/60 bg-white text-xs text-muted-foreground"
+              className="grid sticky top-0 z-20 border-b border-border/60 bg-white text-xs text-muted-foreground"
               style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(${viewDays.length}, minmax(0, 1fr))` }}
             >
               <div className="px-4 py-4">
@@ -591,16 +602,23 @@ export default function CalendarPage() {
                   minWidth: Math.max(920, viewDays.length * 220 + TIME_COL_WIDTH),
                 }}
               >
-                <div className="relative border-r border-border/60 bg-white" style={{ height: HOUR_HEIGHT * hours.length }}>
+                <div
+                  className="relative border-r border-border/60 bg-white sticky left-0 z-10"
+                  style={{ height: HOUR_HEIGHT * hours.length }}
+                >
                   {hours.map((hour) => {
                     const labelTime = addHours(startOfDay(anchorDate), hour);
+                    const isEven = (hour - visibleRange.startHour) % 2 === 0;
                     return (
                       <div
                         key={`hour-${hour}`}
                         className="absolute left-0 flex w-full items-start gap-2"
                         style={{ top: (hour - visibleRange.startHour) * HOUR_HEIGHT }}
                       >
-                        <div className="absolute left-0 right-0 top-0 border-t border-border/40" />
+                        <div
+                          className={cn("absolute left-0 right-0 top-0 border-t border-border/40", isEven && "bg-blue-50/30")}
+                          style={{ height: HOUR_HEIGHT }}
+                        />
                         <div className="w-full px-3 text-[11px] font-medium text-muted-foreground">
                           {format(labelTime, "h a")}
                         </div>
@@ -651,8 +669,11 @@ export default function CalendarPage() {
                       {hours.map((hour) => (
                         <div
                           key={`${dayKey}-line-${hour}`}
-                          className="absolute left-0 right-0 border-t border-border/40"
-                          style={{ top: (hour - visibleRange.startHour) * HOUR_HEIGHT }}
+                          className={cn(
+                            "absolute left-0 right-0 border-t border-border/40",
+                            (hour - visibleRange.startHour) % 2 === 0 && "bg-blue-50/30"
+                          )}
+                          style={{ top: (hour - visibleRange.startHour) * HOUR_HEIGHT, height: HOUR_HEIGHT }}
                         />
                       ))}
 
@@ -661,11 +682,14 @@ export default function CalendarPage() {
                     {isToday(day) &&
                       nowMinutes >= visibleRange.startHour * 60 &&
                       nowMinutes <= visibleRange.endHour * 60 && (
-                      <div className="absolute left-0 right-0" style={{ top: nowTop }}>
-                        <div className="absolute left-4 h-3 w-3 -translate-y-1/2 rounded-full bg-red-500" />
-                        <div className="absolute left-4 right-4 h-px -translate-y-1/2 bg-red-500/80" />
-                      </div>
-                    )}
+                        <div className="group absolute left-0 right-0" style={{ top: nowTop }}>
+                          <div className="absolute left-4 h-3 w-3 -translate-y-1/2 rounded-full bg-red-500" />
+                          <div className="absolute left-4 right-4 h-px -translate-y-1/2 bg-red-500/80" />
+                          <div className="absolute left-8 -translate-y-1/2 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-red-600 opacity-0 shadow-sm transition group-hover:opacity-100">
+                            {format(now, "h:mm a")}
+                          </div>
+                        </div>
+                      )}
 
                     {positioned.map(({ entry, startMin, endMin, columnIndex, totalColumns }) => {
                       const visibleStartMin = visibleRange.startHour * 60;
@@ -678,23 +702,36 @@ export default function CalendarPage() {
                       const columnWidth = 100 / totalColumns;
                       const left = `calc(${columnWidth * columnIndex}% + ${columnIndex * 6}px + 6px)`;
                       const width = `calc(${columnWidth}% - 12px)`;
+                      const durationMinutes = endMin - startMin;
                       const label = entry.userIds.map((id) => userMap.get(id)).filter(Boolean).join(" + ");
+                      const isShared = entry.userIds.length > 1;
+                      const isWork = entry.type === "busy" || entry.isWork;
+                      const accent =
+                        entry.type === "busy"
+                          ? "border-muted-foreground/30 bg-muted/50 text-muted-foreground"
+                          : isWork
+                            ? "border-amber-400/50 bg-amber-100/60 text-amber-900"
+                            : isShared
+                              ? "border-emerald-400/50 bg-emerald-100/60 text-emerald-900"
+                              : "border-blue-400/50 bg-blue-100/60 text-blue-900";
                       return (
                           <div
                             key={entry.key}
                             className={cn(
-                              "absolute overflow-hidden rounded-lg border px-2 py-1 text-[11px] shadow-sm",
-                              entry.type === "busy"
-                                ? "border-muted-foreground/20 bg-muted/50 text-muted-foreground"
-                                : "border-blue-400/40 bg-blue-500/10 text-foreground"
+                              "absolute overflow-hidden rounded-lg border px-2 py-1 text-[11px] shadow-sm"
                             )}
                             style={{ top, height, left, width }}
                           >
+                            <div className={cn("absolute inset-0 -z-10 rounded-lg border", accent)} />
                             <div className="truncate text-[11px] font-semibold">{entry.title}</div>
-                            <div className="truncate text-[10px] text-muted-foreground">
-                              {format(entry.startAt, "h:mm a")}–{format(entry.endAt, "h:mm a")}
-                            </div>
-                            {label && <div className="truncate text-[10px] text-muted-foreground">{label}</div>}
+                            {durationMinutes >= 30 && (
+                              <div className="truncate text-[10px] text-muted-foreground">
+                                {format(entry.startAt, "h:mm a")}–{format(entry.endAt, "h:mm a")}
+                              </div>
+                            )}
+                            {durationMinutes >= 60 && label && (
+                              <div className="truncate text-[10px] text-muted-foreground">{label}</div>
+                            )}
                           </div>
                         );
                       })}
@@ -702,6 +739,35 @@ export default function CalendarPage() {
                   );
                 })}
               </div>
+            </div>
+          </div>
+        )}
+
+        {!loading && !error && isMobile && view === "day" && (
+          <div className="rounded-xl border border-border/60 bg-white px-4 py-3 shadow-sm">
+            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              Agenda
+            </div>
+            <div className="mt-3 space-y-2">
+              {(entriesByDay.get(format(anchorDate, "yyyy-MM-dd")) || [])
+                .filter((item) => isSameDay(item.startAt, anchorDate))
+                .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
+                .map((item) => (
+                  <div
+                    key={`agenda-${item.key}`}
+                    className="flex items-start justify-between gap-3 rounded-lg border border-border/60 bg-background/80 px-3 py-2"
+                  >
+                    <div>
+                      <div className="text-sm font-semibold">{item.title}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {format(item.startAt, "h:mm a")} – {format(item.endAt, "h:mm a")}
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {item.userIds.map((id) => userMap.get(id)).filter(Boolean).join(" + ")}
+                    </div>
+                  </div>
+                ))}
             </div>
           </div>
         )}

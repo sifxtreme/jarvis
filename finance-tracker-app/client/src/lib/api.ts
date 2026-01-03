@@ -30,8 +30,6 @@ axiosInstance.interceptors.response.use(
   error => {
     if (error.response?.status === 401) {
       // If we get a 401, we know we're unauthenticated
-      // Clear the API key and update authentication state
-      localStorage.removeItem(GOOGLE_ID_TOKEN_KEY);
       useAuthStore.getState().setIsAuthenticated(false);
       useAuthStore.getState().setShowAuthModal(true);
     }
@@ -67,14 +65,12 @@ export const verifyAuthentication = async (): Promise<boolean> => {
 };
 
 // Function to set authentication
-export const setAuthentication = (token: string): void => {
-  localStorage.removeItem(GOOGLE_ID_TOKEN_KEY);
+export const setAuthentication = (): void => {
   useAuthStore.getState().setIsAuthenticated(true);
 };
 
 // Function to clear authentication
 export const clearAuthentication = (): void => {
-  localStorage.removeItem(GOOGLE_ID_TOKEN_KEY);
   useAuthStore.getState().setIsAuthenticated(false);
 };
 

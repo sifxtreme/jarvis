@@ -22,7 +22,7 @@ export function AuthModal({ isOpen, onAuthenticate }: AuthModalProps) {
     setError("");
     try {
       await createSession(token);
-      setAuthentication(token);
+      setAuthentication();
       onAuthenticate();
     } catch (err) {
       console.error("Authentication error:", err);
