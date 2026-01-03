@@ -8,10 +8,14 @@
 - Added user/work filters with popover UI and per-user color palette.
 - Fixed grid column alignment and busy-only filtering.
 - Set week to start on Sunday.
+- Added calendar chat panel (text-only) with iMessage-style flow + refresh on event creation.
+- Added keyboard shortcuts (D/W/M) and day header click to jump to day view.
+- Added calendar event deletion via popover (deletes in Google, marks cancelled locally).
 
 ## Calendar Sync
 - Fixed duplicate event inserts when calendars are shared across users.
 - Busy blocks pulled via FreeBusy API; shown in UI with reduced opacity.
+- Calendar sync now marks cancelled events instead of deleting.
 
 ## Auth
 - Added session verification endpoint and switched frontend auth checks to it.
@@ -19,3 +23,4 @@
 
 ## Docs
 - Added calendar future features doc (bulk actions + chat panel).
+- Added layout standards doc and linked docs in README.

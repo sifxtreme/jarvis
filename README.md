@@ -25,6 +25,7 @@ Personal finance tracker with automatic bank sync and spending insights.
 - **Google Auth** — Google Sign-In + session auth for the API. See docs/features/GOOGLE_AUTH.md.
 - **Calendar Sync** — Personal events + busy-only work calendars. See docs/features/CALENDAR_SYNC.md.
 - **Calendar UI** — New /calendar page with day/week/2-week/month views. See docs/features/CALENDAR_UI.md.
+- **Calendar Chat (Web)** — In-app chat to create events (text only). See docs/features/JARVIS_CHAT.md.
 
 ## Architecture
 
