@@ -650,12 +650,54 @@ export default function CalendarPage() {
               ))}
             </div>
 
+            <div className="border-b border-slate-200/70">
+              <div
+                className="grid text-xs text-slate-500"
+                style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(${viewDays.length}, minmax(0, 1fr))` }}
+              >
+                <div className="px-3 py-2 text-[11px] font-medium uppercase tracking-[0.2em] text-slate-400">
+                  All day
+                </div>
+                {viewDays.map((day) => {
+                  const dayKey = format(day, "yyyy-MM-dd");
+                  const items = allDayByDay.get(dayKey) || [];
+                  return (
+                    <div key={`allday-${dayKey}`} className="border-l border-slate-200/70 px-3 py-2">
+                      <div className="flex flex-col gap-1">
+                        {items.slice(0, 3).map((item) => {
+                          const primaryUserId = item.userIds[0];
+                          const primaryEmail = primaryUserId ? userEmailMap.get(primaryUserId) : undefined;
+                          const palette = (primaryEmail && USER_PALETTE[primaryEmail]) || DEFAULT_PALETTE;
+                          const paletteClass = item.isWork ? palette.work : palette.personal;
+                          const muted = item.type === "busy" ? "opacity-75" : "";
+                          return (
+                            <div
+                              key={`allday-${item.key}`}
+                              className={cn(
+                                "rounded-md border border-slate-200/70 px-2 py-1 text-[11px] font-semibold border-l-[3px] truncate",
+                                paletteClass,
+                                muted
+                              )}
+                            >
+                              {item.title}
+                            </div>
+                          );
+                        })}
+                        {items.length > 3 && (
+                          <div className="text-[10px] text-slate-400">+{items.length - 3} more</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="max-h-[70vh] overflow-auto">
               <div
                 className="relative grid"
                 style={{
                   gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(${viewDays.length}, minmax(0, 1fr))`,
-                  minWidth: Math.max(920, viewDays.length * 220 + TIME_COL_WIDTH),
                 }}
               >
                 <div
