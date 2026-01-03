@@ -13,13 +13,13 @@ import FilterControls from "@/components/FilterControls";
 import SheetFilterControls from "@/components/SheetFilterControls";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { FilterIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { FilterIcon, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useSearchParams } from 'react-router-dom'
 
 export default function TransactionsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams()
-  const [isStatsVisible, setIsStatsVisible] = useState(true);
+  const [isSidePanelOpen, setIsSidePanelOpen] = useState(true);
   const [quickAddTransaction, setQuickAddTransaction] = useState<Partial<Transaction> | null>(null);
 
   // Initialize filters from URL or defaults
@@ -83,37 +83,53 @@ export default function TransactionsPage() {
         <ResizablePanel defaultSize={70} minSize={50}>
           <div className="h-full flex flex-col">
             <div className="p-4 flex-shrink-0">
-              <div className="flex justify-between items-center mb-2">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <h1 className="text-2xl font-bold">Transactions</h1>
 
-                {/* Desktop inline filters */}
-                <div className="hidden md:block">
-                  <FilterControls
-                    onSearch={handleSearch}
-                    initialFilters={filters}
-                    className="w-auto flex-shrink-0 bg-transparent shadow-none p-0"
-                  />
-                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Desktop inline filters */}
+                  <div className="hidden md:block">
+                    <FilterControls
+                      onSearch={handleSearch}
+                      initialFilters={filters}
+                      className="w-auto flex-shrink-0 bg-transparent shadow-none p-0"
+                    />
+                  </div>
 
-                {/* Mobile sheet filters */}
-                <div className="md:hidden flex items-center gap-2">
-                  <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
-                    <SheetTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <FilterIcon className="h-4 w-4 mr-2" />
-                        Filters
-                      </Button>
-                    </SheetTrigger>
-                    <SheetContent side="right" className="w-[300px] sm:w-[400px]">
-                      <div className="h-full py-6">
-                        <SheetFilterControls
-                          onSearch={handleSearch}
-                          initialFilters={filters}
-                          className="w-full bg-transparent shadow-none"
-                        />
-                      </div>
-                    </SheetContent>
-                  </Sheet>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="hidden md:inline-flex"
+                    onClick={() => setIsSidePanelOpen((current) => !current)}
+                  >
+                    {isSidePanelOpen ? (
+                      <PanelRightClose className="h-4 w-4 mr-2" />
+                    ) : (
+                      <PanelRightOpen className="h-4 w-4 mr-2" />
+                    )}
+                    {isSidePanelOpen ? "Hide Panel" : "Show Panel"}
+                  </Button>
+
+                  {/* Mobile sheet filters */}
+                  <div className="md:hidden flex items-center gap-2">
+                    <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+                      <SheetTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <FilterIcon className="h-4 w-4 mr-2" />
+                          Filters
+                        </Button>
+                      </SheetTrigger>
+                      <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+                        <div className="h-full py-6">
+                          <SheetFilterControls
+                            onSearch={handleSearch}
+                            initialFilters={filters}
+                            className="w-full bg-transparent shadow-none"
+                          />
+                        </div>
+                      </SheetContent>
+                    </Sheet>
+                  </div>
                 </div>
               </div>
             </div>
@@ -159,25 +175,17 @@ export default function TransactionsPage() {
           </div>
         </ResizablePanel>
 
-        {!!filters?.year && !!filters?.month && (
+        {!!filters?.year && !!filters?.month && isSidePanelOpen && (
           <>
             <ResizeHandle
-              className="bg-border w-2 hover:bg-primary/10 transition-colors relative group cursor-pointer"
-              onClick={() => setIsStatsVisible(!isStatsVisible)}
+              className="bg-border w-2 hover:bg-primary/10 transition-colors relative cursor-col-resize"
             >
-              <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-1/2 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-                {!isStatsVisible ? (
-                  <ChevronLeft className="h-12 w-4" />
-                ) : (
-                  <ChevronRight className="h-12 w-4" />
-                )}
-              </div>
+              <div className="absolute inset-y-3 left-1/2 w-px -translate-x-1/2 bg-border/80" />
             </ResizeHandle>
             <ResizablePanel
               defaultSize={30}
               minSize={20}
-              className={`hidden md:block h-full overflow-hidden ${!isStatsVisible ? 'w-0 !min-w-0' : ''}`}
-              style={{ display: !isStatsVisible ? 'none' : undefined }}
+              className="hidden md:block h-full overflow-hidden"
             >
               <TransactionStats
                 transactions={transactions}

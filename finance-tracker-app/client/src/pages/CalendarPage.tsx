@@ -17,10 +17,17 @@ import {
 } from "date-fns";
 import { CalendarOverviewResponse, CalendarItem, getCalendarOverview } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import {
+  Panel as ResizablePanel,
+  PanelGroup as ResizablePanelGroup,
+  PanelResizeHandle as ResizeHandle,
+} from "react-resizable-panels";
+import { ChatPanel } from "@/components/ChatPanel";
 
 type ViewMode = "day" | "week" | "2weeks" | "month";
 
@@ -231,10 +238,18 @@ export default function CalendarPage() {
 
   useEffect(() => {
     if (!isMobile) return;
-    if (view === "week" || view === "2weeks") {
+    if (view !== "day") {
       setView("day");
     }
   }, [isMobile, view]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    const today = startOfDay(new Date());
+    if (!isSameDay(anchorDate, today)) {
+      setAnchorDate(today);
+    }
+  }, [anchorDate, isMobile]);
 
   useEffect(() => {
     const measure = () => {
@@ -558,8 +573,11 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="h-full overflow-auto p-4 md:p-6">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <div className="h-full">
+      <ResizablePanelGroup direction="horizontal" className="h-full">
+        <ResizablePanel defaultSize={70} minSize={50} className="min-w-0">
+          <div className="h-full overflow-auto p-4 md:p-6">
+            <div className="space-y-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-6">
             <h1 className="text-2xl font-bold">Calendar</h1>
@@ -653,7 +671,7 @@ export default function CalendarPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {viewOptions
-              .filter((option) => (isMobile ? option.value === "day" || option.value === "month" : true))
+              .filter((option) => (isMobile ? option.value === "day" : true))
               .map((option) => (
                 <Button
                   key={option.value}
@@ -686,7 +704,7 @@ export default function CalendarPage() {
           <div className="text-sm text-muted-foreground">No items in this window.</div>
         )}
 
-        {!loading && !error && view === "month" && (
+        {!loading && !error && !isMobile && view === "month" && (
           <div className="rounded-xl border border-border/60 bg-background/70 p-2 shadow-sm">
             <div className="grid grid-cols-7 gap-px rounded-lg bg-border/40 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label) => (
@@ -738,7 +756,7 @@ export default function CalendarPage() {
           </div>
         )}
 
-        {!loading && !error && view !== "month" && (
+        {!loading && !error && !isMobile && view !== "month" && (
           <div className="space-y-4">
             {weekSections.map((days, sectionIndex) => {
               const stickyHeader = view !== "2weeks";
@@ -1041,7 +1059,29 @@ export default function CalendarPage() {
             </div>
           </div>
         )}
-      </div>
+            </div>
+          </div>
+        </ResizablePanel>
+        {!isMobile && (
+          <>
+            <ResizeHandle className="bg-border w-2 hover:bg-primary/10 transition-colors relative cursor-col-resize">
+              <div className="absolute inset-y-3 left-1/2 w-px -translate-x-1/2 bg-border/80" />
+            </ResizeHandle>
+            <ResizablePanel defaultSize={30} minSize={20} className="hidden md:block h-full overflow-hidden">
+              <div className="h-full overflow-hidden p-4">
+                <Card className="flex h-full flex-col">
+                  <CardHeader className="py-2 px-3">
+                    <CardTitle className="text-lg">Jarvis Chat</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex-1 overflow-hidden p-0">
+                    <ChatPanel />
+                  </CardContent>
+                </Card>
+              </div>
+            </ResizablePanel>
+          </>
+        )}
+      </ResizablePanelGroup>
     </div>
   );
 }

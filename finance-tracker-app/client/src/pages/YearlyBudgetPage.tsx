@@ -501,14 +501,16 @@ export default function YearlyBudgetPage() {
 
   if (isLoading) {
     return (
-      <Card className="animate-pulse">
-        <CardHeader>
-          <CardTitle>Yearly Budget Comparison</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[600px] bg-gray-100 rounded-md"></div>
-        </CardContent>
-      </Card>
+      <div className="h-full overflow-auto p-4 md:p-6">
+        <Card className="animate-pulse">
+          <CardHeader>
+            <CardTitle>Yearly Budget Comparison</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[600px] bg-gray-100 rounded-md dark:bg-slate-800"></div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
@@ -518,20 +520,21 @@ export default function YearlyBudgetPage() {
   );
 
   return (
-    <div className="h-full overflow-auto">
-    <div className="container mx-auto py-6 font-mono">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Yearly Budget Comparison</h1>
-        <Select value={selectedYear.toString()} onValueChange={handleYearChange}>
-          <SelectTrigger className="w-32">
-            <SelectValue placeholder="Year" />
-          </SelectTrigger>
-          <SelectContent>
-            {YEARS.map(year => (
-              <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+    <div className="h-full overflow-auto p-4 md:p-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <h1 className="text-2xl font-bold">Yearly Budget Comparison</h1>
+        <div className="flex items-center gap-2">
+          <Select value={selectedYear.toString()} onValueChange={handleYearChange}>
+            <SelectTrigger className="w-[100px]">
+              <SelectValue placeholder="Year" />
+            </SelectTrigger>
+            <SelectContent>
+              {YEARS.map(year => (
+                <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Monthly Summary Card */}
@@ -563,26 +566,30 @@ export default function YearlyBudgetPage() {
               </TableHeader>
               <TableBody>
                 {monthlySummary.map((summary, index) => (
-                  <TableRow key={summary.month} className={`hover:bg-muted/80 transition-colors ${summary.isCurrentMonth ? 'bg-blue-50/50' : ''}`}>
+                  <TableRow key={summary.month} className={`hover:bg-muted/80 transition-colors ${summary.isCurrentMonth ? 'bg-blue-50/50 dark:bg-blue-950/40' : ''}`}>
                     <TableCell className="font-medium border border-border p-0">
-                      <div className={`px-3 py-2 text-sm font-mono ${summary.isCurrentMonth ? 'italic text-blue-700' : ''}`}>
+                      <div className={`px-3 py-2 text-sm font-mono ${summary.isCurrentMonth ? 'italic text-blue-700 dark:text-blue-300' : ''}`}>
                         {summary.label}
-                        {summary.isCurrentMonth && <span className="ml-2 text-xs text-blue-500">(In Progress)</span>}
+                        {summary.isCurrentMonth && <span className="ml-2 text-xs text-blue-500 dark:text-blue-300">(In Progress)</span>}
                       </div>
                     </TableCell>
                     <TableCell className="text-right font-mono border border-border p-0">
-                      <div className={`px-3 py-2 text-sm ${summary.isCurrentMonth ? 'italic text-blue-700' : ''}`}>{formatCurrency(summary.totalIncome)}</div>
+                      <div className={`px-3 py-2 text-sm ${summary.isCurrentMonth ? 'italic text-blue-700 dark:text-blue-300' : ''}`}>{formatCurrency(summary.totalIncome)}</div>
                     </TableCell>
                     <TableCell className="text-right font-mono border border-border p-0">
-                      <div className={`px-3 py-2 text-sm ${summary.isCurrentMonth ? 'italic text-blue-700' : ''}`}>{formatCurrency(summary.totalExpenses)}</div>
+                      <div className={`px-3 py-2 text-sm ${summary.isCurrentMonth ? 'italic text-blue-700 dark:text-blue-300' : ''}`}>{formatCurrency(summary.totalExpenses)}</div>
                     </TableCell>
                     <TableCell className="text-right font-mono border border-border p-0">
-                      <div className={`px-3 py-2 text-sm ${summary.isCurrentMonth ? 'italic bg-blue-50 text-blue-700' : summary.savings >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                      <div
+                        className={`px-3 py-2 text-sm ${summary.isCurrentMonth ? 'italic bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300' : summary.savings >= 0 ? 'bg-green-50 text-green-700 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-red-50 text-red-700 dark:bg-rose-950/40 dark:text-rose-300'}`}
+                      >
                         {formatCurrency(summary.savings)}
                       </div>
                     </TableCell>
                     <TableCell className="text-right font-mono border border-border p-0">
-                      <div className={`px-3 py-2 text-sm ${summary.isCurrentMonth ? 'italic bg-blue-50 text-blue-700' : summary.savingsRate >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                      <div
+                        className={`px-3 py-2 text-sm ${summary.isCurrentMonth ? 'italic bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300' : summary.savingsRate >= 0 ? 'bg-green-50 text-green-700 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-red-50 text-red-700 dark:bg-rose-950/40 dark:text-rose-300'}`}
+                      >
                         {summary.savingsRate.toFixed(1)}%
                       </div>
                     </TableCell>
@@ -608,7 +615,7 @@ export default function YearlyBudgetPage() {
                     {(() => {
                       const yearlySavings = monthlySummary.reduce((sum, month) => sum + month.savings, 0);
                       return (
-                        <div className={`px-3 py-2 text-sm ${yearlySavings >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                        <div className={`px-3 py-2 text-sm ${yearlySavings >= 0 ? 'bg-green-50 text-green-700 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-red-50 text-red-700 dark:bg-rose-950/40 dark:text-rose-300'}`}>
                           {formatCurrency(yearlySavings)}
                         </div>
                       );
@@ -621,7 +628,7 @@ export default function YearlyBudgetPage() {
                       const yearlySavingsRate = yearlyIncome > 0 ? (yearlySavings / yearlyIncome) * 100 : 0;
 
                       return (
-                        <div className={`px-3 py-2 text-sm ${yearlySavingsRate >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                        <div className={`px-3 py-2 text-sm ${yearlySavingsRate >= 0 ? 'bg-green-50 text-green-700 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-red-50 text-red-700 dark:bg-rose-950/40 dark:text-rose-300'}`}>
                           {yearlySavingsRate.toFixed(1)}%
                         </div>
                       );
@@ -705,11 +712,11 @@ export default function YearlyBudgetPage() {
                   {visibleMonths.map((month) => (
                     <TableHead
                       key={`${month.year}-${month.month}`}
-                      className={`text-right border border-border font-semibold w-[120px] min-w-[120px] p-2 ${month.isCurrentMonth ? 'bg-blue-100' : 'bg-muted'}`}
+                      className={`text-right border border-border font-semibold w-[120px] min-w-[120px] p-2 ${month.isCurrentMonth ? 'bg-blue-100 dark:bg-blue-950/60' : 'bg-muted'}`}
                     >
-                      <div className={`px-2 py-1 text-sm font-mono ${month.isCurrentMonth ? 'italic text-blue-700' : ''}`}>
+                      <div className={`px-2 py-1 text-sm font-mono ${month.isCurrentMonth ? 'italic text-blue-700 dark:text-blue-300' : ''}`}>
                         {month.label}
-                        {month.isCurrentMonth && <span className="block text-xs text-blue-500">(In Progress)</span>}
+                        {month.isCurrentMonth && <span className="block text-xs text-blue-500 dark:text-blue-300">(In Progress)</span>}
                       </div>
                     </TableHead>
                   ))}
@@ -777,7 +784,7 @@ export default function YearlyBudgetPage() {
                         <TableCell className="text-right font-mono border border-border p-0">
                           <Popover>
                             <PopoverTrigger asChild>
-                              <div className={`px-2 py-1 text-sm cursor-pointer ${avgVariance >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                              <div className={`px-2 py-1 text-sm cursor-pointer ${avgVariance >= 0 ? 'bg-green-50 text-green-700 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-red-50 text-red-700 dark:bg-rose-950/40 dark:text-rose-300'
                                 }`}>
                                 {(() => {
                                   // Calculate percentage of budget
@@ -868,7 +875,7 @@ export default function YearlyBudgetPage() {
                             <Popover>
                               <PopoverTrigger asChild>
                                 <div
-                                  className={`px-2 py-1 text-sm cursor-pointer ${isPositive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                                  className={`px-2 py-1 text-sm cursor-pointer ${isPositive ? 'bg-green-50 text-green-700 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-red-50 text-red-700 dark:bg-rose-950/40 dark:text-rose-300'
                                     }`}
                                 >
                                   {displayValue}
@@ -894,7 +901,6 @@ export default function YearlyBudgetPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
     </div>
   );
 }
