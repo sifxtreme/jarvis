@@ -70,7 +70,7 @@ class SyncCalendarEvents
                  .where("start_at < ? OR start_at > ?", time_min, time_max)
                  .delete_all
 
-    existing = CalendarEvent.where(user_id: connection.user_id, calendar_id: connection.calendar_id)
+    existing = CalendarEvent.where(user_id: connection.user_id)
                             .index_by(&:event_id)
 
     seen_ids = []
@@ -94,7 +94,7 @@ class SyncCalendarEvents
       }
 
       if existing_event = existing[event.id]
-        existing_event.update(attrs)
+        existing_event.update(attrs.merge(calendar_id: connection.calendar_id))
       else
         CalendarEvent.create!(
           attrs.merge(
