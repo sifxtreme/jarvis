@@ -683,19 +683,18 @@ export default function TrendsPage() {
     });
   }
   const allMerchants = filteredMerchants.slice(0, categoryCount);
-  const merchantVisibleMax = useMemo(() => {
-    if (!merchantChartData.length) return 0;
-    return Math.max(...merchantChartData.map(d => {
-      let max = 0;
-      allMerchants.forEach(merch => {
-        if (!hiddenMerchants.has(merch.merchant)) {
-          const val = (d as Record<string, number | string | null>)[merch.merchant] as number || 0;
-          if (val > max) max = val;
-        }
-      });
-      return max;
-    }));
-  }, [merchantChartData, allMerchants, hiddenMerchants]);
+  const merchantVisibleMax = merchantChartData.length
+    ? Math.max(...merchantChartData.map(d => {
+        let max = 0;
+        allMerchants.forEach(merch => {
+          if (!hiddenMerchants.has(merch.merchant)) {
+            const val = (d as Record<string, number | string | null>)[merch.merchant] as number || 0;
+            if (val > max) max = val;
+          }
+        });
+        return max;
+      }))
+    : 0;
   const merchantTrendMax = merchantTrendSeries.length > 0
     ? Math.max(...merchantTrendSeries.map(d => d.total))
     : 0;
