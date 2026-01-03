@@ -325,7 +325,7 @@ export default function TrendsPage() {
 
   const formatAxisCurrency = (value: number, max: number) => {
     if (max < 1000) {
-      return `$${value.toFixed(1)}`;
+      return `$${Math.round(value).toLocaleString()}`;
     }
     if (max < 1_000_000) {
       const short = (value / 1000).toFixed(1);
