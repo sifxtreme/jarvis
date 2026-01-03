@@ -22,11 +22,6 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import {
-  Panel as ResizablePanel,
-  PanelGroup as ResizablePanelGroup,
-  PanelResizeHandle as ResizeHandle,
-} from "react-resizable-panels";
 import { ChatPanel } from "@/components/ChatPanel";
 import { StateCard } from "@/components/StateCard";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
@@ -176,6 +171,9 @@ export default function CalendarPage() {
   const pendingDayRef = useRef<Date | null>(null);
   const [deletingEventId, setDeletingEventId] = useState<number | null>(null);
   const [isChatPanelOpen, setIsChatPanelOpen] = useState(true);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [rightPanelWidth, setRightPanelWidth] = useState(320);
+  const resizingRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -634,8 +632,8 @@ export default function CalendarPage() {
 
   return (
     <div className="h-full">
-      <ResizablePanelGroup direction="horizontal" className="h-full">
-        <ResizablePanel defaultSize={70} minSize={50} className="min-w-0">
+      <div className="h-full flex min-h-0" ref={containerRef}>
+        <div className="min-w-0 flex-1">
           <div className="h-full overflow-auto p-4 md:p-6">
             <div className="space-y-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -1199,10 +1197,31 @@ export default function CalendarPage() {
         )}
             </div>
           </div>
-        </ResizablePanel>
+        </div>
         {!isMobile && (
           <>
-            <ResizeHandle className="bg-border w-2 hover:bg-primary/10 transition-colors relative cursor-col-resize">
+            <div
+              className="relative hidden md:block w-2 bg-border hover:bg-primary/10 transition-colors cursor-col-resize"
+              onPointerDown={(event) => {
+                if (!isChatPanelOpen) return;
+                resizingRef.current = { startX: event.clientX, startWidth: rightPanelWidth };
+                const handleMove = (moveEvent: PointerEvent) => {
+                  if (!resizingRef.current) return;
+                  const delta = moveEvent.clientX - resizingRef.current.startX;
+                  const next = resizingRef.current.startWidth - delta;
+                  const containerWidth = containerRef.current?.clientWidth || 0;
+                  const maxWidth = Math.max(200, containerWidth - 240);
+                  setRightPanelWidth(Math.min(Math.max(0, next), maxWidth));
+                };
+                const handleUp = () => {
+                  resizingRef.current = null;
+                  window.removeEventListener("pointermove", handleMove);
+                  window.removeEventListener("pointerup", handleUp);
+                };
+                window.addEventListener("pointermove", handleMove);
+                window.addEventListener("pointerup", handleUp);
+              }}
+            >
               <div className="absolute inset-y-3 left-1/2 w-px -translate-x-1/2 bg-border/80" />
               <button
                 type="button"
@@ -1216,12 +1235,10 @@ export default function CalendarPage() {
                   <PanelRightOpen className="h-4 w-4 text-muted-foreground" />
                 )}
               </button>
-            </ResizeHandle>
-            <ResizablePanel
-              defaultSize={30}
-              minSize={isChatPanelOpen ? 20 : 0}
-              className={cn("hidden md:block h-full overflow-hidden", !isChatPanelOpen && "w-0 !min-w-0 !max-w-0")}
-              style={{ flexBasis: isChatPanelOpen ? undefined : "0px" }}
+            </div>
+            <div
+              className={cn("hidden md:block h-full overflow-hidden", !isChatPanelOpen && "w-0")}
+              style={{ width: isChatPanelOpen ? `${rightPanelWidth}px` : "0px" }}
             >
               <div className="h-full overflow-hidden p-4">
                 <Card className="flex h-full flex-col">
@@ -1232,10 +1249,10 @@ export default function CalendarPage() {
                   </CardContent>
                 </Card>
               </div>
-            </ResizablePanel>
+            </div>
           </>
         )}
-      </ResizablePanelGroup>
+      </div>
     </div>
   );
 }
