@@ -115,6 +115,7 @@ export type CalendarItem = {
   calendar_summary?: string | null;
   user_id: number;
   busy_only: boolean;
+  is_recurring?: boolean;
 };
 
 export type CalendarOverviewResponse = {

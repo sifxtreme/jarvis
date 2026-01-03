@@ -196,7 +196,8 @@ class CalendarController < ApplicationController
       calendar_id: event.calendar_id,
       calendar_summary: connection&.summary,
       user_id: event.user_id,
-      busy_only: false
+      busy_only: false,
+      is_recurring: raw['recurringEventId'].present? || raw['recurrence'].present? || raw['originalStartTime'].present?
     }
   end
 

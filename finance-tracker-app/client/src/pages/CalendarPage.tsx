@@ -24,7 +24,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ChatPanel } from "@/components/ChatPanel";
 import { StateCard } from "@/components/StateCard";
-import { PanelRightClose, PanelRightOpen } from "lucide-react";
+import { PanelRightClose, PanelRightOpen, Repeat } from "lucide-react";
 
 type ViewMode = "day" | "week" | "2weeks" | "month";
 
@@ -33,6 +33,7 @@ type CalendarEntry = {
   key: string;
   type: "event" | "busy";
   title: string;
+  isRecurring: boolean;
   startAt: Date;
   endAt: Date;
   description?: string | null;
@@ -91,6 +92,28 @@ const DEFAULT_PALETTE = {
   blockWork: "border-l-slate-300 bg-slate-50/70 text-slate-900 dark:bg-slate-800/70 dark:text-slate-100",
   dotPersonal: "bg-slate-300",
   dotWork: "bg-slate-300",
+};
+const USER_PALETTE_COLORS: Record<string, { personal: { border: string; bg: string }; work: { border: string; bg: string } }> = {
+  "asif.h.ahmed@gmail.com": {
+    personal: { border: "#c084fc", bg: "rgba(192, 132, 252, 0.2)" },
+    work: { border: "#38bdf8", bg: "rgba(56, 189, 248, 0.2)" },
+  },
+  "hsayyeda@gmail.com": {
+    personal: { border: "#fbbf24", bg: "rgba(251, 191, 36, 0.2)" },
+    work: { border: "#34d399", bg: "rgba(52, 211, 153, 0.2)" },
+  },
+  "asif@sevensevensix.com": {
+    personal: { border: "#38bdf8", bg: "rgba(56, 189, 248, 0.2)" },
+    work: { border: "#38bdf8", bg: "rgba(56, 189, 248, 0.2)" },
+  },
+  "hafsa.sayyeda@goodrx.com": {
+    personal: { border: "#34d399", bg: "rgba(52, 211, 153, 0.2)" },
+    work: { border: "#34d399", bg: "rgba(52, 211, 153, 0.2)" },
+  },
+};
+const DEFAULT_PALETTE_COLORS = {
+  personal: { border: "#cbd5e1", bg: "rgba(203, 213, 225, 0.2)" },
+  work: { border: "#cbd5e1", bg: "rgba(203, 213, 225, 0.2)" },
 };
 
 type GeoPoint = { lat: number; lng: number };
@@ -348,6 +371,34 @@ export default function CalendarPage() {
     return map;
   }, [data]);
 
+  const getPaletteColors = (email: string | undefined, isWork: boolean) => {
+    const palette = (email && USER_PALETTE_COLORS[email]) || DEFAULT_PALETTE_COLORS;
+    return isWork ? palette.work : palette.personal;
+  };
+
+  const getEntryPalette = (entry: CalendarEntry) => {
+    const emails = entry.isWork
+      ? [entry.calendarId]
+      : entry.userIds.map((id) => userEmailMap.get(id)).filter((email): email is string => Boolean(email));
+    const uniqueEmails = Array.from(new Set(emails));
+    if (uniqueEmails.length <= 1) {
+      const primaryEmail = uniqueEmails[0];
+      const palette = (primaryEmail && USER_PALETTE[primaryEmail]) || DEFAULT_PALETTE;
+      return { className: entry.isWork ? palette.blockWork : palette.blockPersonal } as const;
+    }
+    const [firstEmail, secondEmail] = uniqueEmails;
+    const first = getPaletteColors(firstEmail, entry.isWork);
+    const second = getPaletteColors(secondEmail, entry.isWork);
+    return {
+      className: "text-slate-900 dark:text-slate-100",
+      style: {
+        borderLeftColor: first.border,
+        backgroundColor: first.bg,
+        backgroundImage: `repeating-linear-gradient(135deg, ${first.bg} 0px, ${first.bg} 10px, ${second.bg} 10px, ${second.bg} 20px)`,
+      },
+    } as const;
+  };
+
   const entries = useMemo(() => {
     if (!data) return [];
     const eventMap = new Map<string, CalendarEntry>();
@@ -370,6 +421,7 @@ export default function CalendarPage() {
             key,
             type: "event",
             title: item.title || "Untitled event",
+            isRecurring: Boolean(item.is_recurring),
             startAt,
             endAt,
             description: item.description,
@@ -389,6 +441,7 @@ export default function CalendarPage() {
         key: busyKey,
         type: "busy",
         title: "Busy",
+        isRecurring: false,
         startAt,
         endAt,
         description: null,
@@ -920,23 +973,17 @@ export default function CalendarPage() {
                           <div key={`allday-${dayKey}`} className="border-l border-slate-200/70 px-3 py-2 dark:border-slate-700/70">
                             <div className="flex flex-col gap-1">
                               {items.slice(0, 3).map((item) => {
-                                const primaryUserId = item.userIds[0];
-                                const primaryEmail = item.isWork
-                                  ? item.calendarId
-                                  : primaryUserId
-                                    ? userEmailMap.get(primaryUserId)
-                                    : undefined;
-                                const palette = (primaryEmail && USER_PALETTE[primaryEmail]) || DEFAULT_PALETTE;
-                                const paletteClass = item.isWork ? palette.blockWork : palette.blockPersonal;
+                                const palette = getEntryPalette(item);
                                 const muted = item.type === "busy" ? "opacity-75" : "";
                                 return (
                                   <div
                                     key={`allday-${item.key}`}
                                     className={cn(
                                       "rounded-md border border-slate-200/70 px-2 py-1 text-[11px] font-semibold border-l-[3px] truncate dark:border-slate-700/70",
-                                      paletteClass,
+                                      palette.className,
                                       muted
                                     )}
+                                    style={palette.style}
                                   >
                                     {item.title}
                                   </div>
@@ -1067,14 +1114,7 @@ export default function CalendarPage() {
                               const left = `calc(${columnWidth * columnIndex}% + ${columnIndex * 6}px + 6px)`;
                               const width = `calc(${columnWidth}% - 12px)`;
                               const durationMinutes = endMin - startMin;
-                              const primaryUserId = entry.userIds[0];
-                              const primaryEmail = entry.isWork
-                                ? entry.calendarId
-                                : primaryUserId
-                                  ? userEmailMap.get(primaryUserId)
-                                  : undefined;
-                              const palette = (primaryEmail && USER_PALETTE[primaryEmail]) || DEFAULT_PALETTE;
-                              const paletteClass = entry.isWork ? palette.blockWork : palette.blockPersonal;
+                              const palette = getEntryPalette(entry);
                               const muted = entry.type === "busy" ? "opacity-75" : "";
                               const label = entry.userIds.map((id) => userMap.get(id)).filter(Boolean).join(" + ");
                               return (
@@ -1083,10 +1123,10 @@ export default function CalendarPage() {
                                     <div
                                       className={cn(
                                         "absolute overflow-hidden rounded-md border border-slate-200/70 px-2 py-1 text-[11px] shadow-sm border-l-[3px] dark:border-slate-700/70",
-                                        paletteClass,
+                                        palette.className,
                                         muted
                                       )}
-                                      style={{ top, height, left, width }}
+                                      style={{ top, height, left, width, ...palette.style }}
                                     >
                                       <div className="truncate text-[11px] font-semibold">{entry.title}</div>
                                       {durationMinutes >= 30 && (
@@ -1101,7 +1141,12 @@ export default function CalendarPage() {
                                   </HoverCardTrigger>
                                   <HoverCardContent align="start" className="w-72 dark:bg-slate-950 dark:border-slate-700">
                                     <div className="space-y-2 text-sm">
-                                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{entry.title}</div>
+                                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                        {entry.title}
+                                        {entry.isRecurring && (
+                                          <Repeat className="h-3.5 w-3.5 text-muted-foreground" />
+                                        )}
+                                      </div>
                                       <div className="text-xs text-slate-500 dark:text-slate-400">
                                         {format(entry.startAt, "EEE, MMM d • h:mm a")} – {format(entry.endAt, "h:mm a")}
                                       </div>
