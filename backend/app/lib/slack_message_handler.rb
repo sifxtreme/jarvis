@@ -91,7 +91,16 @@ class SlackMessageHandler
     return render_extraction_result(event) if event['error']
 
     user = resolve_user(message)
-    return "You're not authorized to create events." unless user
+    unless user
+      return [
+        "I couldn't match your Slack user to a Jarvis account.",
+        "Debug:",
+        "slack_user_id: #{@payload['user']}",
+        "slack_email: #{slack_user_email || 'nil'}",
+        "stored_sender_email: #{message.sender_email || 'nil'}",
+        "active_users: #{User.where(active: true).pluck(:email).join(', ')}"
+      ].join("\n")
+    end
     return "Please connect your calendar at https://finances.sifxtre.me first." if user.google_refresh_token.to_s.empty?
 
     calendar = GoogleCalendarClient.new(user)
