@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { toast } from '@/hooks/use-toast';
 import { create } from 'zustand';
 
 // Define constants first
@@ -32,6 +33,22 @@ axiosInstance.interceptors.response.use(
       // If we get a 401, we know we're unauthenticated
       useAuthStore.getState().setIsAuthenticated(false);
       useAuthStore.getState().setShowAuthModal(true);
+    } else {
+      const status = error.response?.status;
+      const baseMessage =
+        error.response?.data?.msg ||
+        error.response?.data?.message ||
+        error.message ||
+        'Request failed';
+      const debug = error.response?.data?.debug
+        ? ` (event_id=${error.response.data.debug.event_id}, calendar_id=${error.response.data.debug.calendar_id}, owner_id=${error.response.data.debug.owner_id})`
+        : '';
+      const message = `${baseMessage}${debug}`;
+      toast({
+        title: status ? `API error (${status})` : 'API error',
+        description: message,
+        variant: 'destructive',
+      });
     }
     return Promise.reject(error);
   }

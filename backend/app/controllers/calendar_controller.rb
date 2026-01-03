@@ -76,13 +76,34 @@ class CalendarController < ApplicationController
     event = CalendarEvent.find_by(id: params[:id])
     return render json: { msg: 'Event not found' }, status: :not_found unless event
 
-    client = GoogleCalendarClient.new(user)
+    owner = event.user || user
+    if owner.google_refresh_token.to_s.empty?
+      Rails.logger.warn("[CalendarDelete] Missing refresh token for owner_id=#{owner.id} event_id=#{event.id} calendar_id=#{event.calendar_id}")
+      return render json: {
+        msg: 'Calendar not connected',
+        debug: {
+          event_id: event.id,
+          calendar_id: event.calendar_id,
+          owner_id: owner.id
+        }
+      }, status: :unprocessable_entity
+    end
+
+    client = GoogleCalendarClient.new(owner)
     client.delete_event(calendar_id: event.calendar_id, event_id: event.event_id)
     event.update(status: 'cancelled')
 
     render json: { success: true }
   rescue GoogleCalendarClient::CalendarError => e
-    render json: { msg: e.message }, status: :bad_gateway
+    Rails.logger.error("[CalendarDelete] Failed owner_id=#{owner&.id} event_id=#{event&.id} calendar_id=#{event&.calendar_id} error=#{e.message}")
+    render json: {
+      msg: e.message,
+      debug: {
+        event_id: event&.id,
+        calendar_id: event&.calendar_id,
+        owner_id: owner&.id
+      }
+    }, status: :bad_gateway
   end
 
   private
