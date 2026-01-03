@@ -378,6 +378,7 @@ export interface TrendsData {
   budget_comparison: BudgetComparison[];
   monthly_by_category: MonthlyCategoryData[];
   monthly_by_merchant: MonthlyMerchantData[];
+  merchant_trend?: MerchantTrendsData | null;
 }
 
 export interface MerchantTrendPoint {
@@ -450,14 +451,22 @@ export const getTrends = async (filters: TrendsFilters = {}): Promise<TrendsData
 export const getMerchantTrends = async (filters: MerchantTrendsFilters): Promise<MerchantTrendsData> => {
   const params = new URLSearchParams();
 
-  if (filters.query) params.append('query', filters.query);
+  if (filters.query) params.append('merchant', filters.query);
   if (filters.exact !== undefined) params.append('exact', filters.exact.toString());
   if (filters.start_month) params.append('start_month', filters.start_month);
   if (filters.end_month) params.append('end_month', filters.end_month);
 
   try {
-    const response = await axiosInstance.get<MerchantTrendsData>('/financial_transactions/merchant_trends', { params });
-    return response.data;
+    const response = await axiosInstance.get<TrendsData>('/financial_transactions/trends', { params });
+    return (
+      response.data.merchant_trend || {
+        merchant: filters.query || null,
+        months: [],
+        start_month: filters.start_month || '',
+        end_month: filters.end_month || '',
+        total_spent: 0,
+      }
+    );
   } catch (error: any) {
     console.error('[API] Merchant trends error details:', error);
     const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch merchant trends';
@@ -473,9 +482,10 @@ export const getMerchantSuggestions = async (filters: MerchantSuggestionsFilters
   if (filters.start_month) params.append('start_month', filters.start_month);
   if (filters.end_month) params.append('end_month', filters.end_month);
   if (filters.limit !== undefined) params.append('limit', filters.limit.toString());
+  params.append('aggregate', 'merchant_suggestions');
 
   try {
-    const response = await axiosInstance.get<MerchantSuggestionsData>('/financial_transactions/merchant_suggestions', { params });
+    const response = await axiosInstance.get<MerchantSuggestionsData>('/financial_transactions', { params });
     return response.data;
   } catch (error: any) {
     console.error('[API] Merchant suggestions error details:', error);
@@ -491,12 +501,12 @@ export const getMerchantTransactions = async (filters: MerchantTransactionsFilte
   if (filters.exact !== undefined) params.append('exact', filters.exact.toString());
   if (filters.start_month) params.append('start_month', filters.start_month);
   if (filters.end_month) params.append('end_month', filters.end_month);
+  params.append('exclude_income', 'true');
+  params.append('positive_only', 'true');
+  params.append('show_hidden', 'false');
 
   try {
-    const response = await axiosInstance.get<APIResponse<Transaction>>(
-      '/financial_transactions/merchant_transactions',
-      { params }
-    );
+    const response = await axiosInstance.get<APIResponse<Transaction>>('/financial_transactions', { params });
 
     const { results, error } = response.data || {};
     if (error) throw new Error(error);

@@ -4,27 +4,101 @@ class FinancialTransactionsController < ApplicationController
     year = params[:year]
     month = params[:month]
     query = params[:query]
+    exact = params[:exact] == 'true'
+    start_month = params[:start_month].presence
+    end_month = params[:end_month].presence
+    aggregate = params[:aggregate]
     show_hidden = params[:show_hidden]
     show_needs_review = params[:show_needs_review]
+    exclude_income = params[:exclude_income] == 'true'
+    positive_only = params[:positive_only] == 'true'
     columns = [:id, :plaid_id, :plaid_name, :merchant_name, :category, :source, :amount, :transacted_at, :created_at,
                :updated_at, :hidden, :reviewed, :amortized_months]
     columns << :raw_data if params[:include_raw_data] == 'true'
     db_query = FinancialTransaction.select(columns).all
-    if year && year != 'null'
-      db_query = db_query.where('extract(year from transacted_at) = ?', year)
+
+    if start_month.present? && end_month.present?
+      start_date = Date.parse("#{start_month}-01")
+      end_date = Date.parse("#{end_month}-01").end_of_month
+      if start_date > end_date
+        start_date, end_date = end_date, start_date
+      end
+      db_query = db_query.where('transacted_at >= ? AND transacted_at <= ?', start_date, end_date)
+    else
+      if year && year != 'null'
+        db_query = db_query.where('extract(year from transacted_at) = ?', year)
+      end
+      if month && month != 'null'
+        current_year_month = "#{year}-#{month.rjust(2, '0')}"
+        db_query = db_query.where('extract(month from transacted_at) = ? OR ? = ANY(amortized_months)', month, current_year_month)
+      end
     end
-    if month && month != 'null'
-      current_year_month = "#{year}-#{month.rjust(2, '0')}"
-      db_query = db_query.where('extract(month from transacted_at) = ? OR ? = ANY(amortized_months)', month, current_year_month)
+
+    if query.present?
+      if exact
+        lowered = query.downcase
+        db_query = db_query.where(
+          'lower(category) = ? OR lower(merchant_name) = ? OR lower(plaid_name) = ? OR lower(source) = ?',
+          lowered, lowered, lowered, lowered
+        )
+      else
+        db_query = db_query.where(
+          'category ilike ? or merchant_name ilike ? or plaid_name ilike ? or source ilike ?',
+          "%#{query}%", "%#{query}%", "%#{query}%", "%#{query}%"
+        )
+      end
     end
-    db_query = db_query.where('category ilike ? or merchant_name ilike ? or plaid_name ilike ? or source ilike ?', "%#{query}%", "%#{query}%", "%#{query}%", "%#{query}%") if query
+
+    db_query = db_query.where("category NOT ILIKE '%income%' OR category IS NULL") if exclude_income
+    db_query = db_query.where('amount > 0') if positive_only
     db_query = db_query.where('hidden is true') if show_hidden == 'true'
     db_query = db_query.where('hidden is false') if show_hidden == 'false'
     db_query = db_query.where('reviewed is false') if show_needs_review == 'true'
+
+    if aggregate == 'merchant_suggestions'
+      start_month ||= (Date.current.beginning_of_month << 11).strftime('%Y-%m')
+      end_month ||= Date.current.beginning_of_month.strftime('%Y-%m')
+      start_date = Date.parse("#{start_month}-01")
+      end_date = Date.parse("#{end_month}-01").end_of_month
+      if start_date > end_date
+        start_date, end_date = end_date, start_date
+      end
+
+      suggestion_scope = FinancialTransaction.where(hidden: false)
+        .where('transacted_at >= ? AND transacted_at <= ?', start_date, end_date)
+        .where("category NOT ILIKE '%income%' OR category IS NULL")
+        .where('amount > 0')
+
+      if query.present?
+        if exact
+          lowered = query.downcase
+          suggestion_scope = suggestion_scope.where('lower(plaid_name) = ? OR lower(merchant_name) = ?', lowered, lowered)
+        else
+          like = "%#{query}%"
+          suggestion_scope = suggestion_scope.where('plaid_name ILIKE ? OR merchant_name ILIKE ?', like, like)
+        end
+      end
+
+      merchant_expr = "COALESCE(NULLIF(plaid_name, ''), NULLIF(merchant_name, ''))"
+      results = suggestion_scope
+        .where('plaid_name IS NOT NULL OR merchant_name IS NOT NULL')
+        .select("#{merchant_expr} as merchant, SUM(amount) as total")
+        .group(merchant_expr)
+        .order('total DESC')
+        .limit((params[:limit] || 8).to_i.clamp(1, 25))
+
+      render json: {
+        suggestions: results.map { |row| { merchant: row.merchant, total: row.total.to_f.round(2) } },
+        start_month: start_month,
+        end_month: end_month
+      }
+      return
+    end
+
     db_query = db_query.order('transacted_at DESC, id DESC')
 
     transactions = db_query.map
-    if month
+    if month && !(start_month.present? && end_month.present?)
       current_year_month = "#{year}-#{month.rjust(2, '0')}"
       transactions.each do |transaction|
         if transaction.amortized_months.present? && transaction.amortized_months.include?(current_year_month)
@@ -78,6 +152,10 @@ class FinancialTransactionsController < ApplicationController
   def trends
     year = (params[:year] || Date.current.year).to_i
     category_filter = params[:category]
+    merchant_query = params[:merchant].presence || params[:query].presence
+    exact = params[:exact] == 'true'
+    start_month = params[:start_month].presence
+    end_month = params[:end_month].presence
     year_prefix = "#{year}-"
 
     # Fetch ALL transactions that could affect this year:
@@ -95,6 +173,8 @@ class FinancialTransactionsController < ApplicationController
     processed_expenses = process_with_amortization(expense_scope.to_a, year)
     processed_all = process_with_amortization(all_transactions.to_a, year)
 
+    merchant_trend = merchant_query.present? ? merchant_trend_series(merchant_query, exact, start_month, end_month) : nil
+
     render json: {
       period: period_summary_processed(processed_all, year),
       monthly_totals: monthly_breakdown_processed(processed_expenses),
@@ -102,131 +182,11 @@ class FinancialTransactionsController < ApplicationController
       by_merchant: merchant_breakdown(expense_scope),
       budget_comparison: budget_comparison_processed(processed_expenses, year),
       monthly_by_category: monthly_by_category_processed(processed_expenses),
-      monthly_by_merchant: monthly_by_merchant_processed(processed_expenses)
+      monthly_by_merchant: monthly_by_merchant_processed(processed_expenses),
+      merchant_trend: merchant_trend
     }
   end
 
-  def merchant_trends
-    query = params[:query].to_s.strip
-    exact = params[:exact] == 'true'
-    start_month = params[:start_month].presence
-    end_month = params[:end_month].presence
-
-    if start_month.blank? || end_month.blank?
-      default_end = Date.current.beginning_of_month
-      default_start = (default_end << 11)
-      start_month = default_start.strftime('%Y-%m')
-      end_month = default_end.strftime('%Y-%m')
-    end
-
-    start_date = Date.parse("#{start_month}-01")
-    end_date = Date.parse("#{end_month}-01").end_of_month
-    if start_date > end_date
-      start_date, end_date = end_date, start_date
-      start_month = start_date.strftime('%Y-%m')
-      end_month = end_date.strftime('%Y-%m')
-    end
-
-    if query.blank?
-      render json: { merchant: nil, months: [], start_month: start_month, end_month: end_month, total_spent: 0 }
-      return
-    end
-
-    scope = FinancialTransaction.where(hidden: false)
-    scope = scope.where("transacted_at >= ? AND transacted_at <= ?", start_date, end_date)
-
-    if exact
-      lowered = query.downcase
-      scope = scope.where("lower(plaid_name) = ? OR lower(merchant_name) = ?", lowered, lowered)
-    else
-      like = "%#{query}%"
-      scope = scope.where("plaid_name ILIKE ? OR merchant_name ILIKE ?", like, like)
-    end
-
-    scope = scope.where("category NOT ILIKE '%income%' OR category IS NULL")
-    scope = scope.where('amount > 0')
-
-    months = scope
-      .group("to_char(transacted_at, 'YYYY-MM')")
-      .select("to_char(transacted_at, 'YYYY-MM') as month", "SUM(amount) as total")
-      .order('month')
-      .map { |row| { month: row.month, total: row.total.to_f.round(2) } }
-
-    sample = scope
-      .where.not(plaid_name: [nil, ''])
-      .select(:plaid_name, :merchant_name)
-      .order('transacted_at DESC, id DESC')
-      .first
-    if sample.nil?
-      sample = scope
-        .where.not(merchant_name: [nil, ''])
-        .select(:plaid_name, :merchant_name)
-        .order('transacted_at DESC, id DESC')
-        .first
-    end
-    merchant_name = sample&.plaid_name.presence || sample&.merchant_name.presence
-    total_spent = months.sum { |m| m[:total] }.round(2)
-
-    render json: {
-      merchant: merchant_name || query,
-      months: months,
-      start_month: start_month,
-      end_month: end_month,
-      total_spent: total_spent
-    }
-  end
-
-  def merchant_suggestions
-    query = params[:query].to_s.strip
-    exact = params[:exact] == 'true'
-    limit = (params[:limit] || 8).to_i.clamp(1, 25)
-    start_month = params[:start_month].presence
-    end_month = params[:end_month].presence
-
-    if start_month.blank? || end_month.blank?
-      default_end = Date.current.beginning_of_month
-      default_start = (default_end << 11)
-      start_month = default_start.strftime('%Y-%m')
-      end_month = default_end.strftime('%Y-%m')
-    end
-
-    start_date = Date.parse("#{start_month}-01")
-    end_date = Date.parse("#{end_month}-01").end_of_month
-    if start_date > end_date
-      start_date, end_date = end_date, start_date
-      start_month = start_date.strftime('%Y-%m')
-      end_month = end_date.strftime('%Y-%m')
-    end
-
-    scope = FinancialTransaction.where(hidden: false)
-    scope = scope.where("transacted_at >= ? AND transacted_at <= ?", start_date, end_date)
-    scope = scope.where("category NOT ILIKE '%income%' OR category IS NULL")
-    scope = scope.where('amount > 0')
-
-    if query.present?
-      if exact
-        lowered = query.downcase
-        scope = scope.where("lower(plaid_name) = ? OR lower(merchant_name) = ?", lowered, lowered)
-      else
-        like = "%#{query}%"
-        scope = scope.where("plaid_name ILIKE ? OR merchant_name ILIKE ?", like, like)
-      end
-    end
-
-    merchant_expr = "COALESCE(NULLIF(plaid_name, ''), NULLIF(merchant_name, ''))"
-    results = scope
-      .where("plaid_name IS NOT NULL OR merchant_name IS NOT NULL")
-      .select("#{merchant_expr} as merchant, SUM(amount) as total")
-      .group(merchant_expr)
-      .order("total DESC")
-      .limit(limit)
-
-    render json: {
-      suggestions: results.map { |row| { merchant: row.merchant, total: row.total.to_f.round(2) } },
-      start_month: start_month,
-      end_month: end_month
-    }
-  end
 
   def recurring_status
     year = (params[:year] || Date.current.year).to_i
@@ -381,6 +341,61 @@ class FinancialTransactionsController < ApplicationController
     end
 
     result
+  end
+
+  def merchant_trend_series(query, exact, start_month, end_month)
+    start_month ||= (Date.current.beginning_of_month << 11).strftime('%Y-%m')
+    end_month ||= Date.current.beginning_of_month.strftime('%Y-%m')
+
+    start_date = Date.parse("#{start_month}-01")
+    end_date = Date.parse("#{end_month}-01").end_of_month
+    if start_date > end_date
+      start_date, end_date = end_date, start_date
+      start_month = start_date.strftime('%Y-%m')
+      end_month = end_date.strftime('%Y-%m')
+    end
+
+    scope = FinancialTransaction.where(hidden: false)
+      .where('transacted_at >= ? AND transacted_at <= ?', start_date, end_date)
+      .where("category NOT ILIKE '%income%' OR category IS NULL")
+      .where('amount > 0')
+
+    if exact
+      lowered = query.downcase
+      scope = scope.where('lower(plaid_name) = ? OR lower(merchant_name) = ?', lowered, lowered)
+    else
+      like = "%#{query}%"
+      scope = scope.where('plaid_name ILIKE ? OR merchant_name ILIKE ?', like, like)
+    end
+
+    months = scope
+      .group("to_char(transacted_at, 'YYYY-MM')")
+      .select("to_char(transacted_at, 'YYYY-MM') as month", 'SUM(amount) as total')
+      .order('month')
+      .map { |row| { month: row.month, total: row.total.to_f.round(2) } }
+
+    sample = scope
+      .where.not(plaid_name: [nil, ''])
+      .select(:plaid_name, :merchant_name)
+      .order('transacted_at DESC, id DESC')
+      .first
+    if sample.nil?
+      sample = scope
+        .where.not(merchant_name: [nil, ''])
+        .select(:plaid_name, :merchant_name)
+        .order('transacted_at DESC, id DESC')
+        .first
+    end
+    merchant_name = sample&.plaid_name.presence || sample&.merchant_name.presence
+    total_spent = months.sum { |m| m[:total] }.round(2)
+
+    {
+      merchant: merchant_name || query,
+      months: months,
+      start_month: start_month,
+      end_month: end_month,
+      total_spent: total_spent
+    }
   end
 
 

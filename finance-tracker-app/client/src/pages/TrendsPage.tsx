@@ -306,6 +306,18 @@ export default function TrendsPage() {
     return `${monthLabel} '${year.slice(-2)}`;
   };
 
+  const formatAxisCurrency = (value: number, max: number) => {
+    if (max < 1000) {
+      return `$${Math.round(value).toLocaleString()}`;
+    }
+    if (max < 1_000_000) {
+      const short = (value / 1000).toFixed(1).replace(/\.0$/, "");
+      return `$${short}k`;
+    }
+    const short = (value / 1_000_000).toFixed(1).replace(/\.0$/, "");
+    return `$${short}M`;
+  };
+
   const getMonthRange = (startMonth: string, endMonth: string): string[] => {
     const [startYear, startMon] = startMonth.split("-").map(Number);
     const [endYear, endMon] = endMonth.split("-").map(Number);
@@ -1047,7 +1059,7 @@ export default function TrendsPage() {
       {/* Merchant Search */}
       <Card className="mb-8">
         <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <CardTitle className="text-base font-semibold">Merchant Search (Last 12 Months)</CardTitle>
+          <CardTitle className="text-base font-semibold">Merchant Search</CardTitle>
           <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
             {merchantTrends?.merchant && (
               <div>
@@ -1067,9 +1079,8 @@ export default function TrendsPage() {
         </CardHeader>
         <CardContent>
           <div className="rounded-xl border border-border/60 bg-muted/30 p-4 shadow-sm">
-            <div className="grid gap-4 md:grid-cols-[minmax(240px,1.5fr)_auto_auto] md:items-center">
+            <div className="grid gap-4 md:grid-cols-[minmax(240px,1.5fr)_auto_auto] md:items-start">
               <div className="space-y-2">
-                <Label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Merchant search</Label>
                 <div className="relative" ref={merchantSearchRef}>
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -1136,7 +1147,7 @@ export default function TrendsPage() {
                   ) : null}
                 </div>
               </div>
-              <div className="flex h-10 items-center gap-2 rounded-full border border-border/60 bg-background px-3">
+              <div className="flex h-10 items-center gap-2 rounded-full border border-border/60 bg-background px-3 md:mt-6">
                 <button
                   type="button"
                   onClick={() => setMerchantExact((current) => !current)}
@@ -1150,7 +1161,7 @@ export default function TrendsPage() {
                   Exact match
                 </button>
               </div>
-              <div className="flex h-10 items-center gap-2 rounded-lg border border-border/60 bg-background px-3">
+              <div className="flex h-10 items-center gap-2 rounded-lg border border-border/60 bg-background px-3 md:mt-6">
                 <Input
                   type="month"
                   value={merchantStartMonth}
