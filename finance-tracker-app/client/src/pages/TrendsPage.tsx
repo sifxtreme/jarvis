@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ChartContainer } from "@/components/ui/chart";
-import { formatCurrency, cn, YEARS } from "@/lib/utils";
+import { formatCurrency, cn, YEARS, getMonthKey } from "@/lib/utils";
 import { Copy as CopyIcon, Download, TrendingUp, TrendingDown, Target, X, Search } from "lucide-react";
 import { CategoryDrilldownModal } from "@/components/CategoryDrilldownModal";
 import { StateCard } from "@/components/StateCard";
@@ -115,6 +115,7 @@ export default function TrendsPage() {
   // Category drill-down modal state
   const [drilldownCategory, setDrilldownCategory] = useState<string | null>(null);
   const [drilldownTransactions, setDrilldownTransactions] = useState<Transaction[]>([]);
+  const [drilldownSubtitle, setDrilldownSubtitle] = useState<string | null>(null);
 
   // Fetch current year trends
   const { data: trends, isLoading, error } = useQuery({
@@ -231,11 +232,11 @@ export default function TrendsPage() {
   }, [budgets]);
 
   // Open category drill-down modal
-  const openCategoryDrilldown = (category: string) => {
+  const openCategoryDrilldown = (category: string, monthKey?: string) => {
     if (!transactions) return;
 
     // Filter transactions for this category (expenses only)
-    const categoryTransactions = transactions.filter(t => {
+    let categoryTransactions = transactions.filter(t => {
       // Skip income
       if (t.category?.toLowerCase()?.includes('income')) return false;
 
@@ -246,6 +247,17 @@ export default function TrendsPage() {
 
       return t.category === category;
     });
+
+    if (monthKey) {
+      categoryTransactions = categoryTransactions.filter((transaction) => {
+        const transactionMonth = getMonthKey(transaction.transacted_at);
+        const amortizedMonths = transaction.amortized_months || [];
+        return transactionMonth === monthKey || amortizedMonths.includes(monthKey);
+      });
+      setDrilldownSubtitle(formatMonthWithYear(monthKey));
+    } else {
+      setDrilldownSubtitle(null);
+    }
 
     setDrilldownCategory(category);
     setDrilldownTransactions(categoryTransactions);
@@ -308,13 +320,13 @@ export default function TrendsPage() {
 
   const formatAxisCurrency = (value: number, max: number) => {
     if (max < 1000) {
-      return `$${Math.round(value).toLocaleString()}`;
+      return `$${value.toFixed(1)}`;
     }
     if (max < 1_000_000) {
-      const short = (value / 1000).toFixed(1).replace(/\.0$/, "");
+      const short = (value / 1000).toFixed(1);
       return `$${short}k`;
     }
-    const short = (value / 1_000_000).toFixed(1).replace(/\.0$/, "");
+    const short = (value / 1_000_000).toFixed(1);
     return `$${short}M`;
   };
 
@@ -377,7 +389,7 @@ export default function TrendsPage() {
       .slice(0, categoryCount);
 
     const data = filteredMonths.map(month => {
-      const dataPoint: Record<string, string | number | null> = { month: formatMonth(month) };
+      const dataPoint: Record<string, string | number | null> = { month: formatMonth(month), monthKey: month };
       let total = 0;
       categoriesToShow.forEach(cat => {
         const monthData = cat.months.find(m => m.month === month);
@@ -583,7 +595,7 @@ export default function TrendsPage() {
 
   // Custom dot component for category chart
   const renderCategoryDot = (props: any, dataKey: string, color: string): React.ReactElement<SVGElement> => {
-    const { cx, cy, index } = props;
+    const { cx, cy, index, payload } = props;
     if (cx === undefined || cy === undefined) return <circle r={0} />;
     const isHovered = hoveredCategoryDot?.dataKey === dataKey && hoveredCategoryDot?.index === index;
     const isPinned = pinnedCategoryDot?.dataKey === dataKey && pinnedCategoryDot?.index === index;
@@ -598,11 +610,16 @@ export default function TrendsPage() {
         style={{ cursor: 'pointer' }}
         onMouseEnter={() => setHoveredCategoryDot({ dataKey, index })}
         onMouseLeave={() => setHoveredCategoryDot(null)}
-        onClick={() => {
-          setPinnedCategoryDot((current) => {
-            if (current?.dataKey === dataKey && current.index === index) return null;
-            return { dataKey, index };
-          });
+        onClick={(event) => {
+          if (event.shiftKey) {
+            setPinnedCategoryDot((current) => {
+              if (current?.dataKey === dataKey && current.index === index) return null;
+              return { dataKey, index };
+            });
+            return;
+          }
+          const monthKey = payload?.monthKey as string | undefined;
+          openCategoryDrilldown(dataKey, monthKey);
         }}
       />
     );
@@ -1095,8 +1112,8 @@ export default function TrendsPage() {
         </CardHeader>
         <CardContent>
           <div className="rounded-xl border border-border/60 bg-muted/30 p-4 shadow-sm">
-            <div className="grid gap-4 md:grid-cols-[minmax(240px,1.5fr)_auto_auto] md:items-start">
-              <div className="space-y-2">
+            <div className="grid gap-4 md:grid-cols-[minmax(240px,1.5fr)_auto_auto] md:items-center">
+              <div>
                 <div className="relative" ref={merchantSearchRef}>
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -1163,7 +1180,7 @@ export default function TrendsPage() {
                   ) : null}
                 </div>
               </div>
-              <div className="flex h-10 items-center gap-2 rounded-full border border-border/60 bg-background px-3 md:mt-6">
+              <div className="flex h-10 items-center gap-2 rounded-full border border-border/60 bg-background px-3">
                 <button
                   type="button"
                   onClick={() => setMerchantExact((current) => !current)}
@@ -1177,7 +1194,7 @@ export default function TrendsPage() {
                   Exact match
                 </button>
               </div>
-              <div className="flex h-10 items-center gap-2 rounded-lg border border-border/60 bg-background px-3 md:mt-6">
+              <div className="flex h-10 items-center gap-2 rounded-lg border border-border/60 bg-background px-3">
                 <Input
                   type="month"
                   value={merchantStartMonth}
@@ -1186,7 +1203,7 @@ export default function TrendsPage() {
                     setMerchantStartMonth(next);
                     if (next > merchantEndMonth) setMerchantEndMonth(next);
                   }}
-                  className="w-[150px]"
+                  className="h-8 w-[150px]"
                 />
                 <span className="text-xs text-muted-foreground">→</span>
                 <Input
@@ -1197,7 +1214,7 @@ export default function TrendsPage() {
                     setMerchantEndMonth(next);
                     if (next < merchantStartMonth) setMerchantStartMonth(next);
                   }}
-                  className="w-[150px]"
+                  className="h-8 w-[150px]"
                 />
               </div>
             </div>
@@ -1560,6 +1577,7 @@ export default function TrendsPage() {
         onClose={() => setDrilldownCategory(null)}
         category={drilldownCategory || ''}
         transactions={drilldownTransactions}
+        subtitle={drilldownSubtitle || undefined}
       />
       <CategoryDrilldownModal
         isOpen={merchantTransactionsOpen}

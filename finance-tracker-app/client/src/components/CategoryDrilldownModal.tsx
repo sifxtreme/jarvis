@@ -8,6 +8,7 @@ interface CategoryDrilldownModalProps {
   onClose: () => void;
   category: string;
   transactions: Transaction[];
+  subtitle?: string;
 }
 
 type SortField = 'date' | 'amount';
@@ -18,6 +19,7 @@ export function CategoryDrilldownModal({
   onClose,
   category,
   transactions,
+  subtitle,
 }: CategoryDrilldownModalProps) {
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -55,6 +57,7 @@ export function CategoryDrilldownModal({
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-mono">{category} Transactions</DialogTitle>
+          {subtitle && <div className="text-xs text-muted-foreground font-mono">{subtitle}</div>}
           <div className="text-sm text-muted-foreground font-mono">
             {transactions.length} transaction{transactions.length !== 1 ? 's' : ''} totaling {formatCurrency(total)}
           </div>
