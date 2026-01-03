@@ -5,6 +5,7 @@ import {
   getBudgets,
   getMerchantTrends,
   getMerchantSuggestions,
+  getMerchantTransactions,
   type TrendsFilters,
   OTHER_CATEGORY,
   type Transaction,
@@ -105,6 +106,7 @@ export default function TrendsPage() {
   const [highlightedMerchantSuggestion, setHighlightedMerchantSuggestion] = useState(-1);
   const merchantSearchRef = useRef<HTMLDivElement | null>(null);
   const merchantInputRef = useRef<HTMLInputElement | null>(null);
+  const [merchantTransactionsOpen, setMerchantTransactionsOpen] = useState(false);
 
   // Hover state for precise dot highlighting
   const [hoveredCategoryDot, setHoveredCategoryDot] = useState<{ dataKey: string; index: number } | null>(null);
@@ -152,6 +154,29 @@ export default function TrendsPage() {
       }),
     enabled: merchantQuery.trim().length > 1,
     staleTime: 30_000,
+    retry: 1,
+  });
+
+  const {
+    data: merchantTransactions = [],
+    isLoading: merchantTransactionsLoading,
+  } = useQuery({
+    queryKey: [
+      'merchant-transactions',
+      merchantQuery,
+      merchantExact,
+      merchantStartMonth,
+      merchantEndMonth,
+      merchantTransactionsOpen,
+    ],
+    queryFn: () =>
+      getMerchantTransactions({
+        query: merchantQuery.trim(),
+        exact: merchantExact,
+        start_month: merchantStartMonth,
+        end_month: merchantEndMonth,
+      }),
+    enabled: merchantTransactionsOpen && merchantQuery.trim().length > 0,
     retry: 1,
   });
 
@@ -1023,15 +1048,26 @@ export default function TrendsPage() {
       <Card className="mb-8">
         <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <CardTitle className="text-base font-semibold">Merchant Search (Last 12 Months)</CardTitle>
-          {merchantTrends?.merchant && (
-            <div className="text-sm text-muted-foreground">
-              {merchantTrends.merchant} · {formatCurrency(merchantTrends.total_spent)}
-            </div>
-          )}
+          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+            {merchantTrends?.merchant && (
+              <div>
+                {merchantTrends.merchant} · {formatCurrency(merchantTrends.total_spent)}
+              </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setMerchantTransactionsOpen(true)}
+              disabled={merchantQuery.trim().length === 0 || merchantTransactionsLoading}
+            >
+              {merchantTransactionsLoading ? "Loading..." : "View transactions"}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="rounded-xl border border-border/60 bg-muted/30 p-4 shadow-sm">
-            <div className="grid gap-4 md:grid-cols-[minmax(240px,1.5fr)_auto_auto] md:items-end">
+            <div className="grid gap-4 md:grid-cols-[minmax(240px,1.5fr)_auto_auto] md:items-center">
               <div className="space-y-2">
                 <Label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Merchant search</Label>
                 <div className="relative" ref={merchantSearchRef}>
@@ -1100,15 +1136,21 @@ export default function TrendsPage() {
                   ) : null}
                 </div>
               </div>
-              <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-background px-3 py-2">
-                <Switch checked={merchantExact} onCheckedChange={setMerchantExact} />
-                <div>
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Match</Label>
-                  <div className="text-sm font-medium">Exact</div>
-                </div>
+              <div className="flex h-10 items-center gap-2 rounded-full border border-border/60 bg-background px-3">
+                <button
+                  type="button"
+                  onClick={() => setMerchantExact((current) => !current)}
+                  className={cn(
+                    "rounded-full px-3 py-1 text-xs font-semibold tracking-wide transition",
+                    merchantExact
+                      ? "bg-slate-900 text-white"
+                      : "bg-transparent text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Exact match
+                </button>
               </div>
-              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-background px-3 py-2">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">Range</div>
+              <div className="flex h-10 items-center gap-2 rounded-lg border border-border/60 bg-background px-3">
                 <Input
                   type="month"
                   value={merchantStartMonth}
@@ -1504,6 +1546,12 @@ export default function TrendsPage() {
         onClose={() => setDrilldownCategory(null)}
         category={drilldownCategory || ''}
         transactions={drilldownTransactions}
+      />
+      <CategoryDrilldownModal
+        isOpen={merchantTransactionsOpen}
+        onClose={() => setMerchantTransactionsOpen(false)}
+        category={(merchantTrends?.merchant || merchantQuery.trim() || 'Merchant')}
+        transactions={merchantTransactions}
       />
     </div>
   );
