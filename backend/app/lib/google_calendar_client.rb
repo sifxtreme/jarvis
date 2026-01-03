@@ -76,6 +76,29 @@ class GoogleCalendarClient
     raise CalendarError, e.message
   end
 
+  def list_events(calendar_id:, time_min:, time_max:)
+    events = []
+    page_token = nil
+
+    loop do
+      result = @service.list_events(
+        calendar_id,
+        time_min: time_min.iso8601,
+        time_max: time_max.iso8601,
+        single_events: true,
+        order_by: 'startTime',
+        page_token: page_token
+      )
+      events.concat(result.items)
+      page_token = result.next_page_token
+      break if page_token.to_s.empty?
+    end
+
+    events
+  rescue Google::Apis::Error => e
+    raise CalendarError, e.message
+  end
+
   private
 
   def build_oauth_client
