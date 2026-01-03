@@ -26,6 +26,7 @@ Personal finance tracker with automatic bank sync and spending insights.
 - **Calendar Sync** — Personal events + busy-only work calendars. See docs/features/CALENDAR_SYNC.md.
 - **Calendar UI** — New /calendar page with day/week/2-week/month views. See docs/features/CALENDAR_UI.md.
 - **Calendar Chat (Web)** — In-app chat to create events (text only). See docs/features/JARVIS_CHAT.md.
+- **Calendar Delete** — Delete calendar events from the UI (syncs to Google).
 
 ## Architecture
 
@@ -227,6 +228,7 @@ docker-compose logs -f worker
 - [Teller Integration](docs/teller.md) - Bank sync, troubleshooting
 - [Future Vision](docs/FUTURE_VISION.md) - Product direction and roadmap
 - [Layout Standards](docs/LAYOUTS.md) - `split-panel` and `full-width` patterns
+- [Next Features](docs/NEXT_FEATURES.md) - Shortlist for upcoming work
 - [Progress Log](docs/progress.md) - Ongoing development notes
 
 ### Config & Setup

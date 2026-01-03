@@ -73,7 +73,7 @@ class CalendarController < ApplicationController
     user = current_user
     return render json: { msg: 'Unauthorized' }, status: :unauthorized unless user
 
-    event = CalendarEvent.find_by(id: params[:id], user_id: user.id)
+    event = CalendarEvent.find_by(id: params[:id])
     return render json: { msg: 'Event not found' }, status: :not_found unless event
 
     client = GoogleCalendarClient.new(user)
