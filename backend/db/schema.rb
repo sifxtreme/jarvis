@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2025_01_15_000001) do
+ActiveRecord::Schema.define(version: 2025_01_15_000003) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -143,7 +143,13 @@ ActiveRecord::Schema.define(version: 2025_01_15_000001) do
     t.string "email", limit: 255, null: false
     t.string "password_hash", limit: 255, null: false
     t.datetime "created_at", default: -> { "CURRENT_TIMESTAMP" }
+    t.string "google_sub"
+    t.string "google_refresh_token"
+    t.datetime "last_login_at"
+    t.boolean "active", default: true, null: false
     t.index ["email"], name: "users_email_key", unique: true
+    t.index ["google_sub"], name: "index_users_on_google_sub", unique: true
+    t.index ["active"], name: "index_users_on_active"
   end
 
   create_table "versions", force: :cascade do |t|

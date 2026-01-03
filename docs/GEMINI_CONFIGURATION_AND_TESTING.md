@@ -6,12 +6,12 @@
    - Create a key at https://ai.google.dev/
    - Set `GEMINI_API_KEY` in `jarvis.env`
 
-2. **Slack credentials**
-   - Ensure `SLACK_BOT_TOKEN` and `SLACK_SIGNING_SECRET` are set in `jarvis.env`
+2. **Models**
+   - Extraction model: `GEMINI_EXTRACT_MODEL=gemini-3-flash-preview`
+   - Intent model (cheaper): `GEMINI_INTENT_MODEL=gemini-2.0-flash`
 
-3. **Model choice**
-   - Using `gemini-3-flash-preview` for image + text extraction
-   - If switching models later, update the model string in code (or add env-based model override)
+3. **Slack credentials**
+   - Ensure `SLACK_BOT_TOKEN` and `SLACK_SIGNING_SECRET` are set in `jarvis.env`
 
 4. **Migrations**
    - Run: `docker-compose run api rake db:migrate`

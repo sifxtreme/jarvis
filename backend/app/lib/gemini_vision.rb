@@ -2,7 +2,9 @@ require 'json'
 require 'net/http'
 
 class GeminiVision
-  API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent"
+  API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
+  DEFAULT_EXTRACT_MODEL = ENV.fetch('GEMINI_EXTRACT_MODEL', 'gemini-3-flash-preview')
+  DEFAULT_INTENT_MODEL = ENV.fetch('GEMINI_INTENT_MODEL', 'gemini-2.0-flash')
 
   def initialize(api_key: ENV['GEMINI_API_KEY'])
     @api_key = api_key
@@ -14,23 +16,30 @@ class GeminiVision
       { text: extraction_prompt(today: Date.current) }
     ]
 
-    response = make_request(parts: parts)
+    response = make_request(parts: parts, model: DEFAULT_EXTRACT_MODEL)
     parse_json_response(response)
   end
 
   def extract_event_from_text(text)
     parts = [{ text: text_prompt(text) }]
 
-    response = make_request(parts: parts)
+    response = make_request(parts: parts, model: DEFAULT_EXTRACT_MODEL)
+    parse_json_response(response)
+  end
+
+  def classify_intent(text:, has_image:)
+    parts = [{ text: intent_prompt(text, has_image: has_image, today: Date.current) }]
+
+    response = make_request(parts: parts, model: DEFAULT_INTENT_MODEL)
     parse_json_response(response)
   end
 
   private
 
-  def make_request(parts:)
+  def make_request(parts:, model:)
     raise "Missing GEMINI_API_KEY" if @api_key.to_s.strip.empty?
 
-    uri = URI("#{API_URL}?key=#{@api_key}")
+    uri = URI("#{API_BASE_URL}/#{model}:generateContent?key=#{@api_key}")
     request = Net::HTTP::Post.new(uri)
     request['Content-Type'] = 'application/json'
     request.body = {
@@ -145,6 +154,32 @@ class GeminiVision
 
       Text:
       "#{text}"
+    PROMPT
+  end
+
+  def intent_prompt(text, has_image:, today:)
+    <<~PROMPT
+      Today is #{today}.
+
+      You are classifying the user's intent for a Slack assistant that manages calendar events.
+      Return JSON only:
+      {
+        "intent": "create_event" | "list_events" | "digest" | "help",
+        "time_window": "today|this_week|next_week|this_month|custom|unspecified",
+        "raw_time_query": "original time phrase if present"
+      }
+
+      Rules:
+      - If the user is sending an event (title/date/time/location) or an image, use "create_event".
+      - If the user asks "what's coming up", "what's on the calendar", or similar, use "list_events".
+      - If the user asks for a summary (daily/weekly), use "digest".
+      - If the user asks how to use the bot, use "help".
+      - If unsure, default to "create_event".
+
+      User text:
+      "#{text}"
+
+      Has image: #{has_image}
     PROMPT
   end
 end

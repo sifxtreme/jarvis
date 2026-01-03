@@ -27,12 +27,23 @@ class SlackMessageHandler
   private
 
   def response_text(message)
-    if image_files.any?
-      extract_from_image(message)
-    elsif cleaned_text.present?
-      extract_from_text(message)
+    intent = classify_intent(message)
+
+    case intent['intent']
+    when 'list_events'
+      "I can list upcoming events soon. (Calendar querying comes next.)"
+    when 'digest'
+      "I can send daily/weekly digests soon. (Calendar querying comes next.)"
+    when 'help'
+      "Send event details or a screenshot and I’ll extract it. Calendar creation is next."
     else
-      "Slack is wired up. Send a message or image to test."
+      if image_files.any?
+        extract_from_image(message)
+      elsif cleaned_text.present?
+        extract_from_text(message)
+      else
+        "Slack is wired up. Send a message or image to test."
+      end
     end
   end
 
@@ -51,16 +62,16 @@ class SlackMessageHandler
     file = image_files.first
     base64 = download_file(file['url_private_download'] || file['url_private'])
     result = gemini.extract_event_from_image(base64, mime_type: file['mimetype'])
-    log_ai_request(message, result[:usage], request_kind: 'image', status: result[:event]['error'] ? 'error' : 'success')
+    log_ai_request(message, result[:usage], request_kind: 'image', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
     render_extraction_result(result[:event])
   rescue StandardError => e
-    log_ai_request(message, {}, request_kind: 'image', status: 'error', error_message: e.message)
+    log_ai_request(message, {}, request_kind: 'image', model: gemini_extract_model, status: 'error', error_message: e.message)
     "Image extraction error: #{e.message}"
   end
 
   def extract_from_text(message)
     result = gemini.extract_event_from_text(cleaned_text)
-    log_ai_request(message, result[:usage], request_kind: 'text', status: result[:event]['error'] ? 'error' : 'success')
+    log_ai_request(message, result[:usage], request_kind: 'text', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
     render_extraction_result(result[:event])
   end
 
@@ -134,33 +145,58 @@ class SlackMessageHandler
     )
   end
 
-  def log_ai_request(message, usage, request_kind:, status:, error_message: nil)
+  def log_ai_request(message, usage, request_kind:, model:, status:, error_message: nil)
     AiRequest.create!(
       chat_message: message,
       transport: 'slack',
-      model: gemini_model,
+      model: model,
       request_kind: request_kind,
       prompt_tokens: usage['promptTokenCount'],
       output_tokens: usage['candidatesTokenCount'],
       total_tokens: usage['totalTokenCount'],
-      cost_usd: estimate_cost(usage),
+      cost_usd: estimate_cost(usage, model),
       status: status,
       error_message: error_message,
       usage_metadata: usage
     )
   end
 
-  def estimate_cost(usage)
+  def estimate_cost(usage, model)
     prompt = usage['promptTokenCount']
     output = usage['candidatesTokenCount']
     return nil if prompt.nil? || output.nil?
 
-    input_cost = (prompt.to_f / 1_000_000) * 0.50
-    output_cost = (output.to_f / 1_000_000) * 3.00
+    rates = model_rates(model)
+    input_cost = (prompt.to_f / 1_000_000) * rates[:input]
+    output_cost = (output.to_f / 1_000_000) * rates[:output]
     (input_cost + output_cost).round(6)
   end
 
-  def gemini_model
-    'gemini-3-flash-preview'
+  def model_rates(model)
+    case model
+    when 'gemini-2.0-flash'
+      { input: 0.10, output: 0.40 }
+    when 'gemini-2.5-flash'
+      { input: 0.30, output: 2.50 }
+    else
+      { input: 0.50, output: 3.00 }
+    end
+  end
+
+  def gemini_extract_model
+    ENV.fetch('GEMINI_EXTRACT_MODEL', 'gemini-3-flash-preview')
+  end
+
+  def gemini_intent_model
+    ENV.fetch('GEMINI_INTENT_MODEL', 'gemini-2.0-flash')
+  end
+
+  def classify_intent(message)
+    result = gemini.classify_intent(text: cleaned_text, has_image: image_files.any?)
+    log_ai_request(message, result[:usage], request_kind: 'intent', model: gemini_intent_model, status: result[:event]['error'] ? 'error' : 'success')
+    result[:event]
+  rescue StandardError => e
+    log_ai_request(message, {}, request_kind: 'intent', model: gemini_intent_model, status: 'error', error_message: e.message)
+    { 'intent' => 'create_event' }
   end
 end
