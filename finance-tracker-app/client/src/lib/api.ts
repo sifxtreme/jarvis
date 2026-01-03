@@ -46,10 +46,8 @@ axiosInstance.interceptors.request.use(config => {
 // Function to verify if the current API key is valid
 export const verifyAuthentication = async (): Promise<boolean> => {
   try {
-    // Make a lightweight request to verify the API key
-    // Using the budgets endpoint with a minimal request
-    await axiosInstance.get('/budgets', {
-      params: { limit: 1 },
+    // Verify session cookie
+    await axiosInstance.get('/auth/session', {
       timeout: 3000 // Set a timeout to prevent long waits
     });
     return true;
