@@ -107,7 +107,7 @@ class SlackMessageHandler
     return "Please connect your calendar at https://finances.sifxtre.me first." if user.google_refresh_token.to_s.empty?
 
     calendar = GoogleCalendarClient.new(user)
-    attendees = spouse_emails(user)
+    attendees = (spouse_emails(user) + [user.email]).uniq
     result = calendar.create_event(event, attendees: attendees, guests_can_modify: true)
 
     CalendarEvent.create!(
