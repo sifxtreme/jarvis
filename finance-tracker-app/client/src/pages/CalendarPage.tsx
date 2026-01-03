@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   addDays,
   addHours,
@@ -44,19 +44,28 @@ const DAY_MINUTES = 24 * 60;
 const SUN_LINE_HEIGHT = 1;
 const TIME_COL_WIDTH = 80;
 
-const USER_PALETTE: Record<string, { personal: string; work: string }> = {
+const USER_PALETTE: Record<
+  string,
+  { blockPersonal: string; blockWork: string; dotPersonal: string; dotWork: string }
+> = {
   "asif.h.ahmed@gmail.com": {
-    personal: "border-l-purple-400 bg-purple-50/70 text-slate-900",
-    work: "border-l-sky-400 bg-sky-50/70 text-slate-900",
+    blockPersonal: "border-l-purple-400 bg-purple-50/70 text-slate-900",
+    blockWork: "border-l-sky-400 bg-sky-50/70 text-slate-900",
+    dotPersonal: "bg-purple-400",
+    dotWork: "bg-sky-400",
   },
   "hsayyeda@gmail.com": {
-    personal: "border-l-amber-400 bg-amber-50/70 text-slate-900",
-    work: "border-l-emerald-400 bg-emerald-50/70 text-slate-900",
+    blockPersonal: "border-l-amber-400 bg-amber-50/70 text-slate-900",
+    blockWork: "border-l-emerald-400 bg-emerald-50/70 text-slate-900",
+    dotPersonal: "bg-amber-400",
+    dotWork: "bg-emerald-400",
   },
 };
 const DEFAULT_PALETTE = {
-  personal: "border-l-slate-300 bg-slate-50/70 text-slate-900",
-  work: "border-l-slate-300 bg-slate-50/70 text-slate-900",
+  blockPersonal: "border-l-slate-300 bg-slate-50/70 text-slate-900",
+  blockWork: "border-l-slate-300 bg-slate-50/70 text-slate-900",
+  dotPersonal: "bg-slate-300",
+  dotWork: "bg-slate-300",
 };
 
 type GeoPoint = { lat: number; lng: number };
@@ -130,6 +139,8 @@ export default function CalendarPage() {
   const [geo, setGeo] = useState<GeoPoint | null>(null);
   const [geoDenied, setGeoDenied] = useState(false);
   const isMobile = useIsMobile();
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [scrollbarWidth, setScrollbarWidth] = useState(0);
 
   useEffect(() => {
     const load = async () => {
@@ -204,6 +215,17 @@ export default function CalendarPage() {
       setView("day");
     }
   }, [isMobile, view]);
+
+  useEffect(() => {
+    const measure = () => {
+      if (!scrollRef.current) return;
+      const width = scrollRef.current.offsetWidth - scrollRef.current.clientWidth;
+      setScrollbarWidth(width);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [view, viewDays.length, isMobile]);
 
   useEffect(() => {
     if (!data) return;
@@ -300,14 +322,11 @@ export default function CalendarPage() {
 
   const filteredEntries = useMemo(() => {
     return entries.filter((entry) => {
-      const userAllowed = entry.userIds.some((id) => userFilters[id]);
-      if (!userAllowed) return false;
-
       if (entry.isWork) {
         return entry.userIds.some((id) => workFilters[id]);
       }
 
-      return true;
+      return entry.userIds.some((id) => userFilters[id]);
     });
   }, [entries, userFilters, workFilters]);
 
@@ -514,35 +533,52 @@ export default function CalendarPage() {
             <span className="text-sm text-muted-foreground">{headerRange}</span>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {data?.users.map((user) => {
-              const label = userMap.get(user.id) || user.email;
-              const isActive = userFilters[user.id] ?? true;
-              return (
-                <Button
-                  key={user.id}
-                  size="sm"
-                  variant={isActive ? "default" : "outline"}
-                  onClick={() => setUserFilters((prev) => ({ ...prev, [user.id]: !isActive }))}
-                >
-                  {label}
-                </Button>
-              );
-            })}
-            {data?.users.map((user) => {
-              const label = `${userMap.get(user.id) || user.email} (Work)`;
-              const isActive = workFilters[user.id] ?? true;
-              return (
-                <Button
-                  key={`work-${user.id}`}
-                  size="sm"
-                  variant={isActive ? "default" : "outline"}
-                  onClick={() => setWorkFilters((prev) => ({ ...prev, [user.id]: !isActive }))}
-                >
-                  {label}
-                </Button>
-              );
-            })}
+          <div className="rounded-xl border border-slate-200/70 bg-white px-3 py-2 text-sm shadow-sm">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+              Filters
+            </div>
+            <div className="mt-2 grid gap-2">
+              {data?.users.map((user) => {
+                const label = userMap.get(user.id) || user.email;
+                const email = user.email;
+                const palette = USER_PALETTE[email] || DEFAULT_PALETTE;
+                const personalActive = userFilters[user.id] ?? true;
+                const workActive = workFilters[user.id] ?? true;
+                return (
+                  <div key={`filters-${user.id}`} className="flex items-center justify-between gap-4">
+                    <div className="text-sm font-semibold text-slate-700">{label}</div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setUserFilters((prev) => ({ ...prev, [user.id]: !personalActive }))}
+                        className={cn(
+                          "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
+                          personalActive
+                            ? "border-slate-300 bg-slate-900 text-white"
+                            : "border-slate-200 text-slate-500 hover:border-slate-300"
+                        )}
+                      >
+                        <span className={cn("h-2 w-2 rounded-full", palette.dotPersonal)} />
+                        Personal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setWorkFilters((prev) => ({ ...prev, [user.id]: !workActive }))}
+                        className={cn(
+                          "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
+                          workActive
+                            ? "border-slate-300 bg-slate-900 text-white"
+                            : "border-slate-200 text-slate-500 hover:border-slate-300"
+                        )}
+                      >
+                        <span className={cn("h-2 w-2 rounded-full", palette.dotWork)} />
+                        Work
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
 
@@ -621,7 +657,10 @@ export default function CalendarPage() {
           <div className="rounded-xl border border-slate-200/70 bg-white shadow-sm overflow-hidden">
             <div
               className="grid sticky top-0 z-20 border-b border-slate-200/70 bg-white text-xs text-slate-500"
-              style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(${viewDays.length}, minmax(0, 1fr))` }}
+              style={{
+                gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(${viewDays.length}, minmax(0, 1fr))`,
+                paddingRight: scrollbarWidth ? `${scrollbarWidth}px` : undefined,
+              }}
             >
               <div className="px-4 py-4">
                 <div className="text-[11px] uppercase tracking-[0.28em]">GMT-08</div>
@@ -650,7 +689,10 @@ export default function CalendarPage() {
               ))}
             </div>
 
-            <div className="border-b border-slate-200/70">
+            <div
+              className="border-b border-slate-200/70"
+              style={{ paddingRight: scrollbarWidth ? `${scrollbarWidth}px` : undefined }}
+            >
               <div
                 className="grid text-xs text-slate-500"
                 style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(${viewDays.length}, minmax(0, 1fr))` }}
@@ -668,7 +710,7 @@ export default function CalendarPage() {
                           const primaryUserId = item.userIds[0];
                           const primaryEmail = primaryUserId ? userEmailMap.get(primaryUserId) : undefined;
                           const palette = (primaryEmail && USER_PALETTE[primaryEmail]) || DEFAULT_PALETTE;
-                          const paletteClass = item.isWork ? palette.work : palette.personal;
+                          const paletteClass = item.isWork ? palette.blockWork : palette.blockPersonal;
                           const muted = item.type === "busy" ? "opacity-75" : "";
                           return (
                             <div
@@ -693,7 +735,7 @@ export default function CalendarPage() {
               </div>
             </div>
 
-            <div className="max-h-[70vh] overflow-auto">
+            <div className="max-h-[70vh] overflow-auto" ref={scrollRef}>
               <div
                 className="relative grid"
                 style={{
@@ -797,7 +839,7 @@ export default function CalendarPage() {
                       const primaryUserId = entry.userIds[0];
                       const primaryEmail = primaryUserId ? userEmailMap.get(primaryUserId) : undefined;
                       const palette = (primaryEmail && USER_PALETTE[primaryEmail]) || DEFAULT_PALETTE;
-                      const paletteClass = entry.isWork ? palette.work : palette.personal;
+                      const paletteClass = entry.isWork ? palette.blockWork : palette.blockPersonal;
                       const muted = entry.type === "busy" ? "opacity-75" : "";
                       const label = entry.userIds.map((id) => userMap.get(id)).filter(Boolean).join(" + ");
                       return (
