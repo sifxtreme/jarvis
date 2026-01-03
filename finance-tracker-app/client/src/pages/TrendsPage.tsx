@@ -4,6 +4,7 @@ import {
   getTransactions,
   getBudgets,
   getMerchantTrends,
+  getMerchantSuggestions,
   type TrendsFilters,
   OTHER_CATEGORY,
   type Transaction,
@@ -18,7 +19,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ChartContainer } from "@/components/ui/chart";
 import { formatCurrency, cn, YEARS } from "@/lib/utils";
-import { Copy as CopyIcon, Download, TrendingUp, TrendingDown, Target, X } from "lucide-react";
+import { Copy as CopyIcon, Download, TrendingUp, TrendingDown, Target, X, Search } from "lucide-react";
 import { CategoryDrilldownModal } from "@/components/CategoryDrilldownModal";
 import { StateCard } from "@/components/StateCard";
 import {
@@ -133,6 +134,21 @@ export default function TrendsPage() {
   const { data: budgets } = useQuery({
     queryKey: ['budgets-for-trends', filters.year],
     queryFn: () => getBudgets({ year: filters.year, show_hidden: false, show_needs_review: false }),
+  });
+
+  const { data: merchantSuggestions } = useQuery({
+    queryKey: ['merchant-suggestions', merchantQuery, merchantExact, merchantStartMonth, merchantEndMonth],
+    queryFn: () =>
+      getMerchantSuggestions({
+        query: merchantQuery.trim(),
+        exact: merchantExact,
+        start_month: merchantStartMonth,
+        end_month: merchantEndMonth,
+        limit: 8,
+      }),
+    enabled: merchantQuery.trim().length > 1,
+    staleTime: 30_000,
+    retry: 1,
   });
 
   const { data: merchantTrends, isLoading: merchantTrendsLoading, error: merchantTrendsError } = useQuery({
@@ -667,10 +683,10 @@ export default function TrendsPage() {
         <div className="flex flex-wrap items-center gap-2">
           {/* Month Range Filter */}
           <Select value={monthRange} onValueChange={(v) => setMonthRange(v as MonthRange)}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="h-9 w-[140px] text-sm">
               <SelectValue placeholder="Month Range" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="text-sm">
               {Object.entries(MONTH_RANGES).map(([key, { label }]) => (
                 <SelectItem key={key} value={key}>{label}</SelectItem>
               ))}
@@ -679,10 +695,10 @@ export default function TrendsPage() {
 
           {/* Year Filter */}
           <Select value={filters.year?.toString()} onValueChange={handleYearChange}>
-            <SelectTrigger className="w-[100px]">
+            <SelectTrigger className="h-9 w-[100px] text-sm">
               <SelectValue placeholder="Year" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="text-sm">
               {YEARS.map(year => (
                 <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
               ))}
@@ -699,17 +715,17 @@ export default function TrendsPage() {
                 }
               }}
             >
-              <SelectTrigger className="w-[120px]">
+              <SelectTrigger className="h-9 w-[140px] text-sm">
                 <SelectValue placeholder="Source">
                   {selectedSources.size === 0 ? "All Sources" : `${selectedSources.size} selected`}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="text-sm">
                 <SelectItem value="all">All Sources</SelectItem>
                 {availableSources.map(source => (
                   <div
                     key={source}
-                    className="flex items-center gap-2 px-2 py-1.5 cursor-pointer hover:bg-muted"
+                    className="flex items-center gap-2 px-2 py-1 cursor-pointer hover:bg-muted"
                     onClick={(e) => {
                       e.preventDefault();
                       toggleSource(source);
@@ -719,7 +735,7 @@ export default function TrendsPage() {
                       type="checkbox"
                       checked={selectedSources.has(source)}
                       onChange={() => toggleSource(source)}
-                      className="h-4 w-4"
+                      className="h-3.5 w-3.5"
                     />
                     <span className="text-sm">{source}</span>
                   </div>
@@ -730,10 +746,10 @@ export default function TrendsPage() {
 
           {/* Category Count */}
           <Select value={categoryCount.toString()} onValueChange={(v) => setCategoryCount(parseInt(v))}>
-            <SelectTrigger className="w-[100px]">
+            <SelectTrigger className="h-9 w-[100px] text-sm">
               <SelectValue placeholder="Items" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="text-sm">
               <SelectItem value="5">Top 5</SelectItem>
               <SelectItem value="10">Top 10</SelectItem>
               <SelectItem value="15">Top 15</SelectItem>
@@ -747,17 +763,17 @@ export default function TrendsPage() {
             variant={hideOther ? "default" : "outline"}
             size="sm"
             onClick={() => setHideOther(!hideOther)}
-            className="text-xs"
+            className="h-9 px-3 text-sm"
           >
             {hideOther ? "Show Other" : "Hide Other"}
           </Button>
 
           {/* Export Button */}
-          <Button variant="outline" size="sm" onClick={copySummary}>
+          <Button variant="outline" size="sm" onClick={copySummary} className="h-9 px-3 text-sm">
             <CopyIcon className="h-4 w-4 mr-1" />
             {copyStatus === "copied" ? "Copied" : "Copy"}
           </Button>
-          <Button variant="outline" size="sm" onClick={exportToCSV}>
+          <Button variant="outline" size="sm" onClick={exportToCSV} className="h-9 px-3 text-sm">
             <Download className="h-4 w-4 mr-1" />
             CSV
           </Button>
@@ -989,45 +1005,69 @@ export default function TrendsPage() {
           )}
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap items-end gap-3 pb-4">
-            <div className="min-w-[220px] flex-1">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Merchant search</Label>
-              <Input
-                type="search"
-                placeholder="Search merchants..."
-                value={merchantQuery}
-                onChange={(event) => setMerchantQuery(event.target.value)}
-              />
-            </div>
-            <div className="flex items-center gap-2 pt-5">
-              <Switch checked={merchantExact} onCheckedChange={setMerchantExact} />
-              <Label className="text-sm">Exact match</Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Label className="text-xs text-muted-foreground">Start</Label>
-              <Input
-                type="month"
-                value={merchantStartMonth}
-                onChange={(event) => {
-                  const next = event.target.value;
-                  setMerchantStartMonth(next);
-                  if (next > merchantEndMonth) setMerchantEndMonth(next);
-                }}
-                className="w-[150px]"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Label className="text-xs text-muted-foreground">End</Label>
-              <Input
-                type="month"
-                value={merchantEndMonth}
-                onChange={(event) => {
-                  const next = event.target.value;
-                  setMerchantEndMonth(next);
-                  if (next < merchantStartMonth) setMerchantStartMonth(next);
-                }}
-                className="w-[150px]"
-              />
+          <div className="rounded-xl border border-border/60 bg-muted/30 p-4 shadow-sm">
+            <div className="grid gap-4 md:grid-cols-[minmax(240px,1.5fr)_auto_auto] md:items-end">
+              <div className="space-y-2">
+                <Label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Merchant search</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="Search merchants..."
+                    value={merchantQuery}
+                    onChange={(event) => setMerchantQuery(event.target.value)}
+                    className="pl-9"
+                  />
+                  {merchantQuery.trim().length > 1 && merchantSuggestions?.suggestions?.length ? (
+                    <div className="absolute z-20 mt-2 w-full rounded-lg border border-border/70 bg-background shadow-lg">
+                      <div className="max-h-56 overflow-auto py-1">
+                        {merchantSuggestions.suggestions.map((suggestion) => (
+                          <button
+                            key={suggestion.merchant}
+                            type="button"
+                            className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-muted"
+                            onMouseDown={() => setMerchantQuery(suggestion.merchant)}
+                          >
+                            <span className="font-medium">{suggestion.merchant}</span>
+                            <span className="text-xs text-muted-foreground">{formatCurrency(suggestion.total)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-background px-3 py-2">
+                <Switch checked={merchantExact} onCheckedChange={setMerchantExact} />
+                <div>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Match</Label>
+                  <div className="text-sm font-medium">Exact</div>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-background px-3 py-2">
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">Range</div>
+                <Input
+                  type="month"
+                  value={merchantStartMonth}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    setMerchantStartMonth(next);
+                    if (next > merchantEndMonth) setMerchantEndMonth(next);
+                  }}
+                  className="w-[150px]"
+                />
+                <span className="text-xs text-muted-foreground">→</span>
+                <Input
+                  type="month"
+                  value={merchantEndMonth}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    setMerchantEndMonth(next);
+                    if (next < merchantStartMonth) setMerchantStartMonth(next);
+                  }}
+                  className="w-[150px]"
+                />
+              </div>
             </div>
           </div>
 

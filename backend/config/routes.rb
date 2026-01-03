@@ -5,6 +5,7 @@ Rails.application.routes.draw do
     collection do
       get :trends
       get :merchant_trends
+      get :merchant_suggestions
       get :recurring_status
     end
   end

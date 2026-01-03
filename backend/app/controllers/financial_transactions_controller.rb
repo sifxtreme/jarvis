@@ -176,6 +176,58 @@ class FinancialTransactionsController < ApplicationController
     }
   end
 
+  def merchant_suggestions
+    query = params[:query].to_s.strip
+    exact = params[:exact] == 'true'
+    limit = (params[:limit] || 8).to_i.clamp(1, 25)
+    start_month = params[:start_month].presence
+    end_month = params[:end_month].presence
+
+    if start_month.blank? || end_month.blank?
+      default_end = Date.current.beginning_of_month
+      default_start = (default_end << 11)
+      start_month = default_start.strftime('%Y-%m')
+      end_month = default_end.strftime('%Y-%m')
+    end
+
+    start_date = Date.parse("#{start_month}-01")
+    end_date = Date.parse("#{end_month}-01").end_of_month
+    if start_date > end_date
+      start_date, end_date = end_date, start_date
+      start_month = start_date.strftime('%Y-%m')
+      end_month = end_date.strftime('%Y-%m')
+    end
+
+    scope = FinancialTransaction.where(hidden: false)
+    scope = scope.where("transacted_at >= ? AND transacted_at <= ?", start_date, end_date)
+    scope = scope.where("category NOT ILIKE '%income%' OR category IS NULL")
+    scope = scope.where('amount > 0')
+
+    if query.present?
+      if exact
+        lowered = query.downcase
+        scope = scope.where("lower(plaid_name) = ? OR lower(merchant_name) = ?", lowered, lowered)
+      else
+        like = "%#{query}%"
+        scope = scope.where("plaid_name ILIKE ? OR merchant_name ILIKE ?", like, like)
+      end
+    end
+
+    merchant_expr = "COALESCE(NULLIF(plaid_name, ''), NULLIF(merchant_name, ''))"
+    results = scope
+      .where("plaid_name IS NOT NULL OR merchant_name IS NOT NULL")
+      .select("#{merchant_expr} as merchant, SUM(amount) as total")
+      .group(merchant_expr)
+      .order("total DESC")
+      .limit(limit)
+
+    render json: {
+      suggestions: results.map { |row| { merchant: row.merchant, total: row.total.to_f.round(2) } },
+      start_month: start_month,
+      end_month: end_month
+    }
+  end
+
   def recurring_status
     year = (params[:year] || Date.current.year).to_i
     month = (params[:month] || Date.current.month).to_i

@@ -393,6 +393,17 @@ export interface MerchantTrendsData {
   total_spent: number;
 }
 
+export interface MerchantSuggestion {
+  merchant: string;
+  total: number;
+}
+
+export interface MerchantSuggestionsData {
+  suggestions: MerchantSuggestion[];
+  start_month: string;
+  end_month: string;
+}
+
 export interface TrendsFilters {
   year?: number;
   category?: string;
@@ -403,6 +414,14 @@ export interface MerchantTrendsFilters {
   exact?: boolean;
   start_month?: string;
   end_month?: string;
+}
+
+export interface MerchantSuggestionsFilters {
+  query: string;
+  exact?: boolean;
+  start_month?: string;
+  end_month?: string;
+  limit?: number;
 }
 
 export const getTrends = async (filters: TrendsFilters = {}): Promise<TrendsData> => {
@@ -436,6 +455,25 @@ export const getMerchantTrends = async (filters: MerchantTrendsFilters): Promise
     console.error('[API] Merchant trends error details:', error);
     const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch merchant trends';
     throw new Error(`Failed to fetch merchant trends: ${errorMessage}`);
+  }
+};
+
+export const getMerchantSuggestions = async (filters: MerchantSuggestionsFilters): Promise<MerchantSuggestionsData> => {
+  const params = new URLSearchParams();
+
+  if (filters.query) params.append('query', filters.query);
+  if (filters.exact !== undefined) params.append('exact', filters.exact.toString());
+  if (filters.start_month) params.append('start_month', filters.start_month);
+  if (filters.end_month) params.append('end_month', filters.end_month);
+  if (filters.limit !== undefined) params.append('limit', filters.limit.toString());
+
+  try {
+    const response = await axiosInstance.get<MerchantSuggestionsData>('/financial_transactions/merchant_suggestions', { params });
+    return response.data;
+  } catch (error: any) {
+    console.error('[API] Merchant suggestions error details:', error);
+    const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch merchant suggestions';
+    throw new Error(`Failed to fetch merchant suggestions: ${errorMessage}`);
   }
 };
 
