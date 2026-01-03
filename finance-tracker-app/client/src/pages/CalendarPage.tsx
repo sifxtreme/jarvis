@@ -44,6 +44,21 @@ const DAY_MINUTES = 24 * 60;
 const SUN_LINE_HEIGHT = 1;
 const TIME_COL_WIDTH = 80;
 
+const USER_PALETTE: Record<string, { personal: string; work: string }> = {
+  "asif.h.ahmed@gmail.com": {
+    personal: "border-l-purple-400 bg-purple-50/70 text-slate-900",
+    work: "border-l-sky-400 bg-sky-50/70 text-slate-900",
+  },
+  "hsayyeda@gmail.com": {
+    personal: "border-l-amber-400 bg-amber-50/70 text-slate-900",
+    work: "border-l-emerald-400 bg-emerald-50/70 text-slate-900",
+  },
+};
+const DEFAULT_PALETTE = {
+  personal: "border-l-slate-300 bg-slate-50/70 text-slate-900",
+  work: "border-l-slate-300 bg-slate-50/70 text-slate-900",
+};
+
 type GeoPoint = { lat: number; lng: number };
 
 type SunTimes = {
@@ -219,6 +234,14 @@ export default function CalendarPage() {
     return map;
   }, [data]);
 
+  const userEmailMap = useMemo(() => {
+    const map = new Map<number, string>();
+    data?.users.forEach((user) => {
+      map.set(user.id, user.email);
+    });
+    return map;
+  }, [data]);
+
   const entries = useMemo(() => {
     if (!data) return [];
     const eventMap = new Map<string, CalendarEntry>();
@@ -266,6 +289,15 @@ export default function CalendarPage() {
     return Array.from(eventMap.values()).sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
   }, [data]);
 
+  const isAllDayEntry = (entry: CalendarEntry) => {
+    const start = entry.startAt;
+    const end = entry.endAt;
+    const startsAtMidnight = start.getHours() === 0 && start.getMinutes() === 0;
+    const endsAtMidnight = end.getHours() === 0 && end.getMinutes() === 0;
+    const durationMinutes = differenceInMinutes(end, start);
+    return startsAtMidnight && endsAtMidnight && durationMinutes >= 24 * 60;
+  };
+
   const filteredEntries = useMemo(() => {
     return entries.filter((entry) => {
       const userAllowed = entry.userIds.some((id) => userFilters[id]);
@@ -278,6 +310,9 @@ export default function CalendarPage() {
       return true;
     });
   }, [entries, userFilters, workFilters]);
+
+  const timedEntries = useMemo(() => filteredEntries.filter((entry) => !isAllDayEntry(entry)), [filteredEntries]);
+  const allDayEntries = useMemo(() => filteredEntries.filter((entry) => isAllDayEntry(entry)), [filteredEntries]);
 
   const viewDays = useMemo(() => {
     if (view === "month") {
@@ -299,7 +334,7 @@ export default function CalendarPage() {
     const viewEnd = addDays(viewDays[viewDays.length - 1], 1).getTime();
     viewDays.forEach((day) => map.set(format(day, "yyyy-MM-dd"), []));
 
-    filteredEntries.forEach((entry) => {
+    timedEntries.forEach((entry) => {
       const endMarker = new Date(entry.endAt.getTime() - 1);
       let cursor = startOfDay(entry.startAt);
       const lastDay = startOfDay(endMarker);
@@ -316,7 +351,28 @@ export default function CalendarPage() {
     });
 
     return map;
-  }, [filteredEntries, viewDays]);
+  }, [timedEntries, viewDays]);
+
+  const allDayByDay = useMemo(() => {
+    const map = new Map<string, CalendarEntry[]>();
+    if (viewDays.length === 0) return map;
+    viewDays.forEach((day) => map.set(format(day, "yyyy-MM-dd"), []));
+
+    allDayEntries.forEach((entry) => {
+      const endMarker = new Date(entry.endAt.getTime() - 1);
+      let cursor = startOfDay(entry.startAt);
+      const lastDay = startOfDay(endMarker);
+
+      while (cursor.getTime() <= lastDay.getTime()) {
+        const key = format(cursor, "yyyy-MM-dd");
+        const list = map.get(key);
+        if (list) list.push(entry);
+        cursor = addDays(cursor, 1);
+      }
+    });
+
+    return map;
+  }, [allDayEntries, viewDays]);
 
   const visibleRange = useMemo(() => {
     if (view === "month" || filteredEntries.length === 0) {
@@ -562,9 +618,9 @@ export default function CalendarPage() {
         )}
 
         {!loading && !error && view !== "month" && (
-          <div className="rounded-xl border border-border/60 bg-background/90 shadow-sm overflow-hidden">
+          <div className="rounded-xl border border-slate-200/70 bg-white shadow-sm overflow-hidden">
             <div
-              className="grid sticky top-0 z-20 border-b border-border/60 bg-white text-xs text-muted-foreground"
+              className="grid sticky top-0 z-20 border-b border-slate-200/70 bg-white text-xs text-slate-500"
               style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(${viewDays.length}, minmax(0, 1fr))` }}
             >
               <div className="px-4 py-4">
@@ -574,8 +630,8 @@ export default function CalendarPage() {
                 <div
                   key={`header-${format(day, "yyyy-MM-dd")}`}
                   className={cn(
-                    "border-l border-border/60 px-4 py-3",
-                    isToday(day) && "bg-blue-50/60 text-blue-700"
+                    "border-l border-slate-200/70 px-4 py-3",
+                    isToday(day) && "bg-slate-50 text-slate-900"
                   )}
                 >
                   <div className="text-[10px] font-semibold uppercase tracking-[0.2em]">{format(day, "EEE")}</div>
@@ -583,7 +639,7 @@ export default function CalendarPage() {
                     <div
                       className={cn(
                         "flex h-9 w-9 items-center justify-center rounded-full border text-sm font-semibold",
-                        isToday(day) ? "border-blue-400 bg-blue-600 text-white" : "border-border/60"
+                        isToday(day) ? "border-slate-800 bg-slate-900 text-white" : "border-slate-200"
                       )}
                     >
                       {format(day, "d")}
@@ -603,23 +659,19 @@ export default function CalendarPage() {
                 }}
               >
                 <div
-                  className="relative border-r border-border/60 bg-white sticky left-0 z-10"
+                  className="relative border-r border-slate-200/70 bg-white sticky left-0 z-10"
                   style={{ height: HOUR_HEIGHT * hours.length }}
                 >
                   {hours.map((hour) => {
                     const labelTime = addHours(startOfDay(anchorDate), hour);
-                    const isEven = (hour - visibleRange.startHour) % 2 === 0;
                     return (
                       <div
                         key={`hour-${hour}`}
                         className="absolute left-0 flex w-full items-start gap-2"
                         style={{ top: (hour - visibleRange.startHour) * HOUR_HEIGHT }}
                       >
-                        <div
-                          className={cn("absolute left-0 right-0 top-0 border-t border-border/40", isEven && "bg-blue-50/30")}
-                          style={{ height: HOUR_HEIGHT }}
-                        />
-                        <div className="w-full px-3 text-[11px] font-medium text-muted-foreground">
+                        <div className="absolute left-0 right-0 top-0 border-t border-slate-200/60" />
+                        <div className="w-full px-3 text-[11px] font-medium text-slate-400">
                           {format(labelTime, "h a")}
                         </div>
                       </div>
@@ -661,19 +713,16 @@ export default function CalendarPage() {
                     <div
                       key={dayKey}
                       className={cn(
-                        "relative border-l border-border/60 bg-white",
-                        isToday(day) && "bg-blue-50/20"
+                        "relative border-l border-slate-200/70 bg-white",
+                        isToday(day) && "bg-slate-50/70"
                       )}
                       style={{ height: HOUR_HEIGHT * hours.length }}
                     >
                       {hours.map((hour) => (
                         <div
                           key={`${dayKey}-line-${hour}`}
-                          className={cn(
-                            "absolute left-0 right-0 border-t border-border/40",
-                            (hour - visibleRange.startHour) % 2 === 0 && "bg-blue-50/30"
-                          )}
-                          style={{ top: (hour - visibleRange.startHour) * HOUR_HEIGHT, height: HOUR_HEIGHT }}
+                          className="absolute left-0 right-0 border-t border-slate-200/60"
+                          style={{ top: (hour - visibleRange.startHour) * HOUR_HEIGHT }}
                         />
                       ))}
 
@@ -703,34 +752,30 @@ export default function CalendarPage() {
                       const left = `calc(${columnWidth * columnIndex}% + ${columnIndex * 6}px + 6px)`;
                       const width = `calc(${columnWidth}% - 12px)`;
                       const durationMinutes = endMin - startMin;
+                      const primaryUserId = entry.userIds[0];
+                      const primaryEmail = primaryUserId ? userEmailMap.get(primaryUserId) : undefined;
+                      const palette = (primaryEmail && USER_PALETTE[primaryEmail]) || DEFAULT_PALETTE;
+                      const paletteClass = entry.isWork ? palette.work : palette.personal;
+                      const muted = entry.type === "busy" ? "opacity-75" : "";
                       const label = entry.userIds.map((id) => userMap.get(id)).filter(Boolean).join(" + ");
-                      const isShared = entry.userIds.length > 1;
-                      const isWork = entry.type === "busy" || entry.isWork;
-                      const accent =
-                        entry.type === "busy"
-                          ? "border-muted-foreground/30 bg-muted/50 text-muted-foreground"
-                          : isWork
-                            ? "border-amber-400/50 bg-amber-100/60 text-amber-900"
-                            : isShared
-                              ? "border-emerald-400/50 bg-emerald-100/60 text-emerald-900"
-                              : "border-blue-400/50 bg-blue-100/60 text-blue-900";
                       return (
                           <div
                             key={entry.key}
                             className={cn(
-                              "absolute overflow-hidden rounded-lg border px-2 py-1 text-[11px] shadow-sm"
+                              "absolute overflow-hidden rounded-md border border-slate-200/70 px-2 py-1 text-[11px] shadow-sm border-l-[3px]",
+                              paletteClass,
+                              muted
                             )}
                             style={{ top, height, left, width }}
                           >
-                            <div className={cn("absolute inset-0 -z-10 rounded-lg border", accent)} />
                             <div className="truncate text-[11px] font-semibold">{entry.title}</div>
                             {durationMinutes >= 30 && (
-                              <div className="truncate text-[10px] text-muted-foreground">
+                              <div className="truncate text-[10px] text-slate-500">
                                 {format(entry.startAt, "h:mm a")}–{format(entry.endAt, "h:mm a")}
                               </div>
                             )}
                             {durationMinutes >= 60 && label && (
-                              <div className="truncate text-[10px] text-muted-foreground">{label}</div>
+                              <div className="truncate text-[10px] text-slate-500">{label}</div>
                             )}
                           </div>
                         );
