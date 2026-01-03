@@ -7,6 +7,7 @@ import TellerRepairPage from './pages/TellerRepairPage';
 import CalendarPage from './pages/CalendarPage';
 import { AuthModal } from '@/components/AuthModal';
 import { Navbar } from '@/components/Navbar';
+import { Toaster } from '@/components/ui/toaster';
 import { verifyAuthentication, useAuthStore } from '@/lib/api';
 
 function App() {
@@ -96,6 +97,7 @@ function App() {
           </div>
         </div>
       )}
+      <Toaster />
     </>
   );
 }
