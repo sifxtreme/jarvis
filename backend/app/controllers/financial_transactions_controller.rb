@@ -11,7 +11,6 @@ class FinancialTransactionsController < ApplicationController
     show_hidden = params[:show_hidden]
     show_needs_review = params[:show_needs_review]
     exclude_income = params[:exclude_income] == 'true'
-    positive_only = params[:positive_only] == 'true'
     columns = [:id, :plaid_id, :plaid_name, :merchant_name, :category, :source, :amount, :transacted_at, :created_at,
                :updated_at, :hidden, :reviewed, :amortized_months]
     columns << :raw_data if params[:include_raw_data] == 'true'
@@ -50,7 +49,6 @@ class FinancialTransactionsController < ApplicationController
     end
 
     db_query = db_query.where("category NOT ILIKE '%income%' OR category IS NULL") if exclude_income
-    db_query = db_query.where('amount > 0') if positive_only
     db_query = db_query.where('hidden is true') if show_hidden == 'true'
     db_query = db_query.where('hidden is false') if show_hidden == 'false'
     db_query = db_query.where('reviewed is false') if show_needs_review == 'true'
@@ -67,7 +65,6 @@ class FinancialTransactionsController < ApplicationController
       suggestion_scope = FinancialTransaction.where(hidden: false)
         .where('transacted_at >= ? AND transacted_at <= ?', start_date, end_date)
         .where("category NOT ILIKE '%income%' OR category IS NULL")
-        .where('amount > 0')
 
       if query.present?
         if exact
@@ -358,7 +355,6 @@ class FinancialTransactionsController < ApplicationController
     scope = FinancialTransaction.where(hidden: false)
       .where('transacted_at >= ? AND transacted_at <= ?', start_date, end_date)
       .where("category NOT ILIKE '%income%' OR category IS NULL")
-      .where('amount > 0')
 
     if exact
       lowered = query.downcase

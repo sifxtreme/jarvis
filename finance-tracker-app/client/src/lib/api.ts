@@ -502,7 +502,6 @@ export const getMerchantTransactions = async (filters: MerchantTransactionsFilte
   if (filters.start_month) params.append('start_month', filters.start_month);
   if (filters.end_month) params.append('end_month', filters.end_month);
   params.append('exclude_income', 'true');
-  params.append('positive_only', 'true');
   params.append('show_hidden', 'false');
 
   try {

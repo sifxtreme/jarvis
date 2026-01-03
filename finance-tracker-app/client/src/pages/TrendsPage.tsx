@@ -666,6 +666,22 @@ export default function TrendsPage() {
     });
   }
   const allMerchants = filteredMerchants.slice(0, categoryCount);
+  const merchantVisibleMax = useMemo(() => {
+    if (!merchantChartData.length) return 0;
+    return Math.max(...merchantChartData.map(d => {
+      let max = 0;
+      allMerchants.forEach(merch => {
+        if (!hiddenMerchants.has(merch.merchant)) {
+          const val = (d as Record<string, number | string | null>)[merch.merchant] as number || 0;
+          if (val > max) max = val;
+        }
+      });
+      return max;
+    }));
+  }, [merchantChartData, allMerchants, hiddenMerchants]);
+  const merchantTrendMax = merchantTrendSeries.length > 0
+    ? Math.max(...merchantTrendSeries.map(d => d.total))
+    : 0;
 
   // Filter and add moving average to monthly data
   const monthlyData = filterByMonthRange(trends?.monthly_totals || []);
@@ -1206,7 +1222,7 @@ export default function TrendsPage() {
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="month" tickFormatter={formatMonthWithYear} tick={{ fontSize: 12 }} />
                     <YAxis
-                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                      tickFormatter={(value) => formatAxisCurrency(value, merchantTrendMax)}
                       tick={{ fontSize: 12 }}
                       domain={[0, () => {
                         const max = Math.max(...merchantTrendSeries.map(d => d.total));
@@ -1258,22 +1274,9 @@ export default function TrendsPage() {
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="month" tick={{ fontSize: 12 }} />
               <YAxis
-                tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                tickFormatter={(value) => formatAxisCurrency(value, merchantVisibleMax)}
                 tick={{ fontSize: 12 }}
-                domain={[0, () => {
-                  // Calculate max from visible merchants only
-                  const visibleMax = Math.max(...merchantChartData.map(d => {
-                    let max = 0;
-                    allMerchants.forEach(merch => {
-                      if (!hiddenMerchants.has(merch.merchant)) {
-                        const val = (d as Record<string, number | string | null>)[merch.merchant] as number || 0;
-                        if (val > max) max = val;
-                      }
-                    });
-                    return max;
-                  }));
-                  return Math.ceil(visibleMax * 1.1) || 1000; // 10% padding, fallback to 1000
-                }]}
+                domain={[0, Math.ceil(merchantVisibleMax * 1.1) || 1000]}
               />
               <Tooltip cursor={false} content={renderMerchantDotTooltip} />
               <Legend content={(props) => renderClickableLegend(props, hiddenMerchants, toggleMerchant)} />
