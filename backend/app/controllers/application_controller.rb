@@ -1,4 +1,5 @@
 class ApplicationController < ActionController::API
+  include ActionController::Cookies
   include GoogleAuth
 
   before_action :validate_header
@@ -7,6 +8,11 @@ class ApplicationController < ActionController::API
     return if Rails.env.development?
 
     Rails.logger.tagged("AUTH") { Rails.logger.warn "Validating authorization header: #{request.headers['Authorization']}" }
+
+    if session[:user_email].present?
+      @current_user_email = session[:user_email]
+      return
+    end
 
     if allow_google_auth?
       authenticate_google!

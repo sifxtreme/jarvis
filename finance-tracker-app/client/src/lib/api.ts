@@ -3,7 +3,6 @@ import { create } from 'zustand';
 
 // Define constants first
 export const API_BASE_URL = 'https://sifxtre.me/api';
-export const GOOGLE_ID_TOKEN_KEY = 'JARVIS_GOOGLE_ID_TOKEN';
 
 interface AuthStore {
   showAuthModal: boolean;
@@ -15,18 +14,14 @@ interface AuthStore {
 export const useAuthStore = create<AuthStore>((set) => ({
   showAuthModal: false,
   setShowAuthModal: (show) => set({ showAuthModal: show }),
-  isAuthenticated: !!localStorage.getItem(GOOGLE_ID_TOKEN_KEY),
+  isAuthenticated: false,
   setIsAuthenticated: (authenticated) => set({ isAuthenticated: authenticated }),
 }));
 
 // Create an axios instance
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Authorization': localStorage.getItem(GOOGLE_ID_TOKEN_KEY)
-      ? `Bearer ${localStorage.getItem(GOOGLE_ID_TOKEN_KEY)}`
-      : undefined
-  }
+  withCredentials: true
 });
 
 // Add response interceptor
@@ -46,19 +41,13 @@ axiosInstance.interceptors.response.use(
 
 // Add request interceptor to update auth header
 axiosInstance.interceptors.request.use(config => {
-  const token = localStorage.getItem(GOOGLE_ID_TOKEN_KEY);
-  config.headers.Authorization = token ? `Bearer ${token}` : undefined;
+  config.headers.Authorization = undefined;
   return config;
 });
 
 // Function to verify if the current API key is valid
 export const verifyAuthentication = async (): Promise<boolean> => {
   try {
-    const token = localStorage.getItem(GOOGLE_ID_TOKEN_KEY);
-    if (!token) {
-      return false;
-    }
-
     // Make a lightweight request to verify the API key
     // Using the budgets endpoint with a minimal request
     await axiosInstance.get('/budgets', {
@@ -69,18 +58,17 @@ export const verifyAuthentication = async (): Promise<boolean> => {
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       // If we get a 401, we know we're unauthenticated
-      localStorage.removeItem(GOOGLE_ID_TOKEN_KEY);
       return false;
     }
     // For other errors, assume the API is down but the key might be valid
     console.error('Error verifying authentication:', error);
-    return !!localStorage.getItem(GOOGLE_ID_TOKEN_KEY);
+    return true;
   }
 };
 
 // Function to set authentication
 export const setAuthentication = (token: string): void => {
-  localStorage.setItem(GOOGLE_ID_TOKEN_KEY, token);
+  localStorage.removeItem(GOOGLE_ID_TOKEN_KEY);
   useAuthStore.getState().setIsAuthenticated(true);
 };
 
@@ -92,6 +80,14 @@ export const clearAuthentication = (): void => {
 
 export const getGoogleCalendarAuthUrl = async (): Promise<string> => {
   return `${API_BASE_URL}/auth/google_oauth2`;
+};
+
+export const createSession = async (idToken: string): Promise<void> => {
+  await axiosInstance.post('/auth/session', { id_token: idToken });
+};
+
+export const destroySession = async (): Promise<void> => {
+  await axiosInstance.delete('/auth/session');
 };
 
 export type CalendarItem = {

@@ -16,6 +16,8 @@ Rails.application.routes.draw do
   post 'slack/events', to: 'slack_events#events'
 
   get 'auth/google_oauth2/callback', to: 'google_calendar_auth#callback'
+  post 'auth/session', to: 'session#create'
+  delete 'auth/session', to: 'session#destroy'
   get 'calendar/calendars', to: 'calendar#calendars'
   get 'calendar/overview', to: 'calendar#overview'
   post 'calendar/connections', to: 'calendar#upsert_connection'

@@ -5,7 +5,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useState } from "react";
-import { setAuthentication } from "../lib/api";
+import { createSession, setAuthentication } from "../lib/api";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 
 interface AuthModalProps {
@@ -21,6 +21,7 @@ export function AuthModal({ isOpen, onAuthenticate }: AuthModalProps) {
     setIsLoading(true);
     setError("");
     try {
+      await createSession(token);
       setAuthentication(token);
       onAuthenticate();
     } catch (err) {

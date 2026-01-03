@@ -5,6 +5,10 @@ module GoogleAuth
 
   def authenticate_google!
     token = bearer_token
+    authenticate_google_token!(token)
+  end
+
+  def authenticate_google_token!(token)
     unless token
       render json: { msg: 'Unauthorized' }, status: :unauthorized
       return

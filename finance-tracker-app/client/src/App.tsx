@@ -7,7 +7,7 @@ import TellerRepairPage from './pages/TellerRepairPage';
 import CalendarPage from './pages/CalendarPage';
 import { AuthModal } from '@/components/AuthModal';
 import { Navbar } from '@/components/Navbar';
-import { GOOGLE_ID_TOKEN_KEY, verifyAuthentication, useAuthStore } from '@/lib/api';
+import { verifyAuthentication, useAuthStore } from '@/lib/api';
 
 function App() {
   // Use the authentication state from the store
@@ -16,30 +16,16 @@ function App() {
   const location = useLocation();
 
   useEffect(() => {
-    // Check if we have an API key in localStorage
-    const token = localStorage.getItem(GOOGLE_ID_TOKEN_KEY);
-
-    if (!token) {
-      // No API key, we're definitely not authenticated
-      setIsAuthenticated(false);
-      setIsLoading(false);
-      return;
-    }
-
-    // We have an API key, assume we're authenticated until proven otherwise
-    setIsAuthenticated(true);
-    setIsLoading(false);
-
-    // Verify the API key in the background
+    // Verify session in the background
     // This will update the auth state if the key is invalid
     verifyAuthentication().then(isValid => {
-      if (!isValid) {
-        setIsAuthenticated(false);
-      }
+      setIsAuthenticated(isValid);
+      setIsLoading(false);
     }).catch(error => {
       console.error('Authentication verification failed:', error);
       // Don't change authentication state for network errors
       // The API interceptor will handle 401 errors during API calls
+      setIsLoading(false);
     });
   }, [setIsAuthenticated]);
 
