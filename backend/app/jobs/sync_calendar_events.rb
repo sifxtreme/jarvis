@@ -25,13 +25,25 @@ class SyncCalendarEvents
     busy_times = response.calendars[connection.calendar_id]&.busy || []
 
     BusyBlock.where(user_id: connection.user_id, calendar_id: connection.calendar_id)
-             .where(start_at: time_min..time_max)
+             .where("start_at < ? OR start_at > ?", time_min, time_max)
              .delete_all
 
+    existing = BusyBlock.where(user_id: connection.user_id, calendar_id: connection.calendar_id)
+                        .where(start_at: time_min..time_max)
+                        .pluck(:id, :start_at, :end_at)
+                        .map { |id, start_at, end_at| [busy_key(start_at, end_at), id] }
+                        .to_h
+
+    seen_keys = []
     busy_times.each do |block|
       start_at = parse_time(block.start)
       end_at = parse_time(block.end)
       next unless start_at && end_at
+
+      key = busy_key(start_at, end_at)
+      seen_keys << key
+
+      next if existing.key?(key)
 
       BusyBlock.create!(
         user_id: connection.user_id,
@@ -40,6 +52,9 @@ class SyncCalendarEvents
         end_at: end_at
       )
     end
+
+    stale_ids = existing.reject { |key, _id| seen_keys.include?(key) }.values
+    BusyBlock.where(id: stale_ids).delete_all if stale_ids.any?
 
     connection.update(last_synced_at: Time.current)
   end
@@ -52,8 +67,14 @@ class SyncCalendarEvents
     )
 
     CalendarEvent.where(user_id: connection.user_id, calendar_id: connection.calendar_id)
-                 .where(start_at: time_min..time_max)
+                 .where("start_at < ? OR start_at > ?", time_min, time_max)
                  .delete_all
+
+    existing = CalendarEvent.where(user_id: connection.user_id, calendar_id: connection.calendar_id)
+                            .where(start_at: time_min..time_max)
+                            .index_by(&:event_id)
+
+    seen_ids = []
 
     events.each do |event|
       next if event.status == 'cancelled'
@@ -61,10 +82,8 @@ class SyncCalendarEvents
       start_at = parse_time(event.start.date_time || event.start.date)
       end_at = parse_time(event.end.date_time || event.end.date)
 
-      CalendarEvent.create!(
-        user_id: connection.user_id,
-        calendar_id: connection.calendar_id,
-        event_id: event.id,
+      seen_ids << event.id
+      attrs = {
         title: event.summary,
         description: event.description,
         location: event.location,
@@ -73,8 +92,25 @@ class SyncCalendarEvents
         attendees: (event.attendees || []).map { |a| { email: a.email, response_status: a.response_status } },
         raw_event: event.to_h,
         source: 'google_sync'
-      )
+      }
+
+      if existing_event = existing[event.id]
+        existing_event.update(attrs)
+      else
+        CalendarEvent.create!(
+          attrs.merge(
+            user_id: connection.user_id,
+            calendar_id: connection.calendar_id,
+            event_id: event.id
+          )
+        )
+      end
     end
+
+    CalendarEvent.where(user_id: connection.user_id, calendar_id: connection.calendar_id)
+                 .where(start_at: time_min..time_max)
+                 .where.not(event_id: seen_ids)
+                 .delete_all
 
     connection.update(last_synced_at: Time.current)
   end
@@ -85,5 +121,9 @@ class SyncCalendarEvents
     Time.zone.parse(value.to_s)
   rescue StandardError
     nil
+  end
+
+  def self.busy_key(start_at, end_at)
+    "#{start_at.iso8601}-#{end_at.iso8601}"
   end
 end

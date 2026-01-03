@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2025_01_15_000005) do
+ActiveRecord::Schema.define(version: 2025_01_15_000006) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -179,6 +179,7 @@ ActiveRecord::Schema.define(version: 2025_01_15_000005) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["user_id", "calendar_id"], name: "index_calendar_connections_on_user_id_and_calendar_id", unique: true
+    t.index ["sync_enabled", "busy_only"], name: "index_calendar_connections_on_sync_flags"
   end
 
   create_table "busy_blocks", force: :cascade do |t|
@@ -189,6 +190,7 @@ ActiveRecord::Schema.define(version: 2025_01_15_000005) do
     t.string "source", default: "google_freebusy", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["user_id", "calendar_id", "start_at", "end_at"], name: "index_busy_blocks_on_user_calendar_time", unique: true
     t.index ["start_at", "end_at"], name: "index_busy_blocks_on_start_at_and_end_at"
     t.index ["user_id", "calendar_id"], name: "index_busy_blocks_on_user_id_and_calendar_id"
   end
@@ -207,6 +209,7 @@ ActiveRecord::Schema.define(version: 2025_01_15_000005) do
     t.string "source", default: "slack", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["user_id", "calendar_id", "start_at"], name: "index_calendar_events_on_user_calendar_start"
     t.index ["user_id", "event_id"], name: "index_calendar_events_on_user_id_and_event_id", unique: true
   end
 
