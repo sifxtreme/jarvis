@@ -16,6 +16,7 @@ import { CalendarOverviewResponse, CalendarItem, getCalendarOverview } from "@/l
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 type ViewMode = "day" | "week" | "2weeks" | "month";
 
@@ -26,6 +27,7 @@ type CalendarEntry = {
   startAt: Date;
   endAt: Date;
   calendarSummary?: string | null;
+  calendarId: string;
   userIds: number[];
   isWork: boolean;
 };
@@ -41,7 +43,7 @@ const GEO_CACHE_KEY = "jarvis_geo";
 const GEO_DENIED_KEY = "jarvis_geo_denied";
 const HOUR_HEIGHT = 56;
 const DAY_MINUTES = 24 * 60;
-const SUN_LINE_HEIGHT = 1;
+const SUN_LINE_HEIGHT = 2;
 const TIME_COL_WIDTH = 80;
 
 const USER_PALETTE: Record<
@@ -205,7 +207,7 @@ export default function CalendarPage() {
       return;
     }
     if (view === "week" || view === "2weeks") {
-      setAnchorDate((current) => startOfWeek(current, { weekStartsOn: 1 }));
+      setAnchorDate((current) => startOfWeek(current, { weekStartsOn: 0 }));
     }
   }, [view]);
 
@@ -288,6 +290,7 @@ export default function CalendarPage() {
             startAt,
             endAt,
             calendarSummary: item.calendar_summary,
+            calendarId: item.calendar_id,
             userIds,
             isWork: false,
           });
@@ -303,6 +306,7 @@ export default function CalendarPage() {
         startAt,
         endAt,
         calendarSummary: item.calendar_summary,
+        calendarId: item.calendar_id,
         userIds,
         isWork: true,
       });
@@ -335,13 +339,13 @@ export default function CalendarPage() {
 
   const viewDays = useMemo(() => {
     if (view === "month") {
-      const start = startOfWeek(startOfMonth(anchorDate), { weekStartsOn: 1 });
+      const start = startOfWeek(startOfMonth(anchorDate), { weekStartsOn: 0 });
       return Array.from({ length: 42 }, (_, index) => addDays(start, index));
     }
     if (view === "day") {
       return [startOfDay(anchorDate)];
     }
-    const start = startOfWeek(anchorDate, { weekStartsOn: 1 });
+    const start = startOfWeek(anchorDate, { weekStartsOn: 0 });
     const days = view === "2weeks" ? 14 : 7;
     return Array.from({ length: days }, (_, index) => addDays(start, index));
   }, [anchorDate, view]);
@@ -394,15 +398,17 @@ export default function CalendarPage() {
   }, [allDayEntries, viewDays]);
 
   const visibleRange = useMemo(() => {
-    if (view === "month" || filteredEntries.length === 0) {
-      return { startHour: 0, endHour: 24 };
+    const defaultStart = 6;
+    const defaultEnd = 20;
+    if (view === "month" || timedEntries.length === 0) {
+      return { startHour: defaultStart, endHour: defaultEnd };
     }
     const viewStart = viewDays[0];
     const viewEnd = addDays(viewDays[viewDays.length - 1], 1);
     let minMinute = DAY_MINUTES;
     let maxMinute = 0;
 
-    filteredEntries.forEach((entry) => {
+    timedEntries.forEach((entry) => {
       if (entry.endAt <= viewStart || entry.startAt >= viewEnd) return;
       const startDay = startOfDay(entry.startAt);
       const startMinute = Math.max(0, Math.min(DAY_MINUTES, differenceInMinutes(entry.startAt, startDay)));
@@ -413,13 +419,19 @@ export default function CalendarPage() {
     });
 
     if (minMinute === DAY_MINUTES && maxMinute === 0) {
-      return { startHour: 0, endHour: 24 };
+      return { startHour: defaultStart, endHour: defaultEnd };
     }
 
-    const startHour = Math.max(0, Math.floor(minMinute / 60) - 1);
-    const endHour = Math.min(24, Math.ceil(maxMinute / 60) + 1);
+    const startHour = Math.min(
+      defaultStart,
+      Math.max(0, Math.floor(minMinute / 60) - 1)
+    );
+    const endHour = Math.max(
+      defaultEnd,
+      Math.min(24, Math.ceil(maxMinute / 60) + 1)
+    );
     return { startHour, endHour };
-  }, [filteredEntries, view, viewDays]);
+  }, [timedEntries, view, viewDays]);
 
   const hours = useMemo(
     () => Array.from({ length: visibleRange.endHour - visibleRange.startHour }, (_, index) => visibleRange.startHour + index),
@@ -501,7 +513,6 @@ export default function CalendarPage() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl font-bold">Calendar</h1>
-            <p className="text-muted-foreground">Upcoming events and busy blocks</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {viewOptions
@@ -520,7 +531,7 @@ export default function CalendarPage() {
         </div>
 
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="outline" onClick={() => (view === "month" ? handleMonth("prev") : handleNavigate("prev"))}>
               Prev
             </Button>
@@ -531,55 +542,62 @@ export default function CalendarPage() {
               Next
             </Button>
             <span className="text-sm text-muted-foreground">{headerRange}</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button size="sm" variant="outline">
+                  Filters
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-80">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  Filters
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {data?.users.map((user) => {
+                    const label = userMap.get(user.id) || user.email;
+                    const email = user.email;
+                    const palette = USER_PALETTE[email] || DEFAULT_PALETTE;
+                    const personalActive = userFilters[user.id] ?? true;
+                    const workActive = workFilters[user.id] ?? true;
+                    return (
+                      <div key={`filters-${user.id}`} className="flex items-center justify-between gap-4">
+                        <div className="text-sm font-semibold text-slate-700">{label}</div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setUserFilters((prev) => ({ ...prev, [user.id]: !personalActive }))}
+                            className={cn(
+                              "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
+                              personalActive
+                                ? "border-slate-300 bg-slate-900 text-white"
+                                : "border-slate-200 text-slate-500 hover:border-slate-300"
+                            )}
+                          >
+                            <span className={cn("h-2 w-2 rounded-full", palette.dotPersonal)} />
+                            Personal
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setWorkFilters((prev) => ({ ...prev, [user.id]: !workActive }))}
+                            className={cn(
+                              "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
+                              workActive
+                                ? "border-slate-300 bg-slate-900 text-white"
+                                : "border-slate-200 text-slate-500 hover:border-slate-300"
+                            )}
+                          >
+                            <span className={cn("h-2 w-2 rounded-full", palette.dotWork)} />
+                            Work
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
 
-          <div className="rounded-xl border border-slate-200/70 bg-white px-3 py-2 text-sm shadow-sm">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-              Filters
-            </div>
-            <div className="mt-2 grid gap-2">
-              {data?.users.map((user) => {
-                const label = userMap.get(user.id) || user.email;
-                const email = user.email;
-                const palette = USER_PALETTE[email] || DEFAULT_PALETTE;
-                const personalActive = userFilters[user.id] ?? true;
-                const workActive = workFilters[user.id] ?? true;
-                return (
-                  <div key={`filters-${user.id}`} className="flex items-center justify-between gap-4">
-                    <div className="text-sm font-semibold text-slate-700">{label}</div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setUserFilters((prev) => ({ ...prev, [user.id]: !personalActive }))}
-                        className={cn(
-                          "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
-                          personalActive
-                            ? "border-slate-300 bg-slate-900 text-white"
-                            : "border-slate-200 text-slate-500 hover:border-slate-300"
-                        )}
-                      >
-                        <span className={cn("h-2 w-2 rounded-full", palette.dotPersonal)} />
-                        Personal
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setWorkFilters((prev) => ({ ...prev, [user.id]: !workActive }))}
-                        className={cn(
-                          "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
-                          workActive
-                            ? "border-slate-300 bg-slate-900 text-white"
-                            : "border-slate-200 text-slate-500 hover:border-slate-300"
-                        )}
-                      >
-                        <span className={cn("h-2 w-2 rounded-full", palette.dotWork)} />
-                        Work
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
         </div>
 
         {!geo && (
@@ -604,7 +622,7 @@ export default function CalendarPage() {
         {!loading && !error && view === "month" && (
           <div className="rounded-xl border border-border/60 bg-background/70 p-2 shadow-sm">
             <div className="grid grid-cols-7 gap-px rounded-lg bg-border/40 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label) => (
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label) => (
                 <div key={label} className="bg-background/80 px-3 py-2 text-center">
                   {label}
                 </div>
@@ -708,7 +726,11 @@ export default function CalendarPage() {
                       <div className="flex flex-col gap-1">
                         {items.slice(0, 3).map((item) => {
                           const primaryUserId = item.userIds[0];
-                          const primaryEmail = primaryUserId ? userEmailMap.get(primaryUserId) : undefined;
+                          const primaryEmail = item.isWork
+                            ? item.calendarId
+                            : primaryUserId
+                              ? userEmailMap.get(primaryUserId)
+                              : undefined;
                           const palette = (primaryEmail && USER_PALETTE[primaryEmail]) || DEFAULT_PALETTE;
                           const paletteClass = item.isWork ? palette.blockWork : palette.blockPersonal;
                           const muted = item.type === "busy" ? "opacity-75" : "";
@@ -784,12 +806,22 @@ export default function CalendarPage() {
                           : key === "sunrise"
                             ? "from-amber-200/10 via-amber-400/80 to-amber-200/10 shadow-[0_0_10px_rgba(251,191,36,0.35)]"
                             : "from-rose-200/10 via-orange-300/80 to-rose-200/10 shadow-[0_0_10px_rgba(251,113,133,0.35)]";
+                      const label =
+                        key === "dawn" ? "Dawn" : key === "sunrise" ? "Sunrise" : "Sunset";
                       return (
-                        <div
-                          key={`${dayKey}-${key}`}
-                          className={cn("absolute left-4 right-4 bg-gradient-to-r", className)}
-                          style={{ top, height: SUN_LINE_HEIGHT }}
-                        />
+                        <div key={`${dayKey}-${key}`} className="group">
+                          <div
+                            title={label}
+                            className={cn("absolute left-4 right-4 bg-gradient-to-r", className)}
+                            style={{ top, height: SUN_LINE_HEIGHT }}
+                          />
+                          <div
+                            className="absolute left-4 -translate-y-1/2 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500 opacity-0 shadow-sm transition group-hover:opacity-100"
+                            style={{ top }}
+                          >
+                            {label}
+                          </div>
+                        </div>
                       );
                     });
 
@@ -830,14 +862,21 @@ export default function CalendarPage() {
                       const displayStart = Math.max(startMin, visibleStartMin);
                       const displayEnd = Math.min(endMin, visibleEndMin);
                       if (displayEnd <= displayStart) return null;
-                      const top = ((displayStart - visibleStartMin) / 60) * HOUR_HEIGHT;
-                      const height = Math.max(((displayEnd - displayStart) / 60) * HOUR_HEIGHT, 20);
+                      const topBase = ((displayStart - visibleStartMin) / 60) * HOUR_HEIGHT;
+                      const heightBase = Math.max(((displayEnd - displayStart) / 60) * HOUR_HEIGHT, 20);
+                      const busyPadding = entry.type === "busy" ? 2 : 0;
+                      const top = topBase + busyPadding / 2;
+                      const height = Math.max(heightBase - busyPadding, 18);
                       const columnWidth = 100 / totalColumns;
                       const left = `calc(${columnWidth * columnIndex}% + ${columnIndex * 6}px + 6px)`;
                       const width = `calc(${columnWidth}% - 12px)`;
                       const durationMinutes = endMin - startMin;
                       const primaryUserId = entry.userIds[0];
-                      const primaryEmail = primaryUserId ? userEmailMap.get(primaryUserId) : undefined;
+                      const primaryEmail = entry.isWork
+                        ? entry.calendarId
+                        : primaryUserId
+                          ? userEmailMap.get(primaryUserId)
+                          : undefined;
                       const palette = (primaryEmail && USER_PALETTE[primaryEmail]) || DEFAULT_PALETTE;
                       const paletteClass = entry.isWork ? palette.blockWork : palette.blockPersonal;
                       const muted = entry.type === "busy" ? "opacity-75" : "";

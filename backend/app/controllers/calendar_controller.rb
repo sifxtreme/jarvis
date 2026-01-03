@@ -73,7 +73,7 @@ class CalendarController < ApplicationController
     base_date =
       case view
       when 'week', '2weeks'
-        base_date.beginning_of_week
+        base_date.beginning_of_week(:sunday)
       when 'month'
         base_date.beginning_of_month
       else
