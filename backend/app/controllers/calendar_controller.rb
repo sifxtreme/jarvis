@@ -128,7 +128,16 @@ class CalendarController < ApplicationController
   end
 
   def related_calendar_events(event)
-    uid = event.raw_event&.dig('i_cal_uid') || event.raw_event&.dig('iCalUID')
+    raw = event.raw_event || {}
+    recurring_id = raw['recurringEventId']
+    original_start = raw.dig('originalStartTime', 'dateTime') || raw.dig('originalStartTime', 'date')
+
+    if recurring_id && original_start
+      return CalendarEvent.where("raw_event ->> 'recurringEventId' = ?", recurring_id)
+                          .where("(raw_event -> 'originalStartTime' ->> 'dateTime' = ? OR raw_event -> 'originalStartTime' ->> 'date' = ?)", original_start, original_start)
+    end
+
+    uid = raw['i_cal_uid'] || raw['iCalUID']
     return CalendarEvent.where(event_id: event.event_id) if uid.to_s.empty?
 
     CalendarEvent.where("raw_event ->> 'i_cal_uid' = ? OR raw_event ->> 'iCalUID' = ?", uid, uid)
