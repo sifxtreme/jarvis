@@ -28,6 +28,9 @@ class CalendarController < ApplicationController
     users = User.where(active: true)
 
     connections = CalendarConnection.where(user: users).index_by { |c| [c.user_id, c.calendar_id] }
+    work_calendars = CalendarConnection.where(user: users, busy_only: true, sync_enabled: true)
+                                        .select(:calendar_id, :summary)
+                                        .distinct
 
     events = CalendarEvent.where(user: users)
                           .where(start_at: start_time..end_time)
@@ -45,6 +48,7 @@ class CalendarController < ApplicationController
         end_at: end_time.iso8601
       },
       users: users.map { |u| { id: u.id, email: u.email } },
+      work_calendars: work_calendars.map { |cal| { calendar_id: cal.calendar_id, summary: cal.summary } },
       items: (events + busy_blocks).sort_by { |item| item[:start_at] }
     }
   end

@@ -62,6 +62,18 @@ const USER_PALETTE: Record<
     dotPersonal: "bg-amber-400",
     dotWork: "bg-emerald-400",
   },
+  "asif@sevensevensix.com": {
+    blockPersonal: "border-l-sky-400 bg-sky-50/70 text-slate-900",
+    blockWork: "border-l-sky-400 bg-sky-50/70 text-slate-900",
+    dotPersonal: "bg-sky-400",
+    dotWork: "bg-sky-400",
+  },
+  "hafsa.sayyeda@goodrx.com": {
+    blockPersonal: "border-l-emerald-400 bg-emerald-50/70 text-slate-900",
+    blockWork: "border-l-emerald-400 bg-emerald-50/70 text-slate-900",
+    dotPersonal: "bg-emerald-400",
+    dotWork: "bg-emerald-400",
+  },
 };
 const DEFAULT_PALETTE = {
   blockPersonal: "border-l-slate-300 bg-slate-50/70 text-slate-900",
@@ -137,7 +149,7 @@ export default function CalendarPage() {
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(new Date());
   const [userFilters, setUserFilters] = useState<Record<number, boolean>>({});
-  const [workFilters, setWorkFilters] = useState<Record<number, boolean>>({});
+  const [workFilters, setWorkFilters] = useState<Record<string, boolean>>({});
   const [geo, setGeo] = useState<GeoPoint | null>(null);
   const [geoDenied, setGeoDenied] = useState(false);
   const isMobile = useIsMobile();
@@ -232,10 +244,12 @@ export default function CalendarPage() {
   useEffect(() => {
     if (!data) return;
     const initialUsers: Record<number, boolean> = {};
-    const initialWork: Record<number, boolean> = {};
+    const initialWork: Record<string, boolean> = {};
     data.users.forEach((user) => {
       if (initialUsers[user.id] === undefined) initialUsers[user.id] = true;
-      if (initialWork[user.id] === undefined) initialWork[user.id] = true;
+    });
+    (data.work_calendars || []).forEach((cal) => {
+      if (initialWork[cal.calendar_id] === undefined) initialWork[cal.calendar_id] = true;
     });
     setUserFilters((prev) => (Object.keys(prev).length ? prev : initialUsers));
     setWorkFilters((prev) => (Object.keys(prev).length ? prev : initialWork));
@@ -327,7 +341,7 @@ export default function CalendarPage() {
   const filteredEntries = useMemo(() => {
     return entries.filter((entry) => {
       if (entry.isWork) {
-        return entry.userIds.some((id) => workFilters[id]);
+        return workFilters[entry.calendarId] ?? true;
       }
 
       return entry.userIds.some((id) => userFilters[id]);
@@ -558,7 +572,6 @@ export default function CalendarPage() {
                     const email = user.email;
                     const palette = USER_PALETTE[email] || DEFAULT_PALETTE;
                     const personalActive = userFilters[user.id] ?? true;
-                    const workActive = workFilters[user.id] ?? true;
                     return (
                       <div key={`filters-${user.id}`} className="flex items-center justify-between gap-4">
                         <div className="text-sm font-semibold text-slate-700">{label}</div>
@@ -576,23 +589,45 @@ export default function CalendarPage() {
                             <span className={cn("h-2 w-2 rounded-full", palette.dotPersonal)} />
                             Personal
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => setWorkFilters((prev) => ({ ...prev, [user.id]: !workActive }))}
-                            className={cn(
-                              "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
-                              workActive
-                                ? "border-slate-300 bg-slate-900 text-white"
-                                : "border-slate-200 text-slate-500 hover:border-slate-300"
-                            )}
-                          >
-                            <span className={cn("h-2 w-2 rounded-full", palette.dotWork)} />
-                            Work
-                          </button>
                         </div>
                       </div>
                     );
                   })}
+                  <div className="pt-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                      Work calendars
+                    </div>
+                    <div className="mt-2 grid gap-2">
+                      {(data?.work_calendars || []).map((cal) => {
+                        const label =
+                          cal.calendar_id === "asif@sevensevensix.com"
+                            ? "Asif (Work)"
+                            : cal.calendar_id === "hafsa.sayyeda@goodrx.com"
+                              ? "Hafsa (Work)"
+                              : cal.summary || cal.calendar_id;
+                        const palette = USER_PALETTE[cal.calendar_id] || DEFAULT_PALETTE;
+                        const workActive = workFilters[cal.calendar_id] ?? true;
+                        return (
+                          <div key={`work-${cal.calendar_id}`} className="flex items-center justify-between gap-4">
+                            <div className="text-sm font-semibold text-slate-700">{label}</div>
+                            <button
+                              type="button"
+                              onClick={() => setWorkFilters((prev) => ({ ...prev, [cal.calendar_id]: !workActive }))}
+                              className={cn(
+                                "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
+                                workActive
+                                  ? "border-slate-300 bg-slate-900 text-white"
+                                  : "border-slate-200 text-slate-500 hover:border-slate-300"
+                              )}
+                            >
+                              <span className={cn("h-2 w-2 rounded-full", palette.dotWork)} />
+                              Work
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </PopoverContent>
             </Popover>

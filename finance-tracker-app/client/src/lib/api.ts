@@ -103,6 +103,7 @@ export type CalendarItem = {
 export type CalendarOverviewResponse = {
   window: { start_at: string; end_at: string };
   users: { id: number; email: string }[];
+  work_calendars?: { calendar_id: string; summary?: string | null }[];
   items: CalendarItem[];
 };
 
