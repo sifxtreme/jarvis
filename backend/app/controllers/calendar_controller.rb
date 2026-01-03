@@ -1,4 +1,4 @@
-class CalendarController < GoogleAuthController
+class CalendarController < ApplicationController
   DEFAULT_WINDOW_DAYS = 30
 
   def calendars
