@@ -160,6 +160,7 @@ class FinancialTransactionsController < ApplicationController
     # 2. Transactions with any amortized_month in this year
     all_transactions = FinancialTransaction
       .where(hidden: false)
+      .where('transacted_at <= ?', Time.current)
       .where("extract(year from transacted_at) = ? OR EXISTS (SELECT 1 FROM unnest(amortized_months) AS m WHERE m LIKE ?)", year, "#{year}-%")
 
     # Expense-only scope excludes income categories
