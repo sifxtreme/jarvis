@@ -9,7 +9,7 @@ import {
   OTHER_CATEGORY,
   type Transaction,
 } from "../lib/api";
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -101,6 +101,10 @@ export default function TrendsPage() {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
+  const [merchantSuggestionsOpen, setMerchantSuggestionsOpen] = useState(false);
+  const [highlightedMerchantSuggestion, setHighlightedMerchantSuggestion] = useState(-1);
+  const merchantSearchRef = useRef<HTMLDivElement | null>(null);
+  const merchantInputRef = useRef<HTMLInputElement | null>(null);
 
   // Hover state for precise dot highlighting
   const [hoveredCategoryDot, setHoveredCategoryDot] = useState<{ dataKey: string; index: number } | null>(null);
@@ -150,6 +154,27 @@ export default function TrendsPage() {
     staleTime: 30_000,
     retry: 1,
   });
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!merchantSearchRef.current) return;
+      if (!merchantSearchRef.current.contains(event.target as Node)) {
+        setMerchantSuggestionsOpen(false);
+        setHighlightedMerchantSuggestion(-1);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (merchantQuery.trim().length > 1 && (merchantSuggestions?.suggestions?.length || 0) > 0) {
+      setMerchantSuggestionsOpen(true);
+      return;
+    }
+    setMerchantSuggestionsOpen(false);
+    setHighlightedMerchantSuggestion(-1);
+  }, [merchantQuery, merchantSuggestions]);
 
   const { data: merchantTrends, isLoading: merchantTrendsLoading, error: merchantTrendsError } = useQuery({
     queryKey: ['merchant-trends', merchantQuery, merchantExact, merchantStartMonth, merchantEndMonth],
@@ -680,7 +705,7 @@ export default function TrendsPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <h1 className="text-2xl font-bold">Spending Trends</h1>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-end gap-2">
           {/* Month Range Filter */}
           <Select value={monthRange} onValueChange={(v) => setMonthRange(v as MonthRange)}>
             <SelectTrigger className="h-9 w-[140px] text-sm">
@@ -715,7 +740,7 @@ export default function TrendsPage() {
                 }
               }}
             >
-              <SelectTrigger className="h-9 w-[140px] text-sm">
+              <SelectTrigger className="h-9 w-[120px] text-sm">
                 <SelectValue placeholder="Source">
                   {selectedSources.size === 0 ? "All Sources" : `${selectedSources.size} selected`}
                 </SelectValue>
@@ -1009,24 +1034,62 @@ export default function TrendsPage() {
             <div className="grid gap-4 md:grid-cols-[minmax(240px,1.5fr)_auto_auto] md:items-end">
               <div className="space-y-2">
                 <Label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Merchant search</Label>
-                <div className="relative">
+                <div className="relative" ref={merchantSearchRef}>
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     type="search"
                     placeholder="Search merchants..."
                     value={merchantQuery}
-                    onChange={(event) => setMerchantQuery(event.target.value)}
+                    onChange={(event) => {
+                      setMerchantQuery(event.target.value);
+                      setHighlightedMerchantSuggestion(-1);
+                    }}
+                    onFocus={() => {
+                      if (merchantSuggestions?.suggestions?.length) setMerchantSuggestionsOpen(true);
+                    }}
+                    onKeyDown={(event) => {
+                      if (!merchantSuggestionsOpen || !merchantSuggestions?.suggestions?.length) return;
+                      if (event.key === "ArrowDown") {
+                        event.preventDefault();
+                        setHighlightedMerchantSuggestion((current) =>
+                          Math.min(current + 1, merchantSuggestions.suggestions.length - 1)
+                        );
+                      } else if (event.key === "ArrowUp") {
+                        event.preventDefault();
+                        setHighlightedMerchantSuggestion((current) => Math.max(current - 1, 0));
+                      } else if (event.key === "Enter") {
+                        event.preventDefault();
+                        const selected = merchantSuggestions.suggestions[highlightedMerchantSuggestion];
+                        if (selected) {
+                          setMerchantQuery(selected.merchant);
+                          setMerchantSuggestionsOpen(false);
+                          setHighlightedMerchantSuggestion(-1);
+                        }
+                      } else if (event.key === "Escape") {
+                        setMerchantSuggestionsOpen(false);
+                        setHighlightedMerchantSuggestion(-1);
+                      }
+                    }}
                     className="pl-9"
+                    ref={merchantInputRef}
                   />
-                  {merchantQuery.trim().length > 1 && merchantSuggestions?.suggestions?.length ? (
+                  {merchantSuggestionsOpen && merchantSuggestions?.suggestions?.length ? (
                     <div className="absolute z-20 mt-2 w-full rounded-lg border border-border/70 bg-background shadow-lg">
                       <div className="max-h-56 overflow-auto py-1">
-                        {merchantSuggestions.suggestions.map((suggestion) => (
+                        {merchantSuggestions.suggestions.map((suggestion, index) => (
                           <button
                             key={suggestion.merchant}
                             type="button"
-                            className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-muted"
-                            onMouseDown={() => setMerchantQuery(suggestion.merchant)}
+                            className={cn(
+                              "flex w-full items-center justify-between px-3 py-2 text-left text-sm",
+                              highlightedMerchantSuggestion === index ? "bg-muted" : "hover:bg-muted"
+                            )}
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              setMerchantQuery(suggestion.merchant);
+                              setMerchantSuggestionsOpen(false);
+                              setHighlightedMerchantSuggestion(-1);
+                            }}
                           >
                             <span className="font-medium">{suggestion.merchant}</span>
                             <span className="text-xs text-muted-foreground">{formatCurrency(suggestion.total)}</span>
