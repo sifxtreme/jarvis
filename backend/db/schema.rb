@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2025_01_15_000003) do
+ActiveRecord::Schema.define(version: 2025_01_15_000005) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -32,11 +32,13 @@ ActiveRecord::Schema.define(version: 2025_01_15_000003) do
     t.string "thread_id"
     t.string "message_ts"
     t.string "sender_id"
+    t.string "sender_email"
     t.text "text"
     t.boolean "has_image", default: false, null: false
     t.jsonb "raw_payload", default: {}, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["sender_email"], name: "index_chat_messages_on_sender_email"
     t.index ["message_ts"], name: "index_chat_messages_on_message_ts"
     t.index ["transport", "external_id", "thread_id"], name: "index_chat_messages_on_transport_external_thread"
   end
@@ -163,8 +165,56 @@ ActiveRecord::Schema.define(version: 2025_01_15_000003) do
     t.index ["item_type", "item_id"], name: "index_versions_on_item_type_and_item_id"
   end
 
+  create_table "calendar_connections", force: :cascade do |t|
+    t.bigint "user_id"
+    t.string "calendar_id", null: false
+    t.string "summary"
+    t.string "access_role"
+    t.boolean "busy_only", default: false, null: false
+    t.boolean "sync_enabled", default: true, null: false
+    t.boolean "primary", default: false, null: false
+    t.string "time_zone"
+    t.string "source", default: "google", null: false
+    t.datetime "last_synced_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id", "calendar_id"], name: "index_calendar_connections_on_user_id_and_calendar_id", unique: true
+  end
+
+  create_table "busy_blocks", force: :cascade do |t|
+    t.bigint "user_id"
+    t.string "calendar_id", null: false
+    t.datetime "start_at", null: false
+    t.datetime "end_at", null: false
+    t.string "source", default: "google_freebusy", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["start_at", "end_at"], name: "index_busy_blocks_on_start_at_and_end_at"
+    t.index ["user_id", "calendar_id"], name: "index_busy_blocks_on_user_id_and_calendar_id"
+  end
+
+  create_table "calendar_events", force: :cascade do |t|
+    t.bigint "user_id"
+    t.string "calendar_id", null: false
+    t.string "event_id", null: false
+    t.string "title"
+    t.text "description"
+    t.string "location"
+    t.datetime "start_at"
+    t.datetime "end_at"
+    t.jsonb "attendees", default: [], null: false
+    t.jsonb "raw_event", default: {}, null: false
+    t.string "source", default: "slack", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id", "event_id"], name: "index_calendar_events_on_user_id_and_event_id", unique: true
+  end
+
   add_foreign_key "chat", "\"user\"", column: "user_id", name: "chat_user_id_fkey"
   add_foreign_key "message", "chat", name: "message_chat_id_fkey"
   add_foreign_key "subtitles", "subtitle_sets", column: "set_id", name: "subtitles_set_id_fkey"
   add_foreign_key "ai_requests", "chat_messages"
+  add_foreign_key "calendar_connections", "users"
+  add_foreign_key "busy_blocks", "users"
+  add_foreign_key "calendar_events", "users"
 end

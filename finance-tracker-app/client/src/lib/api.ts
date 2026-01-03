@@ -90,6 +90,10 @@ export const clearAuthentication = (): void => {
   useAuthStore.getState().setIsAuthenticated(false);
 };
 
+export const getGoogleCalendarAuthUrl = async (): Promise<string> => {
+  return `${API_BASE_URL}/auth/google_oauth2`;
+};
+
 export interface Transaction {
   id: number;
   transacted_at: string;

@@ -53,12 +53,19 @@ module GoogleAuth
   def record_last_login(payload)
     return unless defined?(User)
 
-    user = User.find_by(email: payload['email'])
-    return unless user
+    user = User.find_or_create_by(email: payload['email']) do |record|
+      record.password_hash = 'unused'
+    end
 
     user.update(
       google_sub: payload['sub'],
       last_login_at: Time.current
     )
+  end
+
+  def current_user
+    return unless defined?(User)
+
+    User.find_by(email: @current_user_email)
   end
 end

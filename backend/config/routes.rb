@@ -15,6 +15,10 @@ Rails.application.routes.draw do
 
   post 'slack/events', to: 'slack_events#events'
 
+  get 'auth/google_oauth2/callback', to: 'google_calendar_auth#callback'
+  get 'calendar/calendars', to: 'calendar#calendars'
+  post 'calendar/connections', to: 'calendar#upsert_connection'
+
   mount Resque::Server, :at => "resque"
   # For details on the DSL available within this file, see http://guides.rubyonrails.org/routing.html
 end

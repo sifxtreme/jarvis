@@ -35,7 +35,7 @@ class SlackMessageHandler
     when 'digest'
       "I can send daily/weekly digests soon. (Calendar querying comes next.)"
     when 'help'
-      "Send event details or a screenshot and I’ll extract it. Calendar creation is next."
+      "Send event details or a screenshot and I’ll create it on your calendar."
     else
       if image_files.any?
         extract_from_image(message)
@@ -63,7 +63,7 @@ class SlackMessageHandler
     base64 = download_file(file['url_private_download'] || file['url_private'])
     result = gemini.extract_event_from_image(base64, mime_type: file['mimetype'])
     log_ai_request(message, result[:usage], request_kind: 'image', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
-    render_extraction_result(result[:event])
+    handle_event_creation(message, result[:event])
   rescue StandardError => e
     log_ai_request(message, {}, request_kind: 'image', model: gemini_extract_model, status: 'error', error_message: e.message)
     "Image extraction error: #{e.message}"
@@ -72,7 +72,7 @@ class SlackMessageHandler
   def extract_from_text(message)
     result = gemini.extract_event_from_text(cleaned_text)
     log_ai_request(message, result[:usage], request_kind: 'text', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
-    render_extraction_result(result[:event])
+    handle_event_creation(message, result[:event])
   end
 
   def render_extraction_result(event)
@@ -85,6 +85,42 @@ class SlackMessageHandler
         "Reply with any changes. (Calendar creation comes next.)"
       ].compact.join("\n\n")
     end
+  end
+
+  def handle_event_creation(message, event)
+    return render_extraction_result(event) if event['error']
+
+    user = resolve_user(message)
+    return "You're not authorized to create events." unless user
+    return "Please connect your calendar at https://finances.sifxtre.me first." if user.google_refresh_token.to_s.empty?
+
+    calendar = GoogleCalendarClient.new(user)
+    attendees = spouse_emails(user)
+    result = calendar.create_event(event, attendees: attendees, guests_can_modify: true)
+
+    CalendarEvent.create!(
+      user: user,
+      calendar_id: 'primary',
+      event_id: result.id,
+      title: result.summary,
+      description: result.description,
+      location: result.location,
+      start_at: result.start&.date_time,
+      end_at: result.end&.date_time,
+      attendees: attendees.map { |email| { email: email } },
+      raw_event: result.to_h,
+      source: 'slack'
+    )
+
+    [
+      "Added to your calendar! ✅",
+      "Title: #{result.summary}",
+      "Date: #{event_date(result)}",
+      "Time: #{event_time(result)}",
+      "Link: #{result.html_link}"
+    ].compact.join("\n")
+  rescue GoogleCalendarClient::CalendarError => e
+    "Calendar error: #{e.message}"
   end
 
   def format_event(event)
@@ -133,12 +169,14 @@ class SlackMessageHandler
   end
 
   def create_chat_message
+    sender_email = slack_user_email
     ChatMessage.create!(
       transport: 'slack',
       external_id: channel,
       thread_id: thread_ts,
       message_ts: @payload['ts'],
       sender_id: @payload['user'],
+      sender_email: sender_email,
       text: cleaned_text.presence,
       has_image: image_files.any?,
       raw_payload: @payload
@@ -198,5 +236,40 @@ class SlackMessageHandler
   rescue StandardError => e
     log_ai_request(message, {}, request_kind: 'intent', model: gemini_intent_model, status: 'error', error_message: e.message)
     { 'intent' => 'create_event' }
+  end
+
+  def resolve_user(message)
+    email = message.sender_email || slack_user_email
+    return nil if email.to_s.empty?
+
+    User.find_by(email: email, active: true)
+  end
+
+  def spouse_emails(user)
+    User.where(active: true).where.not(id: user.id).pluck(:email)
+  end
+
+  def slack_user_email
+    user_id = @payload['user'].to_s
+    return nil if user_id.empty?
+
+    response = client.users_info(user: user_id)
+    response&.user&.profile&.email
+  rescue StandardError
+    nil
+  end
+
+  def event_date(result)
+    if result.start&.date
+      result.start.date
+    else
+      result.start&.date_time&.to_date
+    end
+  end
+
+  def event_time(result)
+    return nil if result.start&.date
+
+    result.start&.date_time&.strftime('%H:%M')
   end
 end

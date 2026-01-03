@@ -11,3 +11,10 @@ testing_resque:
   queue: test
   args:
   description: "This job queues testing jobs"
+
+calendar_busy_sync:
+  cron: "*/10 * * * *"
+  class: "SyncCalendarBusyBlocks"
+  queue: calendar
+  args:
+  description: "Sync busy blocks from connected calendars"

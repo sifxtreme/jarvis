@@ -31,6 +31,13 @@ module JarvisApi
     # Skip views, helpers and assets when generating a new resource.
     config.api_only = true
 
+    # Google OAuth needs cookies + sessions for the OmniAuth flow.
+    config.middleware.use ActionDispatch::Cookies
+    config.middleware.use ActionDispatch::Session::CookieStore, key: '_jarvis_session'
+
+    config.time_zone = 'America/Los_Angeles'
+    config.active_record.default_timezone = :utc
+
     # config.action_mailer.delivery_method = :smtp
     # config.action_mailer.smtp_settings = {
     #   address:              'smtp.gmail.com',

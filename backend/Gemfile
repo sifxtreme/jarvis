@@ -15,6 +15,10 @@ gem 'puma', '~> 3.12'
 gem 'httparty', '0.18.1'
 gem 'slack-ruby-client', '~> 2.4'
 gem 'google-id-token', '~> 1.4.2'
+gem 'google-apis-calendar_v3', '~> 0.45'
+gem 'signet', '~> 0.17'
+gem 'omniauth-google-oauth2', '~> 1.2'
+gem 'omniauth-rails_csrf_protection', '~> 1.0'
 
 gem 'rack-cors', '~> 1.0.5', require: 'rack/cors' # allow cors requests (good for local development against production server)
 

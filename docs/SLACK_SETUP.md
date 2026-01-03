@@ -11,6 +11,7 @@ This config gets Slack wired up with simple test responses.
      - chat:write
      - files:read
      - im:history
+     - users:read.email
 3. Event Subscriptions:
    - Enable events
    - Request URL: `https://<your-domain>/slack/events`
@@ -18,7 +19,8 @@ This config gets Slack wired up with simple test responses.
      - app_mention
      - message.im
 4. Install the app to your workspace.
-5. Copy secrets:
+5. Reinstall the app after adding new scopes.
+6. Copy secrets:
    - `SLACK_BOT_TOKEN` (starts with `xoxb-`)
    - `SLACK_SIGNING_SECRET`
 
