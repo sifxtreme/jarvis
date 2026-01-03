@@ -640,7 +640,7 @@ export default function CalendarPage() {
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-6">
             <h1 className="text-2xl font-bold">Calendar</h1>
             <div className="flex flex-wrap items-center gap-2 md:flex-nowrap">
-              <div className="inline-flex">
+              <div className="inline-flex scale-[0.92] origin-left md:scale-100">
                 <Button
                   size="sm"
                   variant="outline"
@@ -668,7 +668,7 @@ export default function CalendarPage() {
                   {">"}
                 </Button>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
                 {data?.users
                   .slice()
                   .sort((a, b) => {
@@ -687,20 +687,22 @@ export default function CalendarPage() {
                     const email = user.email;
                     const palette = USER_PALETTE[email] || DEFAULT_PALETTE;
                     const personalActive = userFilters[user.id] ?? true;
+                    const mobileLabel = label.replace(/\s*\(.*\)\s*/g, "").split(" ")[0];
                     return (
                       <button
                         key={`filters-${user.id}`}
                         type="button"
                         onClick={() => setUserFilters((prev) => ({ ...prev, [user.id]: !personalActive }))}
                         className={cn(
-                          "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
+                          "flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition md:px-3 md:text-xs",
                           personalActive
                             ? "border-slate-300 bg-slate-900 text-white"
                             : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300"
                         )}
                       >
                         <span className={cn("h-2 w-2 rounded-full", palette.dotPersonal)} />
-                        {label}
+                        <span className="md:hidden">{mobileLabel}</span>
+                        <span className="hidden md:inline">{label}</span>
                       </button>
                     );
                   })}
@@ -724,20 +726,24 @@ export default function CalendarPage() {
                           : cal.summary || cal.calendar_id;
                     const palette = USER_PALETTE[cal.calendar_id] || DEFAULT_PALETTE;
                     const workActive = workFilters[cal.calendar_id] ?? true;
+                    const mobileLabel = label
+                      .replace(/\s*\(Work\)\s*/g, "")
+                      .split(" ")[0];
                     return (
                       <button
                         key={`work-${cal.calendar_id}`}
                         type="button"
                         onClick={() => setWorkFilters((prev) => ({ ...prev, [cal.calendar_id]: !workActive }))}
                         className={cn(
-                          "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
+                          "flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition md:px-3 md:text-xs",
                           workActive
                             ? "border-slate-300 bg-slate-900 text-white"
                             : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300"
                         )}
                       >
                         <span className={cn("h-2 w-2 rounded-full", palette.dotWork)} />
-                        {label}
+                        <span className="md:hidden">{mobileLabel} W</span>
+                        <span className="hidden md:inline">{label}</span>
                       </button>
                     );
                   })}

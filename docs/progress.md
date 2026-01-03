@@ -11,6 +11,7 @@
 - Added calendar chat panel (text-only) with iMessage-style flow + refresh on event creation.
 - Added keyboard shortcuts (D/W/M) and day header click to jump to day view.
 - Added calendar event deletion via popover (deletes in Google, marks cancelled locally).
+- Added shared-event delete (one click removes both calendars) and chat panel toggle.
 
 ## Calendar Sync
 - Fixed duplicate event inserts when calendars are shared across users.
