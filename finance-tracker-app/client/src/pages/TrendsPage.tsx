@@ -1256,56 +1256,6 @@ export default function TrendsPage() {
         </CardContent>
       </Card>
 
-      {/* Merchant Trends */}
-      <Card className="mb-8">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base font-semibold">Spending by Merchant (Month over Month)</CardTitle>
-          <div className="flex items-center gap-4">
-            <Select value={merchantCategoryFilter} onValueChange={setMerchantCategoryFilter}>
-              <SelectTrigger className="w-[160px]">
-                <SelectValue placeholder="Filter by Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {availableCategories.map(cat => (
-                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer config={chartConfig} className="h-[400px] w-full">
-            <LineChart data={merchantChartData}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-              <YAxis
-                tickFormatter={(value) => formatAxisCurrency(value, merchantVisibleMax)}
-                tick={{ fontSize: 12 }}
-                domain={[0, Math.ceil(merchantVisibleMax * 1.1) || 1000]}
-              />
-              <Tooltip cursor={false} content={renderMerchantDotTooltip} />
-              <Legend content={(props) => renderClickableLegend(props, hiddenMerchants, toggleMerchant)} />
-              {allMerchants.map((merch, idx) => {
-                const color = COLORS[idx % COLORS.length];
-                return (
-                  <Line
-                    key={merch.merchant}
-                    type="linear"
-                    dataKey={merch.merchant}
-                    stroke={color}
-                    strokeWidth={hiddenMerchants.has(merch.merchant) ? 0 : 2}
-                    dot={(props) => renderMerchantDot(props, merch.merchant, color)}
-                    activeDot={false}
-                    opacity={hiddenMerchants.has(merch.merchant) ? 0 : 1}
-                  />
-                );
-              })}
-            </LineChart>
-          </ChartContainer>
-        </CardContent>
-      </Card>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         {/* Category Breakdown Pie */}
         <Card>
