@@ -19,6 +19,13 @@ Personal finance tracker with automatic bank sync and spending insights.
 - **Teller Repair Tool** - Built-in tool to fix disconnected bank connections (MFA)
 - **Supported Banks** - Chase, Amex, Bank of America, Citi, Capital One, 5000+ others
 
+### Jarvis Extensions (2026-01-02)
+- **Slack Bot** — Screenshot + text ingestion for calendar events. See docs/features/SLACK_BOT.md.
+- **Gemini Extraction** — Intent + extraction with cost logging. See docs/features/GEMINI_EXTRACTION.md.
+- **Google Auth** — Google Sign-In + session auth for the API. See docs/features/GOOGLE_AUTH.md.
+- **Calendar Sync** — Personal events + busy-only work calendars. See docs/features/CALENDAR_SYNC.md.
+- **Calendar UI** — New /calendar page with day/week/2-week/month views. See docs/features/CALENDAR_UI.md.
+
 ## Architecture
 
 ```
