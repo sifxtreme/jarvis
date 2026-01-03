@@ -6,7 +6,7 @@ Rails.application.config.middleware.use OmniAuth::Builder do
     {
       scope: 'email profile https://www.googleapis.com/auth/calendar',
       access_type: 'offline',
-      prompt: 'consent',
+      prompt: 'consent select_account',
       include_granted_scopes: 'true'
     }
   )
