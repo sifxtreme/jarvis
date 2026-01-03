@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "../components/ui";
 import {
   Table,
@@ -55,6 +54,8 @@ const MOCK_DATA = {
 };
 
 export default function BudgetComparison({ budgets, transactions, isLoading }: BudgetComparisonProps) {
+  void budgets;
+  void transactions;
   if (isLoading) {
     return (
       <Card className="animate-pulse">

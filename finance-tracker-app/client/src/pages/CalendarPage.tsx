@@ -421,7 +421,6 @@ export default function CalendarPage() {
     items.forEach((item) => {
       const startAt = parseISO(item.start_at);
       const endAt = parseISO(item.end_at);
-      const isWork = item.busy_only;
       const userIds = [item.user_id];
 
       if (item.type === "event") {

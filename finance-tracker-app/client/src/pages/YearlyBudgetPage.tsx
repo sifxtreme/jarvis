@@ -1,6 +1,6 @@
 import { Fragment, useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getBudgets, getTransactions, type TransactionFilters, type Budget, type Transaction, OTHER_CATEGORY } from "../lib/api";
+import { getBudgets, getTransactions, type Budget, type Transaction, OTHER_CATEGORY } from "../lib/api";
 import {
   Card,
   CardHeader,
@@ -26,7 +26,6 @@ import {
 } from "@/components/ui/popover";
 import { formatDate } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Settings2 } from "lucide-react";
 
@@ -243,12 +242,15 @@ export default function YearlyBudgetPage() {
   // Create an array of all months for the selected year
   // Include current month if we're past the 20th
   const months = useMemo(() => {
-    return Array.from({ length: 12 }, (_, i) => ({
-      year: selectedYear,
-      month: i + 1,
-      label: new Date(selectedYear, i).toLocaleString('default', { month: 'long' }),
-      isCurrentMonth: selectedYear === currentYear && i + 1 === currentMonth
-    })).filter(month => {
+    return Array.from({ length: 12 }, (value, i) => {
+      void value;
+      return {
+        year: selectedYear,
+        month: i + 1,
+        label: new Date(selectedYear, i).toLocaleString('default', { month: 'long' }),
+        isCurrentMonth: selectedYear === currentYear && i + 1 === currentMonth,
+      };
+    }).filter(month => {
       // Include all months for past years
       if (month.year < currentYear) return true;
       // For current year, include up to current month (including current if past 20th)
@@ -457,12 +459,12 @@ export default function YearlyBudgetPage() {
       // Calculate total income for the month
       const totalIncome = Object.entries(categoryActuals)
         .filter(([category]) => category.toLowerCase().includes('income'))
-        .reduce((sum, [category, monthValues]) => sum + (monthValues[monthNum] || 0), 0);
+        .reduce((sum, [, monthValues]) => sum + (monthValues[monthNum] || 0), 0);
 
       // Calculate total expenses for the month
       const totalExpenses = Object.entries(categoryActuals)
         .filter(([category]) => !category.toLowerCase().includes('income'))
-        .reduce((sum, [category, monthValues]) => sum + (monthValues[monthNum] || 0), 0);
+        .reduce((sum, [, monthValues]) => sum + (monthValues[monthNum] || 0), 0);
 
       // Calculate savings (income - expenses)
       const savings = totalIncome - totalExpenses;
@@ -609,7 +611,7 @@ export default function YearlyBudgetPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {monthlySummary.map((summary, index) => (
+                {monthlySummary.map((summary) => (
                   <TableRow key={summary.month} className={`hover:bg-muted/80 transition-colors ${summary.isCurrentMonth ? 'bg-blue-50/50 dark:bg-blue-950/40' : ''}`}>
                     <TableCell className="font-medium border border-border p-0">
                       <div className={`px-3 py-2 text-sm font-mono ${summary.isCurrentMonth ? 'italic text-blue-700 dark:text-blue-300' : ''}`}>
@@ -807,12 +809,12 @@ export default function YearlyBudgetPage() {
 
                   // Calculate average actual spending for the category across all months
                   const actualValues = Object.entries(categoryActuals[category] || {})
-                    .filter(([monthKey, _]) => {
+                    .filter(([monthKey]) => {
                       const monthNum = parseInt(monthKey);
                       // Only include past months (not current or future months)
                       return selectedYear < currentYear || (selectedYear === currentYear && monthNum < currentMonth);
                     })
-                    .map(([_, value]) => value);
+                    .map(([, value]) => value);
 
                   // For the average calculation, we need to account for all months including those with zero values
                   // Get the total number of months we should be considering
@@ -832,10 +834,6 @@ export default function YearlyBudgetPage() {
                     : avgBudget - avgActual; // For expenses, positive variance means under budget (good)
 
                   // Determine if average actual is positive compared to budget
-                  const isAvgPositive = isIncome
-                    ? avgActual >= avgBudget
-                    : avgActual <= avgBudget;
-
                         return (
                           <TableRow
                             key={category}
@@ -889,7 +887,7 @@ export default function YearlyBudgetPage() {
                             </PopoverTrigger>
                             <PopoverContent className="w-96 p-0">
                               <AllTransactionsPopover
-                                transactions={Object.entries(transactionsByCategory[category] || {}).flatMap(([month, transactions]) => transactions)}
+                                transactions={Object.entries(transactionsByCategory[category] || {}).flatMap(([, transactions]) => transactions)}
                                 category={category}
                                 year={selectedYear}
                               />

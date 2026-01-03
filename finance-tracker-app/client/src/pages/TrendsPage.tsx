@@ -16,8 +16,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { ChartContainer } from "@/components/ui/chart";
 import { formatCurrency, cn, YEARS, getMonthKey } from "@/lib/utils";
 import { Copy as CopyIcon, Download, TrendingUp, TrendingDown, Target, X, Search } from "lucide-react";
@@ -37,8 +35,8 @@ import {
   Legend,
   CartesianGrid,
   ReferenceLine,
-  ResponsiveContainer,
 } from "recharts";
+import type { TooltipProps as RechartsTooltipProps } from "recharts";
 
 const COLORS = [
   "#2563eb", // blue
@@ -57,6 +55,13 @@ const OTHER_COLOR = "#9ca3af"; // gray for "Other" category
 
 const chartConfig = {
   spent: { label: "Spent", color: "#2563eb" },
+};
+
+type DotProps = {
+  cx?: number;
+  cy?: number;
+  index?: number;
+  payload?: { monthKey?: string };
 };
 
 type MonthRange = 'all' | 'q1' | 'q2' | 'q3' | 'q4' | 'h1' | 'h2';
@@ -313,7 +318,7 @@ export default function TrendsPage() {
   };
 
   const formatMonthWithYear = (monthStr: string) => {
-    const [year, month] = monthStr.split("-");
+    const [year] = monthStr.split("-");
     const monthLabel = formatMonth(monthStr);
     return `${monthLabel} '${year.slice(-2)}`;
   };
@@ -504,25 +509,26 @@ export default function TrendsPage() {
   };
 
   // Custom legend with click handler
-  const renderClickableLegend = (props: any, hiddenSet: Set<string>, toggleFn: (name: string) => void) => {
-    const { payload } = props;
+  const renderClickableLegend = (props: unknown, hiddenSet: Set<string>, toggleFn: (name: string) => void) => {
+    const { payload } = (props as { payload?: Array<{ value: string | number; color?: string }> });
     return (
       <div className="flex flex-wrap gap-2 justify-center mt-2">
-        {payload?.map((entry: any, index: number) => {
-          const isHidden = hiddenSet.has(entry.value);
-          const isOther = entry.value === OTHER_CATEGORY;
+        {payload?.map((entry, index) => {
+          const value = String(entry.value);
+          const isHidden = hiddenSet.has(value);
+          const isOther = value === OTHER_CATEGORY;
           return (
             <button
               key={`legend-${index}`}
               onClick={(event) => {
                 if (event.shiftKey) {
                   setPinnedCategoryDot((current) => {
-                    if (current?.dataKey === entry.value) return null;
-                    return { dataKey: entry.value, index: 0 };
+                    if (current?.dataKey === value) return null;
+                    return { dataKey: value, index: 0 };
                   });
                   return;
                 }
-                toggleFn(entry.value);
+                toggleFn(value);
               }}
               className={cn(
                 "flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-all",
@@ -532,9 +538,9 @@ export default function TrendsPage() {
             >
               <span
                 className="w-3 h-3 rounded-sm"
-                style={{ backgroundColor: isOther ? OTHER_COLOR : entry.color }}
+                style={{ backgroundColor: isOther ? OTHER_COLOR : entry.color || "#94a3b8" }}
               />
-              <span>{entry.value}</span>
+              <span>{value}</span>
             </button>
           );
         })}
@@ -543,62 +549,45 @@ export default function TrendsPage() {
   };
 
   // Custom tooltip sorted by value
-  const renderSortedTooltip = ({ active, payload, label }: any) => {
-    if (!active || !payload?.length) return null;
-    const sortedPayload = [...payload].sort((a, b) => (b.value as number) - (a.value as number));
-    return (
-      <div className="bg-background border rounded-lg p-3 shadow-lg max-w-xs">
-        <p className="font-medium mb-2">{label}</p>
-        {sortedPayload.map((entry: any, idx: number) => (
-          <div key={idx} className="flex justify-between gap-4 text-sm">
-            <span style={{ color: entry.color }} className="truncate max-w-[150px]">
-              {entry.name}
-            </span>
-            <span className="font-mono">{formatCurrency(entry.value as number)}</span>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
   // Custom tooltip that only shows when hovering a specific dot
-  const renderCategoryDotTooltip = ({ payload, label }: any) => {
+  const renderCategoryDotTooltip = ({ payload, label }: RechartsTooltipProps<number, string>) => {
     const activeDot = hoveredCategoryDot || pinnedCategoryDot;
     if (!activeDot || !payload?.length) return null;
-    const hoveredEntry = payload.find((p: any) => p.dataKey === activeDot.dataKey);
+    const hoveredEntry = payload.find((p) => String(p.dataKey) === activeDot.dataKey);
     if (!hoveredEntry) return null;
     return (
       <div className="bg-background border rounded-lg p-3 shadow-lg">
         <p className="font-medium mb-1">{label}</p>
         <div className="flex justify-between gap-4 text-sm">
-          <span style={{ color: hoveredEntry.color }}>{hoveredEntry.name}</span>
-          <span className="font-mono">{formatCurrency(hoveredEntry.value as number)}</span>
+          <span style={{ color: hoveredEntry.color }}>{String(hoveredEntry.name || "")}</span>
+          <span className="font-mono">{formatCurrency(Number(hoveredEntry.value || 0))}</span>
         </div>
       </div>
     );
   };
 
-  const renderMerchantDotTooltip = ({ payload, label }: any) => {
+  const renderMerchantDotTooltip = ({ payload, label }: RechartsTooltipProps<number, string>) => {
     if (!hoveredMerchantDot || !payload?.length) return null;
-    const hoveredEntry = payload.find((p: any) => p.dataKey === hoveredMerchantDot.dataKey);
+    const hoveredEntry = payload.find((p) => String(p.dataKey) === hoveredMerchantDot.dataKey);
     if (!hoveredEntry) return null;
     return (
       <div className="bg-background border rounded-lg p-3 shadow-lg">
         <p className="font-medium mb-1">{label}</p>
         <div className="flex justify-between gap-4 text-sm">
-          <span style={{ color: hoveredEntry.color }}>{hoveredEntry.name}</span>
-          <span className="font-mono">{formatCurrency(hoveredEntry.value as number)}</span>
+          <span style={{ color: hoveredEntry.color }}>{String(hoveredEntry.name || "")}</span>
+          <span className="font-mono">{formatCurrency(Number(hoveredEntry.value || 0))}</span>
         </div>
       </div>
     );
   };
 
   // Custom dot component for category chart
-  const renderCategoryDot = (props: any, dataKey: string, color: string): React.ReactElement<SVGElement> => {
+  const renderCategoryDot = (props: DotProps, dataKey: string, color: string): React.ReactElement<SVGElement> => {
     const { cx, cy, index, payload } = props;
     if (cx === undefined || cy === undefined) return <circle r={0} />;
-    const isHovered = hoveredCategoryDot?.dataKey === dataKey && hoveredCategoryDot?.index === index;
-    const isPinned = pinnedCategoryDot?.dataKey === dataKey && pinnedCategoryDot?.index === index;
+    const safeIndex = typeof index === "number" ? index : 0;
+    const isHovered = hoveredCategoryDot?.dataKey === dataKey && hoveredCategoryDot?.index === safeIndex;
+    const isPinned = pinnedCategoryDot?.dataKey === dataKey && pinnedCategoryDot?.index === safeIndex;
     return (
       <circle
         cx={cx}
@@ -608,13 +597,13 @@ export default function TrendsPage() {
         stroke={color}
         strokeWidth={isHovered || isPinned ? 2 : 0}
         style={{ cursor: 'pointer' }}
-        onMouseEnter={() => setHoveredCategoryDot({ dataKey, index })}
+        onMouseEnter={() => setHoveredCategoryDot({ dataKey, index: safeIndex })}
         onMouseLeave={() => setHoveredCategoryDot(null)}
         onClick={(event) => {
           if (event.shiftKey) {
             setPinnedCategoryDot((current) => {
-              if (current?.dataKey === dataKey && current.index === index) return null;
-              return { dataKey, index };
+              if (current?.dataKey === dataKey && current.index === safeIndex) return null;
+              return { dataKey, index: safeIndex };
             });
             return;
           }
@@ -626,10 +615,11 @@ export default function TrendsPage() {
   };
 
   // Custom dot component for merchant chart
-  const renderMerchantDot = (props: any, dataKey: string, color: string): React.ReactElement<SVGElement> => {
+  const renderMerchantDot = (props: DotProps, dataKey: string, color: string): React.ReactElement<SVGElement> => {
     const { cx, cy, index } = props;
     if (cx === undefined || cy === undefined) return <circle r={0} />;
-    const isHovered = hoveredMerchantDot?.dataKey === dataKey && hoveredMerchantDot?.index === index;
+    const safeIndex = typeof index === "number" ? index : 0;
+    const isHovered = hoveredMerchantDot?.dataKey === dataKey && hoveredMerchantDot?.index === safeIndex;
     return (
       <circle
         cx={cx}
@@ -639,7 +629,7 @@ export default function TrendsPage() {
         stroke={color}
         strokeWidth={isHovered ? 2 : 0}
         style={{ cursor: 'pointer' }}
-        onMouseEnter={() => setHoveredMerchantDot({ dataKey, index })}
+        onMouseEnter={() => setHoveredMerchantDot({ dataKey, index: safeIndex })}
         onMouseLeave={() => setHoveredMerchantDot(null)}
       />
     );
@@ -1193,7 +1183,7 @@ export default function TrendsPage() {
                   Exact match
                 </button>
               </div>
-              <div className="flex h-10 items-center gap-2 rounded-lg border border-border/60 bg-background px-3">
+              <div className="flex h-10 items-center gap-2 rounded-lg bg-transparent px-1">
                 <Input
                   type="month"
                   value={merchantStartMonth}
@@ -1450,7 +1440,6 @@ export default function TrendsPage() {
                   // Calculate YTD totals
                   const ytdActual = chartData.reduce((sum, d) => sum + d.actual, 0);
                   const ytdBudget = monthlyBudget * 12; // Full year budget
-                  const ytdVariance = ytdBudget - ytdActual;
                   const ytdVariancePercent = ytdBudget > 0 ? ((ytdActual - ytdBudget) / ytdBudget) * 100 : 0;
                   const isOverBudget = ytdActual > ytdBudget;
 

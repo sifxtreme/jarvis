@@ -54,6 +54,19 @@ axiosInstance.interceptors.response.use(
   }
 );
 
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const response = (error as { response?: { data?: { message?: string } } }).response;
+    if (response?.data?.message) {
+      return response.data.message;
+    }
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return fallback;
+};
+
 // Add request interceptor to update auth header
 axiosInstance.interceptors.request.use(config => {
   config.headers.Authorization = undefined;
@@ -274,9 +287,9 @@ export const getTransactions = async (filters: TransactionFilters): Promise<Tran
     });
 
     return validTransactions;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] Error details:', error);
-    const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch transactions';
+    const errorMessage = getErrorMessage(error, 'Failed to fetch transactions');
     throw new Error(`Failed to fetch transactions: ${errorMessage}`);
   }
 };
@@ -291,9 +304,9 @@ export const getBudgets = async (filters: BudgetFilters): Promise<Budget[]> => {
     const response = await axiosInstance.get<Budget[]>('/budgets', { params });
 
     return response.data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] Budget error details:', error);
-    const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch budgets';
+    const errorMessage = getErrorMessage(error, 'Failed to fetch budgets');
     throw new Error(`Failed to fetch budgets: ${errorMessage}`);
   }
 };
@@ -309,9 +322,7 @@ interface CreateTransactionData {
   reviewed: boolean;
 }
 
-interface UpdateTransactionData extends CreateTransactionData {
-  // Same fields as CreateTransactionData
-}
+type UpdateTransactionData = CreateTransactionData;
 
 // Trends API types
 export interface TrendsPeriod {
@@ -441,9 +452,9 @@ export const getTrends = async (filters: TrendsFilters = {}): Promise<TrendsData
   try {
     const response = await axiosInstance.get<TrendsData>('/financial_transactions/trends', { params });
     return response.data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] Trends error details:', error);
-    const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch trends';
+    const errorMessage = getErrorMessage(error, 'Failed to fetch trends');
     throw new Error(`Failed to fetch trends: ${errorMessage}`);
   }
 };
@@ -467,9 +478,9 @@ export const getMerchantTrends = async (filters: MerchantTrendsFilters): Promise
         total_spent: 0,
       }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] Merchant trends error details:', error);
-    const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch merchant trends';
+    const errorMessage = getErrorMessage(error, 'Failed to fetch merchant trends');
     throw new Error(`Failed to fetch merchant trends: ${errorMessage}`);
   }
 };
@@ -487,9 +498,9 @@ export const getMerchantSuggestions = async (filters: MerchantSuggestionsFilters
   try {
     const response = await axiosInstance.get<MerchantSuggestionsData>('/financial_transactions', { params });
     return response.data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] Merchant suggestions error details:', error);
-    const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch merchant suggestions';
+    const errorMessage = getErrorMessage(error, 'Failed to fetch merchant suggestions');
     throw new Error(`Failed to fetch merchant suggestions: ${errorMessage}`);
   }
 };
@@ -510,9 +521,9 @@ export const getMerchantTransactions = async (filters: MerchantTransactionsFilte
     const { results, error } = response.data || {};
     if (error) throw new Error(error);
     return Array.isArray(results) ? results : [];
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] Merchant transactions error details:', error);
-    const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch merchant transactions';
+    const errorMessage = getErrorMessage(error, 'Failed to fetch merchant transactions');
     throw new Error(`Failed to fetch merchant transactions: ${errorMessage}`);
   }
 };
@@ -556,9 +567,9 @@ export const getRecurringStatus = async (filters: RecurringStatusFilters = {}): 
   try {
     const response = await axiosInstance.get<RecurringStatusData>('/financial_transactions/recurring_status', { params });
     return response.data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] Recurring status error:', error);
-    const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch recurring status';
+    const errorMessage = getErrorMessage(error, 'Failed to fetch recurring status');
     throw new Error(`Failed to fetch recurring status: ${errorMessage}`);
   }
 };
