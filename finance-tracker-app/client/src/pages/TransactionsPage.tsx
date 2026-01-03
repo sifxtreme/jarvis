@@ -3,7 +3,7 @@ import { getTransactions, getBudgets, type TransactionFilters, type Transaction 
 import TransactionTable from "../components/TransactionTable";
 import TransactionStats from "../components/TransactionStats";
 import { RecurringStatusCard } from "../components/RecurringStatusCard";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Panel as ResizablePanel,
   PanelGroup as ResizablePanelGroup,
@@ -22,6 +22,7 @@ export default function TransactionsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(true);
   const [quickAddTransaction, setQuickAddTransaction] = useState<Partial<Transaction> | null>(null);
+  const [panelGroupWidth, setPanelGroupWidth] = useState(0);
 
   // Initialize filters from URL or defaults
   const [filters, setFilters] = useState<TransactionFilters>(() => {
@@ -78,10 +79,24 @@ export default function TransactionsPage() {
     setIsFilterOpen(false);
   };
 
+  const rightPanelDefaultSize = useMemo(() => {
+    if (!panelGroupWidth) return 22;
+    const percent = (400 / panelGroupWidth) * 100;
+    return Math.max(15, Math.min(35, percent));
+  }, [panelGroupWidth]);
+
   return (
-    <div className="h-full flex flex-col">
-      <ResizablePanelGroup direction="horizontal" className="flex-1">
-        <ResizablePanel defaultSize={70} minSize={50}>
+    <div className="h-full flex flex-col" id="transactions-panel-group">
+      <ResizablePanelGroup
+        direction="horizontal"
+        className="flex-1"
+        onLayout={() => {
+          const container = document.getElementById("transactions-panel-group");
+          if (!container) return;
+          setPanelGroupWidth(container.clientWidth);
+        }}
+      >
+        <ResizablePanel defaultSize={75} minSize={55}>
           <div className="h-full flex flex-col">
             <div className="p-4 flex-shrink-0">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -182,8 +197,8 @@ export default function TransactionsPage() {
               </button>
             </ResizeHandle>
             <ResizablePanel
-              defaultSize={25}
-              minSize={isSidePanelOpen ? 10 : 0}
+              defaultSize={rightPanelDefaultSize}
+              minSize={isSidePanelOpen ? 5 : 0}
               className={cn(
                 "hidden md:block h-full overflow-hidden",
                 !isSidePanelOpen && "w-0 !min-w-0 !max-w-0"

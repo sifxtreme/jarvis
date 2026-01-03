@@ -167,6 +167,7 @@ export default function CalendarPage() {
   const [geo, setGeo] = useState<GeoPoint | null>(null);
   const [geoDenied, setGeoDenied] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [mobilePane, setMobilePane] = useState<"agenda" | "chat">("agenda");
   const isMobile = useIsMobile();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [scrollbarWidth, setScrollbarWidth] = useState(0);
@@ -561,6 +562,7 @@ export default function CalendarPage() {
   const headerRange = useMemo(() => {
     const startLabel = format(viewDays[0] || anchorDate, "MMM d");
     const endLabel = format(viewDays[viewDays.length - 1] || anchorDate, "MMM d");
+    if (view === "day") return startLabel;
     return `${startLabel} – ${endLabel}`;
   }, [anchorDate, view, viewDays]);
 
@@ -1113,31 +1115,55 @@ export default function CalendarPage() {
           </div>
         )}
         {!loading && !error && isMobile && view === "day" && (
-          <div className="rounded-xl border border-border/60 bg-white px-4 py-3 shadow-sm dark:border-slate-700/70 dark:bg-slate-950">
-            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              Agenda
-            </div>
-            <div className="mt-3 space-y-2">
-              {(entriesByDay.get(format(anchorDate, "yyyy-MM-dd")) || [])
-                .filter((item) => isSameDay(item.startAt, anchorDate))
-                .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
-                .map((item) => (
-                  <div
-                    key={`agenda-${item.key}`}
-                    className="flex items-start justify-between gap-3 rounded-lg border border-border/60 bg-background/80 px-3 py-2"
-                  >
-                    <div>
-                      <div className="text-sm font-semibold">{item.title}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {format(item.startAt, "h:mm a")} – {format(item.endAt, "h:mm a")}
+          <div className="space-y-3">
+            <ToggleGroup
+              type="single"
+              value={mobilePane}
+              onValueChange={(value) => value && setMobilePane(value as "agenda" | "chat")}
+              className="flex w-full items-center justify-start gap-1"
+            >
+              <ToggleGroupItem value="agenda" size="sm" className="flex-1">
+                Agenda
+              </ToggleGroupItem>
+              <ToggleGroupItem value="chat" size="sm" className="flex-1">
+                Chat
+              </ToggleGroupItem>
+            </ToggleGroup>
+
+            {mobilePane === "agenda" ? (
+              <div className="rounded-xl border border-border/60 bg-white px-4 py-3 shadow-sm dark:border-slate-700/70 dark:bg-slate-950">
+                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                  Agenda
+                </div>
+                <div className="mt-3 space-y-2">
+                  {(entriesByDay.get(format(anchorDate, "yyyy-MM-dd")) || [])
+                    .filter((item) => isSameDay(item.startAt, anchorDate))
+                    .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
+                    .map((item) => (
+                      <div
+                        key={`agenda-${item.key}`}
+                        className="flex items-start justify-between gap-3 rounded-lg border border-border/60 bg-background/80 px-3 py-2"
+                      >
+                        <div>
+                          <div className="text-sm font-semibold">{item.title}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {format(item.startAt, "h:mm a")} – {format(item.endAt, "h:mm a")}
+                          </div>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {item.userIds.map((id) => userMap.get(id)).filter(Boolean).join(" + ")}
+                        </div>
                       </div>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {item.userIds.map((id) => userMap.get(id)).filter(Boolean).join(" + ")}
-                    </div>
-                  </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-border/60 bg-white shadow-sm dark:border-slate-700/70 dark:bg-slate-950">
+                <div className="h-[65vh] overflow-hidden">
+                  <ChatPanel onEventCreated={() => setRefreshKey((current) => current + 1)} />
+                </div>
+              </div>
+            )}
           </div>
         )}
             </div>
