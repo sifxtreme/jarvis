@@ -550,6 +550,13 @@ export default function TrendsPage() {
     );
   };
 
+  const merchantTrendSeries = useMemo(() => {
+    if (!merchantTrends) return [];
+    const months = getMonthRange(merchantTrends.start_month, merchantTrends.end_month);
+    const totals = new Map(merchantTrends.months.map(item => [item.month, item.total]));
+    return months.map(month => ({ month, total: totals.get(month) || 0 }));
+  }, [merchantTrends]);
+
   if (isLoading) {
     return (
       <div className="h-full overflow-auto p-4 md:p-6">
@@ -568,12 +575,6 @@ export default function TrendsPage() {
 
   const categoryChartData = getCategoryChartData();
   const merchantChartData = getMerchantChartData();
-  const merchantTrendSeries = useMemo(() => {
-    if (!merchantTrends) return [];
-    const months = getMonthRange(merchantTrends.start_month, merchantTrends.end_month);
-    const totals = new Map(merchantTrends.months.map(item => [item.month, item.total]));
-    return months.map(month => ({ month, total: totals.get(month) || 0 }));
-  }, [merchantTrends]);
   const allCategories = (trends?.monthly_by_category || [])
     .filter(cat => hideOther ? cat.category !== OTHER_CATEGORY : true)
     .slice(0, categoryCount);
