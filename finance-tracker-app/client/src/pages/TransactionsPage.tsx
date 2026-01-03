@@ -19,7 +19,7 @@ export default function TransactionsPage() {
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(true);
   const [quickAddTransaction, setQuickAddTransaction] = useState<Partial<Transaction> | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [rightPanelWidth, setRightPanelWidth] = useState(400);
+  const [rightPanelWidth, setRightPanelWidth] = useState(425);
   const resizingRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   // Initialize filters from URL or defaults

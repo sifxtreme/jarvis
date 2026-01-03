@@ -71,8 +71,9 @@ export function Navbar() {
               <Settings className="h-3.5 w-3.5" />
               Settings
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="text-xs">
               <DropdownMenuItem
+                className="text-xs font-medium"
                 onSelect={(event) => {
                   event.preventDefault();
                   if (!calendarConnecting) connectCalendar();
@@ -80,7 +81,7 @@ export function Navbar() {
               >
                 {calendarConnecting ? "Connecting..." : "Connect Calendar"}
               </DropdownMenuItem>
-              <DropdownMenuItem asChild>
+              <DropdownMenuItem className="text-xs font-medium" asChild>
                 <Link to="/teller-repair">Teller Repair</Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
