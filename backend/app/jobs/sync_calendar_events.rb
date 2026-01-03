@@ -71,7 +71,6 @@ class SyncCalendarEvents
                  .delete_all
 
     existing = CalendarEvent.where(user_id: connection.user_id, calendar_id: connection.calendar_id)
-                            .where(start_at: time_min..time_max)
                             .index_by(&:event_id)
 
     seen_ids = []
