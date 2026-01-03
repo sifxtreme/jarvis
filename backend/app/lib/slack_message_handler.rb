@@ -96,6 +96,9 @@ class SlackMessageHandler
         "I couldn't match your Slack user to a Jarvis account.",
         "Debug:",
         "slack_user_id: #{@payload['user']}",
+        "event_type: #{@payload['event_type'] || 'unknown'}",
+        "channel_type: #{@payload['channel_type'] || 'unknown'}",
+        "payload_keys: #{@payload.keys.sort.join(', ')}",
         "slack_email: #{slack_user_email || 'nil'}",
         "stored_sender_email: #{message.sender_email || 'nil'}",
         "active_users: #{User.where(active: true).pluck(:email).join(', ')}"

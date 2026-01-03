@@ -25,9 +25,12 @@ class SlackEventsController < WebhookController
       SlackMessageJob,
       channel: event['channel'],
       thread_ts: event['thread_ts'] || event['ts'],
+      user: event['user'],
       text: event['text'],
       files: event['files'],
-      ts: event['ts']
+      ts: event['ts'],
+      event_type: event['type'],
+      channel_type: event['channel_type']
     )
   end
 
