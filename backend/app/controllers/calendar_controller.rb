@@ -68,6 +68,22 @@ class CalendarController < ApplicationController
     render json: { success: true }
   end
 
+  def destroy_event
+    user = current_user
+    return render json: { msg: 'Unauthorized' }, status: :unauthorized unless user
+
+    event = CalendarEvent.find_by(id: params[:id], user_id: user.id)
+    return render json: { msg: 'Event not found' }, status: :not_found unless event
+
+    client = GoogleCalendarClient.new(user)
+    client.delete_event(calendar_id: event.calendar_id, event_id: event.event_id)
+    event.update(status: 'cancelled')
+
+    render json: { success: true }
+  rescue GoogleCalendarClient::CalendarError => e
+    render json: { msg: e.message }, status: :bad_gateway
+  end
+
   private
 
   def calendar_window

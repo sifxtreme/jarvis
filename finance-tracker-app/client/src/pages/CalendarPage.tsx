@@ -15,7 +15,7 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
-import { CalendarOverviewResponse, CalendarItem, getCalendarOverview } from "@/lib/api";
+import { CalendarOverviewResponse, CalendarItem, deleteCalendarEvent, getCalendarOverview } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -33,6 +33,7 @@ import { StateCard } from "@/components/StateCard";
 type ViewMode = "day" | "week" | "2weeks" | "month";
 
 type CalendarEntry = {
+  id: number;
   key: string;
   type: "event" | "busy";
   title: string;
@@ -172,6 +173,7 @@ export default function CalendarPage() {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [scrollbarWidth, setScrollbarWidth] = useState(0);
   const pendingDayRef = useRef<Date | null>(null);
+  const [deletingEventId, setDeletingEventId] = useState<number | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -302,6 +304,19 @@ export default function CalendarPage() {
     setView("day");
   };
 
+  const handleDeleteEvent = async (eventId: number) => {
+    if (deletingEventId) return;
+    setDeletingEventId(eventId);
+    try {
+      await deleteCalendarEvent(eventId);
+      setRefreshKey((current) => current + 1);
+    } catch (error) {
+      console.error("Failed to delete calendar event", error);
+    } finally {
+      setDeletingEventId(null);
+    }
+  };
+
   useEffect(() => {
     if (!data) return;
     const initialUsers: Record<number, boolean> = {};
@@ -359,6 +374,7 @@ export default function CalendarPage() {
           existing.userIds = Array.from(new Set([...existing.userIds, item.user_id]));
         } else {
           eventMap.set(key, {
+            id: item.id,
             key,
             type: "event",
             title: item.title || "Untitled event",
@@ -377,6 +393,7 @@ export default function CalendarPage() {
 
       const busyKey = `busy-${item.user_id}-${item.calendar_id}-${item.start_at}-${item.end_at}`;
       eventMap.set(busyKey, {
+        id: item.id,
         key: busyKey,
         type: "busy",
         title: "Busy",
@@ -652,54 +669,78 @@ export default function CalendarPage() {
                 </Button>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {data?.users.map((user) => {
-                  const label = userMap.get(user.id) || user.email;
-                  const email = user.email;
-                  const palette = USER_PALETTE[email] || DEFAULT_PALETTE;
-                  const personalActive = userFilters[user.id] ?? true;
-                  return (
-                    <button
-                      key={`filters-${user.id}`}
-                      type="button"
-                      onClick={() => setUserFilters((prev) => ({ ...prev, [user.id]: !personalActive }))}
-                      className={cn(
-                        "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
-                        personalActive
-                          ? "border-slate-300 bg-slate-900 text-white"
-                          : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300"
-                      )}
-                    >
-                      <span className={cn("h-2 w-2 rounded-full", palette.dotPersonal)} />
-                      {label}
-                    </button>
-                  );
-                })}
-                {(data?.work_calendars || []).map((cal) => {
-                  const label =
-                    cal.calendar_id === "asif@sevensevensix.com"
-                      ? "Asif (Work)"
-                      : cal.calendar_id === "hafsa.sayyeda@goodrx.com"
-                        ? "Hafsa (Work)"
-                        : cal.summary || cal.calendar_id;
-                  const palette = USER_PALETTE[cal.calendar_id] || DEFAULT_PALETTE;
-                  const workActive = workFilters[cal.calendar_id] ?? true;
-                  return (
-                    <button
-                      key={`work-${cal.calendar_id}`}
-                      type="button"
-                      onClick={() => setWorkFilters((prev) => ({ ...prev, [cal.calendar_id]: !workActive }))}
-                      className={cn(
-                        "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
-                        workActive
-                          ? "border-slate-300 bg-slate-900 text-white"
-                          : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300"
-                      )}
-                    >
-                      <span className={cn("h-2 w-2 rounded-full", palette.dotWork)} />
-                      {label}
-                    </button>
-                  );
-                })}
+                {data?.users
+                  .slice()
+                  .sort((a, b) => {
+                    const aLabel = userMap.get(a.id) || a.email;
+                    const bLabel = userMap.get(b.id) || b.email;
+                    const order = ["Hafsa", "Asif"];
+                    const aIndex = order.indexOf(aLabel);
+                    const bIndex = order.indexOf(bLabel);
+                    if (aIndex !== -1 || bIndex !== -1) {
+                      return (aIndex === -1 ? 99 : aIndex) - (bIndex === -1 ? 99 : bIndex);
+                    }
+                    return aLabel.localeCompare(bLabel);
+                  })
+                  .map((user) => {
+                    const label = userMap.get(user.id) || user.email;
+                    const email = user.email;
+                    const palette = USER_PALETTE[email] || DEFAULT_PALETTE;
+                    const personalActive = userFilters[user.id] ?? true;
+                    return (
+                      <button
+                        key={`filters-${user.id}`}
+                        type="button"
+                        onClick={() => setUserFilters((prev) => ({ ...prev, [user.id]: !personalActive }))}
+                        className={cn(
+                          "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
+                          personalActive
+                            ? "border-slate-300 bg-slate-900 text-white"
+                            : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300"
+                        )}
+                      >
+                        <span className={cn("h-2 w-2 rounded-full", palette.dotPersonal)} />
+                        {label}
+                      </button>
+                    );
+                  })}
+                {(data?.work_calendars || [])
+                  .slice()
+                  .sort((a, b) => {
+                    const order = ["hafsa.sayyeda@goodrx.com", "asif@sevensevensix.com"];
+                    const aIndex = order.indexOf(a.calendar_id);
+                    const bIndex = order.indexOf(b.calendar_id);
+                    if (aIndex !== -1 || bIndex !== -1) {
+                      return (aIndex === -1 ? 99 : aIndex) - (bIndex === -1 ? 99 : bIndex);
+                    }
+                    return (a.summary || a.calendar_id).localeCompare(b.summary || b.calendar_id);
+                  })
+                  .map((cal) => {
+                    const label =
+                      cal.calendar_id === "asif@sevensevensix.com"
+                        ? "Asif (Work)"
+                        : cal.calendar_id === "hafsa.sayyeda@goodrx.com"
+                          ? "Hafsa (Work)"
+                          : cal.summary || cal.calendar_id;
+                    const palette = USER_PALETTE[cal.calendar_id] || DEFAULT_PALETTE;
+                    const workActive = workFilters[cal.calendar_id] ?? true;
+                    return (
+                      <button
+                        key={`work-${cal.calendar_id}`}
+                        type="button"
+                        onClick={() => setWorkFilters((prev) => ({ ...prev, [cal.calendar_id]: !workActive }))}
+                        className={cn(
+                          "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
+                          workActive
+                            ? "border-slate-300 bg-slate-900 text-white"
+                            : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300"
+                        )}
+                      >
+                        <span className={cn("h-2 w-2 rounded-full", palette.dotWork)} />
+                        {label}
+                      </button>
+                    );
+                  })}
               </div>
             </div>
           </div>
@@ -743,9 +784,7 @@ export default function CalendarPage() {
         {error && (
           <StateCard title="Calendar error" description={error} variant="error" />
         )}
-        {!loading && !error && filteredEntries.length === 0 && (
-          <StateCard title="No items in this window" description="Try another date range or adjust filters." />
-        )}
+        {/* Hide empty-state card to keep the calendar chrome clean */}
 
         {!loading && !error && !isMobile && view === "month" && (
           <div className="rounded-xl border border-border/60 bg-background/70 p-2 shadow-sm">
@@ -1076,6 +1115,18 @@ export default function CalendarPage() {
                                       )}
                                       {entry.description && (
                                         <div className="text-xs text-slate-600 dark:text-slate-300 line-clamp-4">{entry.description}</div>
+                                      )}
+                                      {entry.type === "event" && (
+                                        <div className="pt-2">
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => handleDeleteEvent(entry.id)}
+                                            disabled={deletingEventId === entry.id}
+                                          >
+                                            {deletingEventId === entry.id ? "Deleting…" : "Delete"}
+                                          </Button>
+                                        </div>
                                       )}
                                     </div>
                                   </HoverCardContent>

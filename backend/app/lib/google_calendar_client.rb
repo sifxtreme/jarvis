@@ -99,6 +99,12 @@ class GoogleCalendarClient
     raise CalendarError, e.message
   end
 
+  def delete_event(calendar_id:, event_id:)
+    @service.delete_event(calendar_id, event_id)
+  rescue Google::Apis::Error => e
+    raise CalendarError, e.message
+  end
+
   private
 
   def build_oauth_client

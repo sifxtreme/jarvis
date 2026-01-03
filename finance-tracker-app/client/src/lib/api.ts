@@ -117,6 +117,10 @@ export const getCalendarOverview = async (
   return response.data as CalendarOverviewResponse;
 };
 
+export const deleteCalendarEvent = async (id: number): Promise<void> => {
+  await axiosInstance.delete(`/calendar/events/${id}`);
+};
+
 export interface Transaction {
   id: number;
   transacted_at: string;
