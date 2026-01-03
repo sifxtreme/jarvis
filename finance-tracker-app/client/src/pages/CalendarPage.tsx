@@ -118,6 +118,12 @@ const DEFAULT_PALETTE_COLORS = {
 
 type GeoPoint = { lat: number; lng: number };
 
+const getWorkCalendarLabel = (calendarId: string, summary?: string | null) => {
+  if (calendarId === "asif@sevensevensix.com") return "Asif (Work)";
+  if (calendarId === "hafsa.sayyeda@goodrx.com") return "Hafsa (Work)";
+  return summary || calendarId;
+};
+
 type SunTimes = {
   dawn: Date;
   sunrise: Date;
@@ -367,6 +373,14 @@ export default function CalendarPage() {
     const map = new Map<number, string>();
     data?.users.forEach((user) => {
       map.set(user.id, user.email);
+    });
+    return map;
+  }, [data]);
+
+  const workCalendarLabelMap = useMemo(() => {
+    const map = new Map<string, string>();
+    (data?.work_calendars || []).forEach((cal) => {
+      map.set(cal.calendar_id, getWorkCalendarLabel(cal.calendar_id, cal.summary));
     });
     return map;
   }, [data]);
@@ -766,12 +780,7 @@ export default function CalendarPage() {
                     return (a.summary || a.calendar_id).localeCompare(b.summary || b.calendar_id);
                   })
                   .map((cal) => {
-                    const label =
-                      cal.calendar_id === "asif@sevensevensix.com"
-                        ? "Asif (Work)"
-                        : cal.calendar_id === "hafsa.sayyeda@goodrx.com"
-                          ? "Hafsa (Work)"
-                          : cal.summary || cal.calendar_id;
+                    const label = getWorkCalendarLabel(cal.calendar_id, cal.summary);
                     const palette = USER_PALETTE[cal.calendar_id] || DEFAULT_PALETTE;
                     const workActive = workFilters[cal.calendar_id] ?? true;
                     const mobileLabel = label
@@ -1214,22 +1223,25 @@ export default function CalendarPage() {
                   {(entriesByDay.get(format(anchorDate, "yyyy-MM-dd")) || [])
                     .filter((item) => isSameDay(item.startAt, anchorDate))
                     .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
-                    .map((item) => (
-                      <div
-                        key={`agenda-${item.key}`}
-                        className="flex items-start justify-between gap-3 rounded-lg border border-border/60 bg-background/80 px-3 py-2"
-                      >
-                        <div>
-                          <div className="text-sm font-semibold">{item.title}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {format(item.startAt, "h:mm a")} – {format(item.endAt, "h:mm a")}
+                    .map((item) => {
+                      const label = item.isWork
+                        ? workCalendarLabelMap.get(item.calendarId) || item.calendarSummary || item.calendarId
+                        : item.userIds.map((id) => userMap.get(id)).filter(Boolean).join(" + ");
+                      return (
+                        <div
+                          key={`agenda-${item.key}`}
+                          className="flex items-start justify-between gap-3 rounded-lg border border-border/60 bg-background/80 px-3 py-2"
+                        >
+                          <div>
+                            <div className="text-sm font-semibold">{item.title}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {format(item.startAt, "h:mm a")} – {format(item.endAt, "h:mm a")}
+                            </div>
                           </div>
+                          {label && <div className="text-xs text-muted-foreground">{label}</div>}
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          {item.userIds.map((id) => userMap.get(id)).filter(Boolean).join(" + ")}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                 </div>
               </div>
             ) : (
