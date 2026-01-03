@@ -239,6 +239,12 @@ class SlackMessageHandler
   end
 
   def resolve_user(message)
+    slack_id = @payload['user'].to_s
+    if slack_id.present?
+      user = User.find_by(slack_user_id: slack_id, active: true)
+      return user if user
+    end
+
     email = message.sender_email || slack_user_email
     return nil if email.to_s.empty?
 

@@ -1,4 +1,6 @@
 class CalendarController < GoogleAuthController
+  DEFAULT_WINDOW_DAYS = 30
+
   def calendars
     user = current_user
     return render json: { msg: 'Unauthorized' }, status: :unauthorized unless user
@@ -21,6 +23,32 @@ class CalendarController < GoogleAuthController
     render json: { msg: e.message }, status: :bad_gateway
   end
 
+  def overview
+    start_time, end_time = calendar_window
+    users = User.where(active: true)
+
+    connections = CalendarConnection.where(user: users).index_by { |c| [c.user_id, c.calendar_id] }
+
+    events = CalendarEvent.where(user: users)
+                          .where(start_at: start_time..end_time)
+                          .order(:start_at)
+                          .map { |event| serialize_event(event, connections) }
+
+    busy_blocks = BusyBlock.where(user: users)
+                           .where(start_at: start_time..end_time)
+                           .order(:start_at)
+                           .map { |block| serialize_busy(block, connections) }
+
+    render json: {
+      window: {
+        start_at: start_time.iso8601,
+        end_at: end_time.iso8601
+      },
+      users: users.map { |u| { id: u.id, email: u.email } },
+      items: (events + busy_blocks).sort_by { |item| item[:start_at] }
+    }
+  end
+
   def upsert_connection
     user = current_user
     return render json: { msg: 'Unauthorized' }, status: :unauthorized unless user
@@ -33,5 +61,76 @@ class CalendarController < GoogleAuthController
     )
 
     render json: { success: true }
+  end
+
+  private
+
+  def calendar_window
+    view = params[:view].to_s
+    date_param = params[:date].to_s
+    base_date = date_param.empty? ? Time.zone.today : Time.zone.parse(date_param).to_date
+
+    base_date =
+      case view
+      when 'week', '2weeks'
+        base_date.beginning_of_week
+      when 'month'
+        base_date.beginning_of_month
+      else
+        base_date
+      end
+
+    start_time = base_date.beginning_of_day
+    days =
+      case view
+      when 'day'
+        1
+      when 'week'
+        7
+      when '2weeks'
+        14
+      when 'month'
+        (base_date.end_of_month - base_date).to_i + 1
+      else
+        DEFAULT_WINDOW_DAYS
+      end
+
+    [start_time, start_time + days.days]
+  end
+
+  def serialize_event(event, connections)
+    raw = event.raw_event || {}
+    uid = raw['i_cal_uid'] || raw['iCalUID'] || event.event_id
+    connection = connections[[event.user_id, event.calendar_id]]
+
+    {
+      id: event.id,
+      type: 'event',
+      event_id: event.event_id,
+      event_uid: uid,
+      title: event.title,
+      description: event.description,
+      location: event.location,
+      start_at: event.start_at&.iso8601,
+      end_at: event.end_at&.iso8601,
+      calendar_id: event.calendar_id,
+      calendar_summary: connection&.summary,
+      user_id: event.user_id,
+      busy_only: false
+    }
+  end
+
+  def serialize_busy(block, connections)
+    connection = connections[[block.user_id, block.calendar_id]]
+    {
+      id: block.id,
+      type: 'busy',
+      start_at: block.start_at&.iso8601,
+      end_at: block.end_at&.iso8601,
+      calendar_id: block.calendar_id,
+      calendar_summary: connection&.summary,
+      user_id: block.user_id,
+      busy_only: true
+    }
   end
 end

@@ -94,6 +94,38 @@ export const getGoogleCalendarAuthUrl = async (): Promise<string> => {
   return `${API_BASE_URL}/auth/google_oauth2`;
 };
 
+export type CalendarItem = {
+  id: number;
+  type: "event" | "busy";
+  event_id?: string;
+  event_uid?: string;
+  title?: string;
+  description?: string | null;
+  location?: string | null;
+  start_at: string;
+  end_at: string;
+  calendar_id: string;
+  calendar_summary?: string | null;
+  user_id: number;
+  busy_only: boolean;
+};
+
+export type CalendarOverviewResponse = {
+  window: { start_at: string; end_at: string };
+  users: { id: number; email: string }[];
+  items: CalendarItem[];
+};
+
+export const getCalendarOverview = async (
+  view: string,
+  date: string
+): Promise<CalendarOverviewResponse> => {
+  const response = await axiosInstance.get('/calendar/overview', {
+    params: { view, date }
+  });
+  return response.data as CalendarOverviewResponse;
+};
+
 export interface Transaction {
   id: number;
   transacted_at: string;

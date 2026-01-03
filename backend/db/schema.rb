@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2025_01_15_000006) do
+ActiveRecord::Schema.define(version: 2025_01_15_000007) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -149,9 +149,12 @@ ActiveRecord::Schema.define(version: 2025_01_15_000006) do
     t.string "google_refresh_token"
     t.datetime "last_login_at"
     t.boolean "active", default: true, null: false
+    t.string "slack_user_id"
+    t.string "slack_email"
     t.index ["email"], name: "users_email_key", unique: true
     t.index ["google_sub"], name: "index_users_on_google_sub", unique: true
     t.index ["active"], name: "index_users_on_active"
+    t.index ["slack_user_id"], name: "index_users_on_slack_user_id", unique: true
   end
 
   create_table "versions", force: :cascade do |t|

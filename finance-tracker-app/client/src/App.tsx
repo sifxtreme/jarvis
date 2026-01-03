@@ -4,6 +4,7 @@ import TransactionsPage from './pages/TransactionsPage';
 import YearlyBudgetPage from './pages/YearlyBudgetPage';
 import TrendsPage from './pages/TrendsPage';
 import TellerRepairPage from './pages/TellerRepairPage';
+import CalendarPage from './pages/CalendarPage';
 import { AuthModal } from '@/components/AuthModal';
 import { Navbar } from '@/components/Navbar';
 import { GOOGLE_ID_TOKEN_KEY, verifyAuthentication, useAuthStore } from '@/lib/api';
@@ -45,6 +46,7 @@ function App() {
   useEffect(() => {
     const titleMap: Record<string, string> = {
       "/": "Transactions",
+      "/calendar": "Calendar",
       "/trends": "Trends",
       "/yearly-budget": "Yearly Budget",
       "/teller-repair": "Teller Repair",
@@ -74,6 +76,7 @@ function App() {
           <div className="flex-1 overflow-hidden">
             <Routes>
               <Route path="/" element={<TransactionsPage />} />
+              <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/yearly-budget" element={<YearlyBudgetPage />} />
               <Route path="/trends" element={<TrendsPage />} />
               <Route path="/teller-repair" element={<TellerRepairPage />} />

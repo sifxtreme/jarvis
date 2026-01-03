@@ -17,6 +17,7 @@ Rails.application.routes.draw do
 
   get 'auth/google_oauth2/callback', to: 'google_calendar_auth#callback'
   get 'calendar/calendars', to: 'calendar#calendars'
+  get 'calendar/overview', to: 'calendar#overview'
   post 'calendar/connections', to: 'calendar#upsert_connection'
 
   mount Resque::Server, :at => "resque"

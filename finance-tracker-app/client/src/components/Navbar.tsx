@@ -1,15 +1,21 @@
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { TrendingUp, DollarSign, Calendar, Menu, Wrench, Sun, Moon } from "lucide-react";
+import { TrendingUp, DollarSign, Calendar, Menu, Sun, Moon, PiggyBank, Settings } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "@/hooks/useTheme";
 import { getGoogleCalendarAuthUrl } from "@/lib/api";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 
 const navItems = [
   { path: "/", label: "Transactions", icon: DollarSign },
+  { path: "/calendar", label: "Calendar", icon: Calendar },
   { path: "/trends", label: "Trends", icon: TrendingUp },
-  { path: "/yearly-budget", label: "Budget", icon: Calendar },
-  { path: "/teller-repair", label: "Teller", icon: Wrench },
+  { path: "/yearly-budget", label: "Budget", icon: PiggyBank },
 ];
 
 export function Navbar() {
@@ -67,6 +73,17 @@ export function Navbar() {
           >
             {calendarConnecting ? "Connecting..." : "Connect Calendar"}
           </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border border-border text-foreground hover:bg-muted transition-colors">
+              <Settings className="h-3.5 w-3.5" />
+              Settings
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link to="/teller-repair">Teller Repair</Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <button
             onClick={toggleTheme}
             className="p-1.5 hover:bg-muted rounded-md text-muted-foreground hover:text-foreground transition-colors"
@@ -107,6 +124,14 @@ export function Navbar() {
               </Link>
             );
           })}
+          <Link
+            to="/teller-repair"
+            onClick={() => setMobileMenuOpen(false)}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+          >
+            <Settings className="h-4 w-4" />
+            Teller Repair
+          </Link>
           <button
             onClick={connectCalendar}
             className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted w-full"
