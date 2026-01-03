@@ -4,6 +4,9 @@ import {
   addHours,
   addMonths,
   differenceInMinutes,
+  differenceInCalendarDays,
+  endOfMonth,
+  endOfWeek,
   format,
   isSameDay,
   isToday,
@@ -361,7 +364,9 @@ export default function CalendarPage() {
   const viewDays = useMemo(() => {
     if (view === "month") {
       const start = startOfWeek(startOfMonth(anchorDate), { weekStartsOn: 0 });
-      return Array.from({ length: 42 }, (_, index) => addDays(start, index));
+      const end = endOfWeek(endOfMonth(anchorDate), { weekStartsOn: 0 });
+      const length = differenceInCalendarDays(end, start) + 1;
+      return Array.from({ length }, (_, index) => addDays(start, index));
     }
     if (view === "day") {
       return [startOfDay(anchorDate)];
@@ -370,6 +375,13 @@ export default function CalendarPage() {
     const days = view === "2weeks" ? 14 : 7;
     return Array.from({ length: days }, (_, index) => addDays(start, index));
   }, [anchorDate, view]);
+
+  const weekSections = useMemo(() => {
+    if (view === "2weeks" && !isMobile) {
+      return [viewDays.slice(0, 7), viewDays.slice(7, 14)];
+    }
+    return [viewDays];
+  }, [view, viewDays, isMobile]);
 
   const entriesByDay = useMemo(() => {
     const map = new Map<string, CalendarEntry[]>();
@@ -512,20 +524,37 @@ export default function CalendarPage() {
       .filter((item) => item.endMin > item.startMin)
       .sort((a, b) => a.startMin - b.startMin);
 
-    const columnsEnd: number[] = [];
-    const placed = base.map((item) => {
-      let columnIndex = columnsEnd.findIndex((end) => end <= item.startMin);
-      if (columnIndex === -1) {
-        columnIndex = columnsEnd.length;
-        columnsEnd.push(item.endMin);
-      } else {
-        columnsEnd[columnIndex] = item.endMin;
-      }
-      return { ...item, columnIndex };
-    });
+    const clusters: typeof base[] = [];
+    let cluster: typeof base = [];
+    let clusterEnd = -1;
 
-    const totalColumns = columnsEnd.length || 1;
-    return placed.map((item) => ({ ...item, totalColumns }));
+    base.forEach((item) => {
+      if (cluster.length === 0 || item.startMin < clusterEnd) {
+        cluster.push(item);
+        clusterEnd = Math.max(clusterEnd, item.endMin);
+        return;
+      }
+      clusters.push(cluster);
+      cluster = [item];
+      clusterEnd = item.endMin;
+    });
+    if (cluster.length) clusters.push(cluster);
+
+    return clusters.flatMap((items) => {
+      const columnsEnd: number[] = [];
+      const placed = items.map((item) => {
+        let columnIndex = columnsEnd.findIndex((end) => end <= item.startMin);
+        if (columnIndex === -1) {
+          columnIndex = columnsEnd.length;
+          columnsEnd.push(item.endMin);
+        } else {
+          columnsEnd[columnIndex] = item.endMin;
+        }
+        return { ...item, columnIndex };
+      });
+      const totalColumns = columnsEnd.length || 1;
+      return placed.map((item) => ({ ...item, totalColumns }));
+    });
   };
 
   return (
@@ -544,7 +573,7 @@ export default function CalendarPage() {
               <Button size="sm" variant="outline" onClick={() => (view === "month" ? handleMonth("next") : handleNavigate("next"))}>
                 Next
               </Button>
-              <span className="text-sm text-muted-foreground">{headerRange}</span>
+              <span className="text-sm text-muted-foreground whitespace-nowrap">{headerRange}</span>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button size="sm" variant="outline">
@@ -710,245 +739,275 @@ export default function CalendarPage() {
         )}
 
         {!loading && !error && view !== "month" && (
-          <div className="rounded-xl border border-slate-200/70 bg-white shadow-sm overflow-hidden">
-            <div
-              className="grid sticky top-0 z-20 border-b border-slate-200/70 bg-white text-xs text-slate-500"
-              style={{
-                gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(${viewDays.length}, minmax(0, 1fr))`,
-                paddingRight: scrollbarWidth ? `${scrollbarWidth}px` : undefined,
-              }}
-            >
-              <div className="px-4 py-4">
-                <div className="text-[11px] uppercase tracking-[0.28em]">GMT-08</div>
-              </div>
-              {viewDays.map((day) => (
-                <div
-                  key={`header-${format(day, "yyyy-MM-dd")}`}
-                  className={cn(
-                    "border-l border-slate-200/70 px-4 py-3",
-                    isToday(day) && "bg-slate-50 text-slate-900"
-                  )}
-                >
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.2em]">{format(day, "EEE")}</div>
-                  <div className="mt-2 flex items-center gap-2">
-                    <div
-                      className={cn(
-                        "flex h-9 w-9 items-center justify-center rounded-full border text-sm font-semibold",
-                        isToday(day) ? "border-slate-800 bg-slate-900 text-white" : "border-slate-200"
-                      )}
-                    >
-                      {format(day, "d")}
+          <div className="space-y-4">
+            {weekSections.map((days, sectionIndex) => {
+              const stickyHeader = view !== "2weeks";
+              return (
+                <div key={`week-${sectionIndex}`} className="rounded-xl border border-slate-200/70 bg-white shadow-sm overflow-hidden">
+                  <div
+                    className={cn(
+                      "grid border-b border-slate-200/70 bg-white text-xs text-slate-500",
+                      stickyHeader && "sticky top-0 z-20"
+                    )}
+                    style={{
+                      gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(${days.length}, minmax(0, 1fr))`,
+                      paddingRight: scrollbarWidth ? `${scrollbarWidth}px` : undefined,
+                    }}
+                  >
+                    <div className="px-3 py-2">
+                      <div className="text-[11px] font-semibold text-slate-500 whitespace-nowrap">GMT-08</div>
                     </div>
-                    <div className="text-sm font-semibold">{format(day, "MMM")}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div
-              className="border-b border-slate-200/70"
-              style={{ paddingRight: scrollbarWidth ? `${scrollbarWidth}px` : undefined }}
-            >
-              <div
-                className="grid text-xs text-slate-500"
-                style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(${viewDays.length}, minmax(0, 1fr))` }}
-              >
-                <div className="px-3 py-2 text-[11px] font-medium uppercase tracking-[0.2em] text-slate-400">
-                  All day
-                </div>
-                {viewDays.map((day) => {
-                  const dayKey = format(day, "yyyy-MM-dd");
-                  const items = allDayByDay.get(dayKey) || [];
-                  return (
-                    <div key={`allday-${dayKey}`} className="border-l border-slate-200/70 px-3 py-2">
-                      <div className="flex flex-col gap-1">
-                        {items.slice(0, 3).map((item) => {
-                          const primaryUserId = item.userIds[0];
-                          const primaryEmail = item.isWork
-                            ? item.calendarId
-                            : primaryUserId
-                              ? userEmailMap.get(primaryUserId)
-                              : undefined;
-                          const palette = (primaryEmail && USER_PALETTE[primaryEmail]) || DEFAULT_PALETTE;
-                          const paletteClass = item.isWork ? palette.blockWork : palette.blockPersonal;
-                          const muted = item.type === "busy" ? "opacity-75" : "";
-                          return (
-                            <div
-                              key={`allday-${item.key}`}
-                              className={cn(
-                                "rounded-md border border-slate-200/70 px-2 py-1 text-[11px] font-semibold border-l-[3px] truncate",
-                                paletteClass,
-                                muted
-                              )}
-                            >
-                              {item.title}
-                            </div>
-                          );
-                        })}
-                        {items.length > 3 && (
-                          <div className="text-[10px] text-slate-400">+{items.length - 3} more</div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="max-h-[70vh] overflow-auto" ref={scrollRef}>
-              <div
-                className="relative grid"
-                style={{
-                  gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(${viewDays.length}, minmax(0, 1fr))`,
-                }}
-              >
-                <div
-                  className="relative border-r border-slate-200/70 bg-white sticky left-0 z-10"
-                  style={{ height: HOUR_HEIGHT * hours.length }}
-                >
-                  {hours.map((hour) => {
-                    const labelTime = addHours(startOfDay(anchorDate), hour);
-                    return (
+                    {days.map((day) => (
                       <div
-                        key={`hour-${hour}`}
-                        className="absolute left-0 flex w-full items-start gap-2"
-                        style={{ top: (hour - visibleRange.startHour) * HOUR_HEIGHT }}
+                        key={`header-${format(day, "yyyy-MM-dd")}`}
+                        className={cn(
+                          "border-l border-slate-200/70 px-3 py-2",
+                          isToday(day) && "bg-slate-50 text-slate-900"
+                        )}
                       >
-                        <div className="absolute left-0 right-0 top-0 border-t border-slate-200/60" />
-                        <div className="w-full px-3 text-[11px] font-medium text-slate-400">
-                          {format(labelTime, "h a")}
+                        <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
+                          <span className="uppercase tracking-[0.2em]">{format(day, "EEE")}</span>
+                          <div
+                            className={cn(
+                              "flex h-7 w-7 items-center justify-center rounded-full border text-[11px] font-semibold",
+                              isToday(day) ? "border-slate-800 bg-slate-900 text-white" : "border-slate-200"
+                            )}
+                          >
+                            {format(day, "d")}
+                          </div>
+                          <span className="text-[11px] font-semibold">{format(day, "MMM")}</span>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+                    ))}
+                  </div>
 
-                {viewDays.map((day) => {
-                  const dayKey = format(day, "yyyy-MM-dd");
-                  const items = entriesByDay.get(dayKey) || [];
-                  const positioned = layoutDayEntries(day, items);
-                  const sunTimes = geo ? getSunTimes(day, geo.lat, geo.lng) : null;
-                  const dayStart = startOfDay(day);
-                  const nowMinutes = differenceInMinutes(now, dayStart);
-                  const minuteOffset = nowMinutes - visibleRange.startHour * 60;
-                  const nowTop = (minuteOffset / 60) * HOUR_HEIGHT;
-                  const sunLines =
-                    sunTimes &&
-                    (["dawn", "sunrise", "sunset"] as const).map((key) => {
-                      const minutes = differenceInMinutes(sunTimes[key], dayStart);
-                      if (minutes < visibleRange.startHour * 60 || minutes > visibleRange.endHour * 60) return null;
-                      const top = ((minutes - visibleRange.startHour * 60) / 60) * HOUR_HEIGHT;
-                      const className =
-                        key === "dawn"
-                          ? "from-amber-100/10 via-amber-200/70 to-amber-100/10 shadow-[0_0_8px_rgba(250,204,120,0.35)]"
-                          : key === "sunrise"
-                            ? "from-amber-200/10 via-amber-400/80 to-amber-200/10 shadow-[0_0_10px_rgba(251,191,36,0.35)]"
-                            : "from-rose-200/10 via-orange-300/80 to-rose-200/10 shadow-[0_0_10px_rgba(251,113,133,0.35)]";
-                      const label =
-                        key === "dawn" ? "Dawn" : key === "sunrise" ? "Sunrise" : "Sunset";
-                      return (
-                        <div key={`${dayKey}-${key}`} className="group">
-                          <div
-                            title={label}
-                            className={cn("absolute left-4 right-4 bg-gradient-to-r", className)}
-                            style={{ top, height: SUN_LINE_HEIGHT }}
-                          />
-                          <div
-                            className="absolute left-4 -translate-y-1/2 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500 opacity-0 shadow-sm transition group-hover:opacity-100"
-                            style={{ top }}
-                          >
-                            {label}
-                          </div>
-                        </div>
-                      );
-                    });
-
-                  return (
+                  <div
+                    className="border-b border-slate-200/70"
+                    style={{ paddingRight: scrollbarWidth ? `${scrollbarWidth}px` : undefined }}
+                  >
                     <div
-                      key={dayKey}
-                      className={cn(
-                        "relative border-l border-slate-200/70 bg-white",
-                        isToday(day) && "bg-slate-50/70"
-                      )}
-                      style={{ height: HOUR_HEIGHT * hours.length }}
+                      className="grid text-xs text-slate-500"
+                      style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(${days.length}, minmax(0, 1fr))` }}
                     >
-                      {hours.map((hour) => (
-                        <div
-                          key={`${dayKey}-line-${hour}`}
-                          className="absolute left-0 right-0 border-t border-slate-200/60"
-                          style={{ top: (hour - visibleRange.startHour) * HOUR_HEIGHT }}
-                        />
-                      ))}
-
-                      {sunLines}
-
-                    {isToday(day) &&
-                      nowMinutes >= visibleRange.startHour * 60 &&
-                      nowMinutes <= visibleRange.endHour * 60 && (
-                        <div className="group absolute left-0 right-0" style={{ top: nowTop }}>
-                          <div className="absolute left-4 h-3 w-3 -translate-y-1/2 rounded-full bg-red-500" />
-                          <div className="absolute left-4 right-4 h-px -translate-y-1/2 bg-red-500/80" />
-                          <div className="absolute left-8 -translate-y-1/2 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-red-600 opacity-0 shadow-sm transition group-hover:opacity-100">
-                            {format(now, "h:mm a")}
-                          </div>
-                        </div>
-                      )}
-
-                    {positioned.map(({ entry, startMin, endMin, columnIndex, totalColumns }) => {
-                      const visibleStartMin = visibleRange.startHour * 60;
-                      const visibleEndMin = visibleRange.endHour * 60;
-                      const displayStart = Math.max(startMin, visibleStartMin);
-                      const displayEnd = Math.min(endMin, visibleEndMin);
-                      if (displayEnd <= displayStart) return null;
-                      const topBase = ((displayStart - visibleStartMin) / 60) * HOUR_HEIGHT;
-                      const heightBase = Math.max(((displayEnd - displayStart) / 60) * HOUR_HEIGHT, 20);
-                      const busyPadding = entry.type === "busy" ? 2 : 0;
-                      const top = topBase + busyPadding / 2;
-                      const height = Math.max(heightBase - busyPadding, 18);
-                      const columnWidth = 100 / totalColumns;
-                      const left = `calc(${columnWidth * columnIndex}% + ${columnIndex * 6}px + 6px)`;
-                      const width = `calc(${columnWidth}% - 12px)`;
-                      const durationMinutes = endMin - startMin;
-                      const primaryUserId = entry.userIds[0];
-                      const primaryEmail = entry.isWork
-                        ? entry.calendarId
-                        : primaryUserId
-                          ? userEmailMap.get(primaryUserId)
-                          : undefined;
-                      const palette = (primaryEmail && USER_PALETTE[primaryEmail]) || DEFAULT_PALETTE;
-                      const paletteClass = entry.isWork ? palette.blockWork : palette.blockPersonal;
-                      const muted = entry.type === "busy" ? "opacity-75" : "";
-                      const label = entry.userIds.map((id) => userMap.get(id)).filter(Boolean).join(" + ");
-                      return (
-                          <div
-                            key={entry.key}
-                            className={cn(
-                              "absolute overflow-hidden rounded-md border border-slate-200/70 px-2 py-1 text-[11px] shadow-sm border-l-[3px]",
-                              paletteClass,
-                              muted
-                            )}
-                            style={{ top, height, left, width }}
-                          >
-                            <div className="truncate text-[11px] font-semibold">{entry.title}</div>
-                            {durationMinutes >= 30 && (
-                              <div className="truncate text-[10px] text-slate-500">
-                                {format(entry.startAt, "h:mm a")}–{format(entry.endAt, "h:mm a")}
-                              </div>
-                            )}
-                            {durationMinutes >= 60 && label && (
-                              <div className="truncate text-[10px] text-slate-500">{label}</div>
-                            )}
+                      <div className="px-3 py-2 text-[11px] font-medium uppercase tracking-[0.2em] text-slate-400">
+                        All day
+                      </div>
+                      {days.map((day) => {
+                        const dayKey = format(day, "yyyy-MM-dd");
+                        const items = allDayByDay.get(dayKey) || [];
+                        return (
+                          <div key={`allday-${dayKey}`} className="border-l border-slate-200/70 px-3 py-2">
+                            <div className="flex flex-col gap-1">
+                              {items.slice(0, 3).map((item) => {
+                                const primaryUserId = item.userIds[0];
+                                const primaryEmail = item.isWork
+                                  ? item.calendarId
+                                  : primaryUserId
+                                    ? userEmailMap.get(primaryUserId)
+                                    : undefined;
+                                const palette = (primaryEmail && USER_PALETTE[primaryEmail]) || DEFAULT_PALETTE;
+                                const paletteClass = item.isWork ? palette.blockWork : palette.blockPersonal;
+                                const muted = item.type === "busy" ? "opacity-75" : "";
+                                return (
+                                  <div
+                                    key={`allday-${item.key}`}
+                                    className={cn(
+                                      "rounded-md border border-slate-200/70 px-2 py-1 text-[11px] font-semibold border-l-[3px] truncate",
+                                      paletteClass,
+                                      muted
+                                    )}
+                                  >
+                                    {item.title}
+                                  </div>
+                                );
+                              })}
+                              {items.length > 3 && (
+                                <div className="text-[10px] text-slate-400">+{items.length - 3} more</div>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
+                  </div>
+
+                  <div className="max-h-[70vh] overflow-auto" ref={sectionIndex == 0 ? scrollRef : undefined}>
+                    <div
+                      className="relative grid"
+                      style={{
+                        gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(${days.length}, minmax(0, 1fr))`,
+                      }}
+                    >
+                      <div
+                        className="relative border-r border-slate-200/70 bg-white sticky left-0 z-10"
+                        style={{ height: HOUR_HEIGHT * hours.length }}
+                      >
+                        {hours.map((hour) => {
+                          const labelTime = addHours(startOfDay(anchorDate), hour);
+                          return (
+                            <div
+                              key={`hour-${hour}-${sectionIndex}`}
+                              className="absolute left-0 flex w-full items-start gap-2"
+                              style={{ top: (hour - visibleRange.startHour) * HOUR_HEIGHT }}
+                            >
+                              <div className="absolute left-0 right-0 top-0 border-t border-slate-200/60" />
+                              <div className="w-full px-3 text-[11px] font-medium text-slate-500 whitespace-nowrap">
+                                {format(labelTime, "h:mm a")}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {days.map((day) => {
+                        const dayKey = format(day, "yyyy-MM-dd");
+                        const items = entriesByDay.get(dayKey) || [];
+                        const positioned = layoutDayEntries(day, items);
+                        const sunTimes = geo ? getSunTimes(day, geo.lat, geo.lng) : null;
+                        const dayStart = startOfDay(day);
+                        const nowMinutes = differenceInMinutes(now, dayStart);
+                        const minuteOffset = nowMinutes - visibleRange.startHour * 60;
+                        const nowTop = (minuteOffset / 60) * HOUR_HEIGHT;
+                        const sunLines =
+                          sunTimes &&
+                          (["dawn", "sunrise", "sunset"] as const).map((key) => {
+                            const minutes = differenceInMinutes(sunTimes[key], dayStart);
+                            if (minutes < visibleRange.startHour * 60 || minutes > visibleRange.endHour * 60) return null;
+                            const top = ((minutes - visibleRange.startHour * 60) / 60) * HOUR_HEIGHT;
+                            const className =
+                              key === "dawn"
+                                ? "from-amber-100/10 via-amber-200/70 to-amber-100/10 shadow-[0_0_8px_rgba(250,204,120,0.35)]"
+                                : key === "sunrise"
+                                  ? "from-amber-200/10 via-amber-400/80 to-amber-200/10 shadow-[0_0_10px_rgba(251,191,36,0.35)]"
+                                  : "from-rose-200/10 via-orange-300/80 to-rose-200/10 shadow-[0_0_10px_rgba(251,113,133,0.35)]";
+                            const label =
+                              key === "dawn" ? "Dawn" : key === "sunrise" ? "Sunrise" : "Sunset";
+                            return (
+                              <div key={`${dayKey}-${key}`} className="group">
+                                <div
+                                  title={label}
+                                  className={cn("absolute left-4 right-4 bg-gradient-to-r", className)}
+                                  style={{ top, height: SUN_LINE_HEIGHT }}
+                                />
+                                <div
+                                  className="absolute left-4 -translate-y-1/2 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500 opacity-0 shadow-sm transition group-hover:opacity-100"
+                                  style={{ top }}
+                                >
+                                  {label}
+                                </div>
+                              </div>
+                            );
+                          });
+
+                        return (
+                          <div
+                            key={dayKey}
+                            className={cn(
+                              "relative border-l border-slate-200/70 bg-white",
+                              isToday(day) && "bg-slate-50/70"
+                            )}
+                            style={{ height: HOUR_HEIGHT * hours.length }}
+                          >
+                            {hours.map((hour) => (
+                              <div
+                                key={`${dayKey}-line-${hour}`}
+                                className="absolute left-0 right-0 border-t border-slate-200/60"
+                                style={{ top: (hour - visibleRange.startHour) * HOUR_HEIGHT }}
+                              />
+                            ))}
+
+                            {sunLines}
+
+                            {isToday(day) &&
+                              nowMinutes >= visibleRange.startHour * 60 &&
+                              nowMinutes <= visibleRange.endHour * 60 && (
+                                <div className="group absolute left-0 right-0" style={{ top: nowTop }}>
+                                  <div className="absolute left-4 h-3 w-3 -translate-y-1/2 rounded-full bg-red-500" />
+                                  <div className="absolute left-4 right-4 h-px -translate-y-1/2 bg-red-500/80" />
+                                  <div className="absolute left-8 -translate-y-1/2 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-red-600 opacity-0 shadow-sm transition group-hover:opacity-100">
+                                    {format(now, "h:mm a")}
+                                  </div>
+                                </div>
+                              )}
+
+                            {positioned.map(({ entry, startMin, endMin, columnIndex, totalColumns }) => {
+                              const visibleStartMin = visibleRange.startHour * 60;
+                              const visibleEndMin = visibleRange.endHour * 60;
+                              const displayStart = Math.max(startMin, visibleStartMin);
+                              const displayEnd = Math.min(endMin, visibleEndMin);
+                              if (displayEnd <= displayStart) return null;
+                              const topBase = ((displayStart - visibleStartMin) / 60) * HOUR_HEIGHT;
+                              const heightBase = Math.max(((displayEnd - displayStart) / 60) * HOUR_HEIGHT, 20);
+                              const busyPadding = entry.type === "busy" ? 2 : 0;
+                              const top = topBase + busyPadding / 2;
+                              const height = Math.max(heightBase - busyPadding, 18);
+                              const columnWidth = 100 / totalColumns;
+                              const left = `calc(${columnWidth * columnIndex}% + ${columnIndex * 6}px + 6px)`;
+                              const width = `calc(${columnWidth}% - 12px)`;
+                              const durationMinutes = endMin - startMin;
+                              const primaryUserId = entry.userIds[0];
+                              const primaryEmail = entry.isWork
+                                ? entry.calendarId
+                                : primaryUserId
+                                  ? userEmailMap.get(primaryUserId)
+                                  : undefined;
+                              const palette = (primaryEmail && USER_PALETTE[primaryEmail]) || DEFAULT_PALETTE;
+                              const paletteClass = entry.isWork ? palette.blockWork : palette.blockPersonal;
+                              const muted = entry.type === "busy" ? "opacity-75" : "";
+                              const label = entry.userIds.map((id) => userMap.get(id)).filter(Boolean).join(" + ");
+                              return (
+                                <HoverCard key={entry.key}>
+                                  <HoverCardTrigger asChild>
+                                    <div
+                                      className={cn(
+                                        "absolute overflow-hidden rounded-md border border-slate-200/70 px-2 py-1 text-[11px] shadow-sm border-l-[3px]",
+                                        paletteClass,
+                                        muted
+                                      )}
+                                      style={{ top, height, left, width }}
+                                    >
+                                      <div className="truncate text-[11px] font-semibold">{entry.title}</div>
+                                      {durationMinutes >= 30 && (
+                                        <div className="truncate text-[10px] text-slate-500">
+                                          {format(entry.startAt, "h:mm a")}–{format(entry.endAt, "h:mm a")}
+                                        </div>
+                                      )}
+                                      {durationMinutes >= 60 && label && (
+                                        <div className="truncate text-[10px] text-slate-500">{label}</div>
+                                      )}
+                                    </div>
+                                  </HoverCardTrigger>
+                                  <HoverCardContent align="start" className="w-72">
+                                    <div className="space-y-2 text-sm">
+                                      <div className="text-sm font-semibold text-slate-900">{entry.title}</div>
+                                      <div className="text-xs text-slate-500">
+                                        {format(entry.startAt, "EEE, MMM d • h:mm a")} – {format(entry.endAt, "h:mm a")}
+                                      </div>
+                                      {entry.location && (
+                                        <div className="text-xs text-slate-600">Location: {entry.location}</div>
+                                      )}
+                                      {entry.calendarSummary && (
+                                        <div className="text-xs text-slate-500">Calendar: {entry.calendarSummary}</div>
+                                      )}
+                                      {label && <div className="text-xs text-slate-500">People: {label}</div>}
+                                      {entry.description && (
+                                        <div className="text-xs text-slate-600 line-clamp-4">{entry.description}</div>
+                                      )}
+                                    </div>
+                                  </HoverCardContent>
+                                </HoverCard>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
-
         {!loading && !error && isMobile && view === "day" && (
           <div className="rounded-xl border border-border/60 bg-white px-4 py-3 shadow-sm">
             <div className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">

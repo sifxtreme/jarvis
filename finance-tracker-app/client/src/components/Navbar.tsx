@@ -66,19 +66,20 @@ export function Navbar() {
         </div>
 
         <div className="ml-auto hidden md:flex items-center gap-2">
-          <button
-            onClick={connectCalendar}
-            className="px-2.5 py-1.5 text-xs font-medium rounded-md border border-border text-foreground hover:bg-muted transition-colors"
-            disabled={calendarConnecting}
-          >
-            {calendarConnecting ? "Connecting..." : "Connect Calendar"}
-          </button>
           <DropdownMenu>
             <DropdownMenuTrigger className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border border-border text-foreground hover:bg-muted transition-colors">
               <Settings className="h-3.5 w-3.5" />
               Settings
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onSelect={(event) => {
+                  event.preventDefault();
+                  if (!calendarConnecting) connectCalendar();
+                }}
+              >
+                {calendarConnecting ? "Connecting..." : "Connect Calendar"}
+              </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link to="/teller-repair">Teller Repair</Link>
               </DropdownMenuItem>

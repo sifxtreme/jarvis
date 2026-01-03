@@ -59,6 +59,7 @@ const MONTH_RANGES: Record<MonthRange, { label: string; months: number[] }> = {
 
 export default function TrendsPage() {
   const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [filters, setFilters] = useState<TrendsFilters>(() => ({
@@ -202,9 +203,12 @@ export default function TrendsPage() {
 
   // Filter data by month range
   const filterByMonthRange = <T extends { month: string }>(data: T[]): T[] => {
-    if (monthRange === 'all') return data;
+    const scoped = filters.year === currentYear
+      ? data.filter(d => getMonthNumber(d.month) <= currentMonth)
+      : data;
+    if (monthRange === 'all') return scoped;
     const allowedMonths = MONTH_RANGES[monthRange].months;
-    return data.filter(d => allowedMonths.includes(getMonthNumber(d.month)));
+    return scoped.filter(d => allowedMonths.includes(getMonthNumber(d.month)));
   };
 
   // Calculate 3-month moving average
@@ -226,9 +230,12 @@ export default function TrendsPage() {
     });
 
     const months = Array.from(allMonths).sort();
+    const scopedMonths = filters.year === currentYear
+      ? months.filter(m => getMonthNumber(m) <= currentMonth)
+      : months;
     const filteredMonths = monthRange === 'all'
-      ? months
-      : months.filter(m => MONTH_RANGES[monthRange].months.includes(getMonthNumber(m)));
+      ? scopedMonths
+      : scopedMonths.filter(m => MONTH_RANGES[monthRange].months.includes(getMonthNumber(m)));
 
     const categoriesToShow = trends.monthly_by_category
       .filter(cat => hideOther ? cat.category !== OTHER_CATEGORY : true)
@@ -277,9 +284,12 @@ export default function TrendsPage() {
     });
 
     const months = Array.from(allMonths).sort();
+    const scopedMonths = filters.year === currentYear
+      ? months.filter(m => getMonthNumber(m) <= currentMonth)
+      : months;
     const filteredMonths = monthRange === 'all'
-      ? months
-      : months.filter(m => MONTH_RANGES[monthRange].months.includes(getMonthNumber(m)));
+      ? scopedMonths
+      : scopedMonths.filter(m => MONTH_RANGES[monthRange].months.includes(getMonthNumber(m)));
 
     // Filter merchants by category if selected
     let merchantsToShow = trends.monthly_by_merchant;
@@ -694,7 +704,7 @@ export default function TrendsPage() {
       {/* Monthly Spending Trend */}
       <Card className="mb-8">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Monthly Spending</CardTitle>
+          <CardTitle className="text-base font-semibold">Monthly Spending</CardTitle>
           <Button
             variant={showMovingAvg ? "default" : "outline"}
             size="sm"
@@ -767,7 +777,7 @@ export default function TrendsPage() {
       {/* Category Trends */}
       <Card className="mb-8">
         <CardHeader>
-          <CardTitle>Spending by Category (Month over Month)</CardTitle>
+          <CardTitle className="text-base font-semibold">Spending by Category (Month over Month)</CardTitle>
         </CardHeader>
         <CardContent>
           <ChartContainer config={chartConfig} className="h-[400px] w-full">
@@ -818,7 +828,7 @@ export default function TrendsPage() {
       {/* Merchant Trends */}
       <Card className="mb-8">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Spending by Merchant (Month over Month)</CardTitle>
+          <CardTitle className="text-base font-semibold">Spending by Merchant (Month over Month)</CardTitle>
           <div className="flex items-center gap-4">
             <Select value={merchantCategoryFilter} onValueChange={setMerchantCategoryFilter}>
               <SelectTrigger className="w-[160px]">
@@ -882,7 +892,7 @@ export default function TrendsPage() {
         {/* Category Breakdown Pie */}
         <Card>
           <CardHeader>
-            <CardTitle>Category Breakdown</CardTitle>
+            <CardTitle className="text-base font-semibold">Category Breakdown</CardTitle>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[300px] w-full">
@@ -936,7 +946,7 @@ export default function TrendsPage() {
         {/* Top Merchants Bar */}
         <Card>
           <CardHeader>
-            <CardTitle>Top Merchants</CardTitle>
+            <CardTitle className="text-base font-semibold">Top Merchants</CardTitle>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[300px] w-full">
@@ -977,7 +987,7 @@ export default function TrendsPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Target className="h-5 w-5 text-primary" />
-              <CardTitle>Budget Tracking by Category</CardTitle>
+              <CardTitle className="text-base font-semibold">Budget Tracking by Category</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
@@ -1091,7 +1101,7 @@ export default function TrendsPage() {
       {trends?.budget_comparison && trends.budget_comparison.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Budget vs Actual (Annual Summary)</CardTitle>
+            <CardTitle className="text-base font-semibold">Budget vs Actual (Annual Summary)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
