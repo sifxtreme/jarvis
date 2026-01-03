@@ -137,7 +137,7 @@ const getSunTimes = (date: Date, lat: number, lng: number): SunTimes => {
 
   const jSunset = getSetJ(-0.833 * rad, lw, phi, dec, n, m, l);
   const jSunrise = jNoon - (jSunset - jNoon);
-  const jDusk = getSetJ(-6 * rad, lw, phi, dec, n, m, l);
+  const jDusk = getSetJ(-15 * rad, lw, phi, dec, n, m, l);
   const jDawn = jNoon - (jDusk - jNoon);
 
   return {
@@ -884,10 +884,11 @@ export default function CalendarPage() {
                                   : "from-rose-200/10 via-orange-300/80 to-rose-200/10 shadow-[0_0_10px_rgba(251,113,133,0.35)]";
                             const label =
                               key === "dawn" ? "Dawn" : key === "sunrise" ? "Sunrise" : "Sunset";
+                            const timeLabel = format(sunTimes[key], "h:mm a");
                             return (
                               <div key={`${dayKey}-${key}`} className="group">
                                 <div
-                                  title={label}
+                                  title={`${label} · ${timeLabel}`}
                                   className={cn("absolute left-4 right-4 bg-gradient-to-r", className)}
                                   style={{ top, height: SUN_LINE_HEIGHT }}
                                 />
@@ -895,7 +896,7 @@ export default function CalendarPage() {
                                   className="absolute left-4 -translate-y-1/2 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500 opacity-0 shadow-sm transition group-hover:opacity-100 dark:bg-slate-950 dark:text-slate-300"
                                   style={{ top }}
                                 >
-                                  {label}
+                                  {label} · {timeLabel}
                                 </div>
                               </div>
                             );
