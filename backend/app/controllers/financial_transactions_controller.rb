@@ -326,7 +326,7 @@ class FinancialTransactionsController < ApplicationController
         end
       else
         # Non-amortized: use transacted_at month
-        month = t.transacted_at.strftime('%Y-%m')
+        month = t.transacted_at.in_time_zone('UTC').strftime('%Y-%m')
         next unless month.start_with?(year_prefix)
         result << {
           month: month,
