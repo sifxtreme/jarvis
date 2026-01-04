@@ -21,6 +21,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChatPanel } from "@/components/ChatPanel";
 import { StateCard } from "@/components/StateCard";
@@ -1214,7 +1215,7 @@ export default function CalendarPage() {
             <ToggleGroup
               type="single"
               value={mobilePane}
-              onValueChange={(value) => value && setMobilePane(value as "agenda" | "chat")}
+              onValueChange={(value: string) => value && setMobilePane(value as "agenda" | "chat")}
               className="flex w-full items-center justify-start gap-1"
             >
               <ToggleGroupItem value="agenda" size="sm" className="flex-1">
