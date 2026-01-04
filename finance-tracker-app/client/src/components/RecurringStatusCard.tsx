@@ -73,21 +73,6 @@ const dismissForMonth = (merchant_key: string, year: number, month: number) => {
   }
 };
 
-// Helper to restore a dismissed item
-const restoreForMonth = (merchant_key: string, year: number, month: number) => {
-  const data = getDismissedItems();
-  data.items = data.items.filter(item =>
-    !(item.merchant_key === merchant_key && item.year === year && item.month === month)
-  );
-  saveDismissedItems(data);
-};
-
-// Helper to get count of dismissed items for a month
-const getDismissedCountForMonth = (year: number, month: number): number => {
-  const data = getDismissedItems();
-  return data.items.filter(item => item.year === year && item.month === month).length;
-};
-
 // Helper to restore all dismissed items for a month
 const restoreAllForMonth = (year: number, month: number) => {
   const data = getDismissedItems();

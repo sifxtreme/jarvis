@@ -89,7 +89,7 @@ export function SplitTransactionModal({
       setRemainingAmount(newRemainingAmount);
       newSplits[index].amount = newAmount;
     } else {
-      // @ts-ignore - we know the field exists
+      // @ts-expect-error - field is dynamic based on editable split properties
       newSplits[index][field] = value;
     }
 

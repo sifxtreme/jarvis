@@ -92,9 +92,6 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
   });
 
   const totalEarned = incomes.reduce((sum, t) => sum + t.amount, 0);
-  const totalBudgeted = budgets.filter(b => b.expense_type === 'expense')
-    .filter(b => transactions.map(t => t.category).includes(b.name))
-    .reduce((sum, b) => sum + b.amount, 0);
   const totalSpent = expenses.reduce((sum, t) => sum + t.amount, 0);
 
   const categoryTotals = expenses.reduce((acc, t) => {

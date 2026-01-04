@@ -54,6 +54,19 @@ axiosInstance.interceptors.response.use(
   }
 );
 
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const response = (error as { response?: { data?: { message?: string } } }).response;
+    if (response?.data?.message) {
+      return response.data.message;
+    }
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return fallback;
+};
+
 // Add request interceptor to update auth header
 axiosInstance.interceptors.request.use(config => {
   config.headers.Authorization = undefined;
@@ -274,9 +287,9 @@ export const getTransactions = async (filters: TransactionFilters): Promise<Tran
     });
 
     return validTransactions;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] Error details:', error);
-    const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch transactions';
+    const errorMessage = getErrorMessage(error, 'Failed to fetch transactions');
     throw new Error(`Failed to fetch transactions: ${errorMessage}`);
   }
 };
@@ -291,9 +304,9 @@ export const getBudgets = async (filters: BudgetFilters): Promise<Budget[]> => {
     const response = await axiosInstance.get<Budget[]>('/budgets', { params });
 
     return response.data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] Budget error details:', error);
-    const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch budgets';
+    const errorMessage = getErrorMessage(error, 'Failed to fetch budgets');
     throw new Error(`Failed to fetch budgets: ${errorMessage}`);
   }
 };
@@ -309,9 +322,7 @@ interface CreateTransactionData {
   reviewed: boolean;
 }
 
-interface UpdateTransactionData extends CreateTransactionData {
-  // Same fields as CreateTransactionData
-}
+type UpdateTransactionData = CreateTransactionData;
 
 // Trends API types
 export interface TrendsPeriod {
@@ -378,11 +389,58 @@ export interface TrendsData {
   budget_comparison: BudgetComparison[];
   monthly_by_category: MonthlyCategoryData[];
   monthly_by_merchant: MonthlyMerchantData[];
+  merchant_trend?: MerchantTrendsData | null;
+}
+
+export interface MerchantTrendPoint {
+  month: string;
+  total: number;
+}
+
+export interface MerchantTrendsData {
+  merchant: string | null;
+  months: MerchantTrendPoint[];
+  start_month: string;
+  end_month: string;
+  total_spent: number;
+}
+
+export interface MerchantSuggestion {
+  merchant: string;
+  total: number;
+}
+
+export interface MerchantSuggestionsData {
+  suggestions: MerchantSuggestion[];
+  start_month: string;
+  end_month: string;
 }
 
 export interface TrendsFilters {
   year?: number;
   category?: string;
+}
+
+export interface MerchantTrendsFilters {
+  query: string;
+  exact?: boolean;
+  start_month?: string;
+  end_month?: string;
+}
+
+export interface MerchantSuggestionsFilters {
+  query: string;
+  exact?: boolean;
+  start_month?: string;
+  end_month?: string;
+  limit?: number;
+}
+
+export interface MerchantTransactionsFilters {
+  query: string;
+  exact?: boolean;
+  start_month?: string;
+  end_month?: string;
 }
 
 export const getTrends = async (filters: TrendsFilters = {}): Promise<TrendsData> => {
@@ -394,10 +452,79 @@ export const getTrends = async (filters: TrendsFilters = {}): Promise<TrendsData
   try {
     const response = await axiosInstance.get<TrendsData>('/financial_transactions/trends', { params });
     return response.data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] Trends error details:', error);
-    const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch trends';
+    const errorMessage = getErrorMessage(error, 'Failed to fetch trends');
     throw new Error(`Failed to fetch trends: ${errorMessage}`);
+  }
+};
+
+export const getMerchantTrends = async (filters: MerchantTrendsFilters): Promise<MerchantTrendsData> => {
+  const params = new URLSearchParams();
+
+  if (filters.query) params.append('merchant', filters.query);
+  if (filters.exact !== undefined) params.append('exact', filters.exact.toString());
+  if (filters.start_month) params.append('start_month', filters.start_month);
+  if (filters.end_month) params.append('end_month', filters.end_month);
+
+  try {
+    const response = await axiosInstance.get<TrendsData>('/financial_transactions/trends', { params });
+    return (
+      response.data.merchant_trend || {
+        merchant: filters.query || null,
+        months: [],
+        start_month: filters.start_month || '',
+        end_month: filters.end_month || '',
+        total_spent: 0,
+      }
+    );
+  } catch (error: unknown) {
+    console.error('[API] Merchant trends error details:', error);
+    const errorMessage = getErrorMessage(error, 'Failed to fetch merchant trends');
+    throw new Error(`Failed to fetch merchant trends: ${errorMessage}`);
+  }
+};
+
+export const getMerchantSuggestions = async (filters: MerchantSuggestionsFilters): Promise<MerchantSuggestionsData> => {
+  const params = new URLSearchParams();
+
+  if (filters.query) params.append('query', filters.query);
+  if (filters.exact !== undefined) params.append('exact', filters.exact.toString());
+  if (filters.start_month) params.append('start_month', filters.start_month);
+  if (filters.end_month) params.append('end_month', filters.end_month);
+  if (filters.limit !== undefined) params.append('limit', filters.limit.toString());
+  params.append('aggregate', 'merchant_suggestions');
+
+  try {
+    const response = await axiosInstance.get<MerchantSuggestionsData>('/financial_transactions', { params });
+    return response.data;
+  } catch (error: unknown) {
+    console.error('[API] Merchant suggestions error details:', error);
+    const errorMessage = getErrorMessage(error, 'Failed to fetch merchant suggestions');
+    throw new Error(`Failed to fetch merchant suggestions: ${errorMessage}`);
+  }
+};
+
+export const getMerchantTransactions = async (filters: MerchantTransactionsFilters): Promise<Transaction[]> => {
+  const params = new URLSearchParams();
+
+  if (filters.query) params.append('query', filters.query);
+  if (filters.exact !== undefined) params.append('exact', filters.exact.toString());
+  if (filters.start_month) params.append('start_month', filters.start_month);
+  if (filters.end_month) params.append('end_month', filters.end_month);
+  params.append('exclude_income', 'true');
+  params.append('show_hidden', 'false');
+
+  try {
+    const response = await axiosInstance.get<APIResponse<Transaction>>('/financial_transactions', { params });
+
+    const { results, error } = response.data || {};
+    if (error) throw new Error(error);
+    return Array.isArray(results) ? results : [];
+  } catch (error: unknown) {
+    console.error('[API] Merchant transactions error details:', error);
+    const errorMessage = getErrorMessage(error, 'Failed to fetch merchant transactions');
+    throw new Error(`Failed to fetch merchant transactions: ${errorMessage}`);
   }
 };
 
@@ -440,9 +567,9 @@ export const getRecurringStatus = async (filters: RecurringStatusFilters = {}): 
   try {
     const response = await axiosInstance.get<RecurringStatusData>('/financial_transactions/recurring_status', { params });
     return response.data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] Recurring status error:', error);
-    const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch recurring status';
+    const errorMessage = getErrorMessage(error, 'Failed to fetch recurring status');
     throw new Error(`Failed to fetch recurring status: ${errorMessage}`);
   }
 };

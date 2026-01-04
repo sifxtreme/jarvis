@@ -1,13 +1,24 @@
 import { useQuery } from "@tanstack/react-query";
-import { getTrends, getTransactions, getBudgets, type TrendsFilters, OTHER_CATEGORY, type Transaction } from "../lib/api";
-import { useState, useMemo } from "react";
+import {
+  getTrends,
+  getTransactions,
+  getBudgets,
+  getMerchantTrends,
+  getMerchantSuggestions,
+  getMerchantTransactions,
+  type TrendsFilters,
+  OTHER_CATEGORY,
+  type Transaction,
+} from "../lib/api";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ChartContainer } from "@/components/ui/chart";
-import { formatCurrency, cn, YEARS } from "@/lib/utils";
-import { Copy as CopyIcon, Download, TrendingUp, TrendingDown, Target, X } from "lucide-react";
+import { formatCurrency, cn, YEARS, getMonthKey } from "@/lib/utils";
+import { Copy as CopyIcon, Download, TrendingUp, TrendingDown, Target, X, Search } from "lucide-react";
 import { CategoryDrilldownModal } from "@/components/CategoryDrilldownModal";
 import { StateCard } from "@/components/StateCard";
 import {
@@ -24,8 +35,8 @@ import {
   Legend,
   CartesianGrid,
   ReferenceLine,
-  ResponsiveContainer,
 } from "recharts";
+import type { TooltipProps as RechartsTooltipProps } from "recharts";
 
 const COLORS = [
   "#2563eb", // blue
@@ -44,6 +55,13 @@ const OTHER_COLOR = "#9ca3af"; // gray for "Other" category
 
 const chartConfig = {
   spent: { label: "Spent", color: "#2563eb" },
+};
+
+type DotProps = {
+  cx?: number;
+  cy?: number;
+  index?: number;
+  payload?: { monthKey?: string };
 };
 
 type MonthRange = 'all' | 'q1' | 'q2' | 'q3' | 'q4' | 'h1' | 'h2';
@@ -78,6 +96,22 @@ export default function TrendsPage() {
   const [merchantCategoryFilter, setMerchantCategoryFilter] = useState<string>('all');
   const [pinnedCategoryDot, setPinnedCategoryDot] = useState<{ dataKey: string; index: number } | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
+  const [merchantQuery, setMerchantQuery] = useState("");
+  const [merchantExact, setMerchantExact] = useState(false);
+  const [merchantStartMonth, setMerchantStartMonth] = useState(() => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    return `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [merchantEndMonth, setMerchantEndMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [merchantSuggestionsOpen, setMerchantSuggestionsOpen] = useState(false);
+  const [highlightedMerchantSuggestion, setHighlightedMerchantSuggestion] = useState(-1);
+  const merchantSearchRef = useRef<HTMLDivElement | null>(null);
+  const merchantInputRef = useRef<HTMLInputElement | null>(null);
+  const [merchantTransactionsOpen, setMerchantTransactionsOpen] = useState(false);
 
   // Hover state for precise dot highlighting
   const [hoveredCategoryDot, setHoveredCategoryDot] = useState<{ dataKey: string; index: number } | null>(null);
@@ -86,6 +120,7 @@ export default function TrendsPage() {
   // Category drill-down modal state
   const [drilldownCategory, setDrilldownCategory] = useState<string | null>(null);
   const [drilldownTransactions, setDrilldownTransactions] = useState<Transaction[]>([]);
+  const [drilldownSubtitle, setDrilldownSubtitle] = useState<string | null>(null);
 
   // Fetch current year trends
   const { data: trends, isLoading, error } = useQuery({
@@ -113,6 +148,78 @@ export default function TrendsPage() {
     queryFn: () => getBudgets({ year: filters.year, show_hidden: false, show_needs_review: false }),
   });
 
+  const { data: merchantSuggestions } = useQuery({
+    queryKey: ['merchant-suggestions', merchantQuery, merchantExact, merchantStartMonth, merchantEndMonth],
+    queryFn: () =>
+      getMerchantSuggestions({
+        query: merchantQuery.trim(),
+        exact: merchantExact,
+        start_month: merchantStartMonth,
+        end_month: merchantEndMonth,
+        limit: 8,
+      }),
+    enabled: merchantQuery.trim().length > 1,
+    staleTime: 30_000,
+    retry: 1,
+  });
+
+  const {
+    data: merchantTransactions = [],
+    isLoading: merchantTransactionsLoading,
+  } = useQuery({
+    queryKey: [
+      'merchant-transactions',
+      merchantQuery,
+      merchantExact,
+      merchantStartMonth,
+      merchantEndMonth,
+      merchantTransactionsOpen,
+    ],
+    queryFn: () =>
+      getMerchantTransactions({
+        query: merchantQuery.trim(),
+        exact: merchantExact,
+        start_month: merchantStartMonth,
+        end_month: merchantEndMonth,
+      }),
+    enabled: merchantTransactionsOpen && merchantQuery.trim().length > 0,
+    retry: 1,
+  });
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!merchantSearchRef.current) return;
+      if (!merchantSearchRef.current.contains(event.target as Node)) {
+        setMerchantSuggestionsOpen(false);
+        setHighlightedMerchantSuggestion(-1);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (merchantQuery.trim().length > 1 && (merchantSuggestions?.suggestions?.length || 0) > 0) {
+      setMerchantSuggestionsOpen(true);
+      return;
+    }
+    setMerchantSuggestionsOpen(false);
+    setHighlightedMerchantSuggestion(-1);
+  }, [merchantQuery, merchantSuggestions]);
+
+  const { data: merchantTrends, isLoading: merchantTrendsLoading, error: merchantTrendsError } = useQuery({
+    queryKey: ['merchant-trends', merchantQuery, merchantExact, merchantStartMonth, merchantEndMonth],
+    queryFn: () =>
+      getMerchantTrends({
+        query: merchantQuery.trim(),
+        exact: merchantExact,
+        start_month: merchantStartMonth,
+        end_month: merchantEndMonth,
+      }),
+    enabled: merchantQuery.trim().length > 0,
+    retry: 1,
+  });
+
   // Get unique sources from transactions
   const availableSources = useMemo(() => {
     if (!transactions) return [];
@@ -130,11 +237,11 @@ export default function TrendsPage() {
   }, [budgets]);
 
   // Open category drill-down modal
-  const openCategoryDrilldown = (category: string) => {
+  const openCategoryDrilldown = (category: string, monthKey?: string) => {
     if (!transactions) return;
 
     // Filter transactions for this category (expenses only)
-    const categoryTransactions = transactions.filter(t => {
+    let categoryTransactions = transactions.filter(t => {
       // Skip income
       if (t.category?.toLowerCase()?.includes('income')) return false;
 
@@ -145,6 +252,17 @@ export default function TrendsPage() {
 
       return t.category === category;
     });
+
+    if (monthKey) {
+      categoryTransactions = categoryTransactions.filter((transaction) => {
+        const transactionMonth = getMonthKey(transaction.transacted_at);
+        const amortizedMonths = transaction.amortized_months || [];
+        return transactionMonth === monthKey || amortizedMonths.includes(monthKey);
+      });
+      setDrilldownSubtitle(formatMonthWithYear(monthKey));
+    } else {
+      setDrilldownSubtitle(null);
+    }
 
     setDrilldownCategory(category);
     setDrilldownTransactions(categoryTransactions);
@@ -199,6 +317,37 @@ export default function TrendsPage() {
     return monthNames[parseInt(month) - 1] || month;
   };
 
+  const formatMonthWithYear = (monthStr: string) => {
+    const [year] = monthStr.split("-");
+    const monthLabel = formatMonth(monthStr);
+    return `${monthLabel} '${year.slice(-2)}`;
+  };
+
+  const formatAxisCurrency = (value: number, max: number) => {
+    if (max < 1000) {
+      return `$${Math.round(value).toLocaleString()}`;
+    }
+    if (max < 1_000_000) {
+      const short = (value / 1000).toFixed(1);
+      return `$${short}k`;
+    }
+    const short = (value / 1_000_000).toFixed(1);
+    return `$${short}M`;
+  };
+
+  const getMonthRange = (startMonth: string, endMonth: string): string[] => {
+    const [startYear, startMon] = startMonth.split("-").map(Number);
+    const [endYear, endMon] = endMonth.split("-").map(Number);
+    const months: string[] = [];
+    let cursor = new Date(startYear, startMon - 1, 1);
+    const end = new Date(endYear, endMon - 1, 1);
+    while (cursor <= end) {
+      months.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`);
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+    }
+    return months;
+  };
+
   const getMonthNumber = (monthStr: string): number => {
     const [, month] = monthStr.split('-');
     return parseInt(month);
@@ -245,7 +394,7 @@ export default function TrendsPage() {
       .slice(0, categoryCount);
 
     const data = filteredMonths.map(month => {
-      const dataPoint: Record<string, string | number | null> = { month: formatMonth(month) };
+      const dataPoint: Record<string, string | number | null> = { month: formatMonth(month), monthKey: month };
       let total = 0;
       categoriesToShow.forEach(cat => {
         const monthData = cat.months.find(m => m.month === month);
@@ -360,25 +509,26 @@ export default function TrendsPage() {
   };
 
   // Custom legend with click handler
-  const renderClickableLegend = (props: any, hiddenSet: Set<string>, toggleFn: (name: string) => void) => {
-    const { payload } = props;
+  const renderClickableLegend = (props: unknown, hiddenSet: Set<string>, toggleFn: (name: string) => void) => {
+    const { payload } = (props as { payload?: Array<{ value: string | number; color?: string }> });
     return (
       <div className="flex flex-wrap gap-2 justify-center mt-2">
-        {payload?.map((entry: any, index: number) => {
-          const isHidden = hiddenSet.has(entry.value);
-          const isOther = entry.value === OTHER_CATEGORY;
+        {payload?.map((entry, index) => {
+          const value = String(entry.value);
+          const isHidden = hiddenSet.has(value);
+          const isOther = value === OTHER_CATEGORY;
           return (
             <button
               key={`legend-${index}`}
               onClick={(event) => {
                 if (event.shiftKey) {
                   setPinnedCategoryDot((current) => {
-                    if (current?.dataKey === entry.value) return null;
-                    return { dataKey: entry.value, index: 0 };
+                    if (current?.dataKey === value) return null;
+                    return { dataKey: value, index: 0 };
                   });
                   return;
                 }
-                toggleFn(entry.value);
+                toggleFn(value);
               }}
               className={cn(
                 "flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-all",
@@ -388,9 +538,9 @@ export default function TrendsPage() {
             >
               <span
                 className="w-3 h-3 rounded-sm"
-                style={{ backgroundColor: isOther ? OTHER_COLOR : entry.color }}
+                style={{ backgroundColor: isOther ? OTHER_COLOR : entry.color || "#94a3b8" }}
               />
-              <span>{entry.value}</span>
+              <span>{value}</span>
             </button>
           );
         })}
@@ -399,62 +549,45 @@ export default function TrendsPage() {
   };
 
   // Custom tooltip sorted by value
-  const renderSortedTooltip = ({ active, payload, label }: any) => {
-    if (!active || !payload?.length) return null;
-    const sortedPayload = [...payload].sort((a, b) => (b.value as number) - (a.value as number));
-    return (
-      <div className="bg-background border rounded-lg p-3 shadow-lg max-w-xs">
-        <p className="font-medium mb-2">{label}</p>
-        {sortedPayload.map((entry: any, idx: number) => (
-          <div key={idx} className="flex justify-between gap-4 text-sm">
-            <span style={{ color: entry.color }} className="truncate max-w-[150px]">
-              {entry.name}
-            </span>
-            <span className="font-mono">{formatCurrency(entry.value as number)}</span>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
   // Custom tooltip that only shows when hovering a specific dot
-  const renderCategoryDotTooltip = ({ payload, label }: any) => {
+  const renderCategoryDotTooltip = ({ payload, label }: RechartsTooltipProps<number, string>) => {
     const activeDot = hoveredCategoryDot || pinnedCategoryDot;
     if (!activeDot || !payload?.length) return null;
-    const hoveredEntry = payload.find((p: any) => p.dataKey === activeDot.dataKey);
+    const hoveredEntry = payload.find((p) => String(p.dataKey) === activeDot.dataKey);
     if (!hoveredEntry) return null;
     return (
       <div className="bg-background border rounded-lg p-3 shadow-lg">
         <p className="font-medium mb-1">{label}</p>
         <div className="flex justify-between gap-4 text-sm">
-          <span style={{ color: hoveredEntry.color }}>{hoveredEntry.name}</span>
-          <span className="font-mono">{formatCurrency(hoveredEntry.value as number)}</span>
+          <span style={{ color: hoveredEntry.color }}>{String(hoveredEntry.name || "")}</span>
+          <span className="font-mono">{formatCurrency(Number(hoveredEntry.value || 0))}</span>
         </div>
       </div>
     );
   };
 
-  const renderMerchantDotTooltip = ({ payload, label }: any) => {
+  const renderMerchantDotTooltip = ({ payload, label }: RechartsTooltipProps<number, string>) => {
     if (!hoveredMerchantDot || !payload?.length) return null;
-    const hoveredEntry = payload.find((p: any) => p.dataKey === hoveredMerchantDot.dataKey);
+    const hoveredEntry = payload.find((p) => String(p.dataKey) === hoveredMerchantDot.dataKey);
     if (!hoveredEntry) return null;
     return (
       <div className="bg-background border rounded-lg p-3 shadow-lg">
         <p className="font-medium mb-1">{label}</p>
         <div className="flex justify-between gap-4 text-sm">
-          <span style={{ color: hoveredEntry.color }}>{hoveredEntry.name}</span>
-          <span className="font-mono">{formatCurrency(hoveredEntry.value as number)}</span>
+          <span style={{ color: hoveredEntry.color }}>{String(hoveredEntry.name || "")}</span>
+          <span className="font-mono">{formatCurrency(Number(hoveredEntry.value || 0))}</span>
         </div>
       </div>
     );
   };
 
   // Custom dot component for category chart
-  const renderCategoryDot = (props: any, dataKey: string, color: string): React.ReactElement<SVGElement> => {
-    const { cx, cy, index } = props;
+  const renderCategoryDot = (props: DotProps, dataKey: string, color: string): React.ReactElement<SVGElement> => {
+    const { cx, cy, index, payload } = props;
     if (cx === undefined || cy === undefined) return <circle r={0} />;
-    const isHovered = hoveredCategoryDot?.dataKey === dataKey && hoveredCategoryDot?.index === index;
-    const isPinned = pinnedCategoryDot?.dataKey === dataKey && pinnedCategoryDot?.index === index;
+    const safeIndex = typeof index === "number" ? index : 0;
+    const isHovered = hoveredCategoryDot?.dataKey === dataKey && hoveredCategoryDot?.index === safeIndex;
+    const isPinned = pinnedCategoryDot?.dataKey === dataKey && pinnedCategoryDot?.index === safeIndex;
     return (
       <circle
         cx={cx}
@@ -464,23 +597,29 @@ export default function TrendsPage() {
         stroke={color}
         strokeWidth={isHovered || isPinned ? 2 : 0}
         style={{ cursor: 'pointer' }}
-        onMouseEnter={() => setHoveredCategoryDot({ dataKey, index })}
+        onMouseEnter={() => setHoveredCategoryDot({ dataKey, index: safeIndex })}
         onMouseLeave={() => setHoveredCategoryDot(null)}
-        onClick={() => {
-          setPinnedCategoryDot((current) => {
-            if (current?.dataKey === dataKey && current.index === index) return null;
-            return { dataKey, index };
-          });
+        onClick={(event) => {
+          if (event.shiftKey) {
+            setPinnedCategoryDot((current) => {
+              if (current?.dataKey === dataKey && current.index === safeIndex) return null;
+              return { dataKey, index: safeIndex };
+            });
+            return;
+          }
+          const monthKey = payload?.monthKey as string | undefined;
+          openCategoryDrilldown(dataKey, monthKey);
         }}
       />
     );
   };
 
   // Custom dot component for merchant chart
-  const renderMerchantDot = (props: any, dataKey: string, color: string): React.ReactElement<SVGElement> => {
+  const renderMerchantDot = (props: DotProps, dataKey: string, color: string): React.ReactElement<SVGElement> => {
     const { cx, cy, index } = props;
     if (cx === undefined || cy === undefined) return <circle r={0} />;
-    const isHovered = hoveredMerchantDot?.dataKey === dataKey && hoveredMerchantDot?.index === index;
+    const safeIndex = typeof index === "number" ? index : 0;
+    const isHovered = hoveredMerchantDot?.dataKey === dataKey && hoveredMerchantDot?.index === safeIndex;
     return (
       <circle
         cx={cx}
@@ -490,11 +629,18 @@ export default function TrendsPage() {
         stroke={color}
         strokeWidth={isHovered ? 2 : 0}
         style={{ cursor: 'pointer' }}
-        onMouseEnter={() => setHoveredMerchantDot({ dataKey, index })}
+        onMouseEnter={() => setHoveredMerchantDot({ dataKey, index: safeIndex })}
         onMouseLeave={() => setHoveredMerchantDot(null)}
       />
     );
   };
+
+  const merchantTrendSeries = useMemo(() => {
+    if (!merchantTrends) return [];
+    const months = getMonthRange(merchantTrends.start_month, merchantTrends.end_month);
+    const totals = new Map(merchantTrends.months.map(item => [item.month, item.total]));
+    return months.map(month => ({ month, total: totals.get(month) || 0 }));
+  }, [merchantTrends]);
 
   if (isLoading) {
     return (
@@ -527,6 +673,21 @@ export default function TrendsPage() {
     });
   }
   const allMerchants = filteredMerchants.slice(0, categoryCount);
+  const merchantVisibleMax = merchantChartData.length
+    ? Math.max(...merchantChartData.map(d => {
+        let max = 0;
+        allMerchants.forEach(merch => {
+          if (!hiddenMerchants.has(merch.merchant)) {
+            const val = (d as Record<string, number | string | null>)[merch.merchant] as number || 0;
+            if (val > max) max = val;
+          }
+        });
+        return max;
+      }))
+    : 0;
+  const merchantTrendMax = merchantTrendSeries.length > 0
+    ? Math.max(...merchantTrendSeries.map(d => d.total))
+    : 0;
 
   // Filter and add moving average to monthly data
   const monthlyData = filterByMonthRange(trends?.monthly_totals || []);
@@ -603,13 +764,13 @@ export default function TrendsPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <h1 className="text-2xl font-bold">Spending Trends</h1>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-end gap-2">
           {/* Month Range Filter */}
           <Select value={monthRange} onValueChange={(v) => setMonthRange(v as MonthRange)}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="h-9 w-[140px] text-sm">
               <SelectValue placeholder="Month Range" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="text-sm">
               {Object.entries(MONTH_RANGES).map(([key, { label }]) => (
                 <SelectItem key={key} value={key}>{label}</SelectItem>
               ))}
@@ -618,10 +779,10 @@ export default function TrendsPage() {
 
           {/* Year Filter */}
           <Select value={filters.year?.toString()} onValueChange={handleYearChange}>
-            <SelectTrigger className="w-[100px]">
+            <SelectTrigger className="h-9 w-[100px] text-sm">
               <SelectValue placeholder="Year" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="text-sm">
               {YEARS.map(year => (
                 <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
               ))}
@@ -638,17 +799,17 @@ export default function TrendsPage() {
                 }
               }}
             >
-              <SelectTrigger className="w-[120px]">
+              <SelectTrigger className="h-9 w-[120px] text-sm">
                 <SelectValue placeholder="Source">
                   {selectedSources.size === 0 ? "All Sources" : `${selectedSources.size} selected`}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="text-sm">
                 <SelectItem value="all">All Sources</SelectItem>
                 {availableSources.map(source => (
                   <div
                     key={source}
-                    className="flex items-center gap-2 px-2 py-1.5 cursor-pointer hover:bg-muted"
+                    className="flex items-center gap-2 px-2 py-1 cursor-pointer hover:bg-muted"
                     onClick={(e) => {
                       e.preventDefault();
                       toggleSource(source);
@@ -658,7 +819,7 @@ export default function TrendsPage() {
                       type="checkbox"
                       checked={selectedSources.has(source)}
                       onChange={() => toggleSource(source)}
-                      className="h-4 w-4"
+                      className="h-3.5 w-3.5"
                     />
                     <span className="text-sm">{source}</span>
                   </div>
@@ -669,10 +830,10 @@ export default function TrendsPage() {
 
           {/* Category Count */}
           <Select value={categoryCount.toString()} onValueChange={(v) => setCategoryCount(parseInt(v))}>
-            <SelectTrigger className="w-[100px]">
+            <SelectTrigger className="h-9 w-[100px] text-sm">
               <SelectValue placeholder="Items" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="text-sm">
               <SelectItem value="5">Top 5</SelectItem>
               <SelectItem value="10">Top 10</SelectItem>
               <SelectItem value="15">Top 15</SelectItem>
@@ -686,17 +847,17 @@ export default function TrendsPage() {
             variant={hideOther ? "default" : "outline"}
             size="sm"
             onClick={() => setHideOther(!hideOther)}
-            className="text-xs"
+            className="h-9 px-3 text-sm"
           >
             {hideOther ? "Show Other" : "Hide Other"}
           </Button>
 
           {/* Export Button */}
-          <Button variant="outline" size="sm" onClick={copySummary}>
+          <Button variant="outline" size="sm" onClick={copySummary} className="h-9 px-3 text-sm">
             <CopyIcon className="h-4 w-4 mr-1" />
             {copyStatus === "copied" ? "Copied" : "Copy"}
           </Button>
-          <Button variant="outline" size="sm" onClick={exportToCSV}>
+          <Button variant="outline" size="sm" onClick={exportToCSV} className="h-9 px-3 text-sm">
             <Download className="h-4 w-4 mr-1" />
             CSV
           </Button>
@@ -917,66 +1078,181 @@ export default function TrendsPage() {
         </CardContent>
       </Card>
 
-      {/* Merchant Trends */}
+      {/* Merchant Search */}
       <Card className="mb-8">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base font-semibold">Spending by Merchant (Month over Month)</CardTitle>
-          <div className="flex items-center gap-4">
-            <Select value={merchantCategoryFilter} onValueChange={setMerchantCategoryFilter}>
-              <SelectTrigger className="w-[160px]">
-                <SelectValue placeholder="Filter by Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {availableCategories.map(cat => (
-                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <CardTitle className="text-base font-semibold">Merchant Search</CardTitle>
+          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+            {merchantTrends?.merchant && (
+              <div>
+                {merchantTrends.merchant} · {formatCurrency(merchantTrends.total_spent)}
+              </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setMerchantTransactionsOpen(true)}
+              disabled={merchantQuery.trim().length === 0 || merchantTransactionsLoading}
+            >
+              {merchantTransactionsLoading ? "Loading..." : "View transactions"}
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <ChartContainer config={chartConfig} className="h-[400px] w-full">
-            <LineChart data={merchantChartData}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-              <YAxis
-                tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                tick={{ fontSize: 12 }}
-                domain={[0, () => {
-                  // Calculate max from visible merchants only
-                  const visibleMax = Math.max(...merchantChartData.map(d => {
-                    let max = 0;
-                    allMerchants.forEach(merch => {
-                      if (!hiddenMerchants.has(merch.merchant)) {
-                        const val = (d as Record<string, number | string | null>)[merch.merchant] as number || 0;
-                        if (val > max) max = val;
+          <div className="rounded-xl border border-border/60 bg-muted/30 p-4 shadow-sm">
+            <div className="grid gap-4 md:grid-cols-[minmax(240px,1.5fr)_auto_auto] md:items-center">
+              <div>
+                <div className="relative" ref={merchantSearchRef}>
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="Search merchants..."
+                    value={merchantQuery}
+                    onChange={(event) => {
+                      setMerchantQuery(event.target.value);
+                      setHighlightedMerchantSuggestion(-1);
+                    }}
+                    onFocus={() => {
+                      if (merchantSuggestions?.suggestions?.length) setMerchantSuggestionsOpen(true);
+                    }}
+                    onKeyDown={(event) => {
+                      if (!merchantSuggestionsOpen || !merchantSuggestions?.suggestions?.length) return;
+                      if (event.key === "ArrowDown") {
+                        event.preventDefault();
+                        setHighlightedMerchantSuggestion((current) =>
+                          Math.min(current + 1, merchantSuggestions.suggestions.length - 1)
+                        );
+                      } else if (event.key === "ArrowUp") {
+                        event.preventDefault();
+                        setHighlightedMerchantSuggestion((current) => Math.max(current - 1, 0));
+                      } else if (event.key === "Enter") {
+                        event.preventDefault();
+                        const selected = merchantSuggestions.suggestions[highlightedMerchantSuggestion];
+                        if (selected) {
+                          setMerchantQuery(selected.merchant);
+                          setMerchantSuggestionsOpen(false);
+                          setHighlightedMerchantSuggestion(-1);
+                        }
+                      } else if (event.key === "Escape") {
+                        setMerchantSuggestionsOpen(false);
+                        setHighlightedMerchantSuggestion(-1);
                       }
-                    });
-                    return max;
-                  }));
-                  return Math.ceil(visibleMax * 1.1) || 1000; // 10% padding, fallback to 1000
-                }]}
-              />
-              <Tooltip cursor={false} content={renderMerchantDotTooltip} />
-              <Legend content={(props) => renderClickableLegend(props, hiddenMerchants, toggleMerchant)} />
-              {allMerchants.map((merch, idx) => {
-                const color = COLORS[idx % COLORS.length];
-                return (
-                  <Line
-                    key={merch.merchant}
-                    type="linear"
-                    dataKey={merch.merchant}
-                    stroke={color}
-                    strokeWidth={hiddenMerchants.has(merch.merchant) ? 0 : 2}
-                    dot={(props) => renderMerchantDot(props, merch.merchant, color)}
-                    activeDot={false}
-                    opacity={hiddenMerchants.has(merch.merchant) ? 0 : 1}
+                    }}
+                    className="pl-9"
+                    ref={merchantInputRef}
                   />
-                );
-              })}
-            </LineChart>
-          </ChartContainer>
+                  {merchantSuggestionsOpen && merchantSuggestions?.suggestions?.length ? (
+                    <div className="absolute z-20 mt-2 w-full rounded-lg border border-border/70 bg-background shadow-lg">
+                      <div className="max-h-56 overflow-auto py-1">
+                        {merchantSuggestions.suggestions.map((suggestion, index) => (
+                          <button
+                            key={suggestion.merchant}
+                            type="button"
+                            className={cn(
+                              "flex w-full items-center justify-between px-3 py-2 text-left text-sm",
+                              highlightedMerchantSuggestion === index ? "bg-muted" : "hover:bg-muted"
+                            )}
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              setMerchantQuery(suggestion.merchant);
+                              setMerchantSuggestionsOpen(false);
+                              setHighlightedMerchantSuggestion(-1);
+                            }}
+                          >
+                            <span className="font-medium">{suggestion.merchant}</span>
+                            <span className="text-xs text-muted-foreground">{formatCurrency(suggestion.total)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              <div className="flex h-10 items-center gap-2 rounded-full border border-border/60 bg-background px-3">
+                <button
+                  type="button"
+                  onClick={() => setMerchantExact((current) => !current)}
+                  className={cn(
+                    "rounded-full px-3 py-1 text-xs font-semibold tracking-wide transition",
+                    merchantExact
+                      ? "bg-slate-900 text-white"
+                      : "bg-transparent text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Exact match
+                </button>
+              </div>
+              <div className="flex h-10 items-center gap-2 rounded-lg bg-transparent px-1">
+                <Input
+                  type="month"
+                  value={merchantStartMonth}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    setMerchantStartMonth(next);
+                    if (next > merchantEndMonth) setMerchantEndMonth(next);
+                  }}
+                  className="h-8 w-[150px]"
+                />
+                <span className="text-xs text-muted-foreground">→</span>
+                <Input
+                  type="month"
+                  value={merchantEndMonth}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    setMerchantEndMonth(next);
+                    if (next < merchantStartMonth) setMerchantStartMonth(next);
+                  }}
+                  className="h-8 w-[150px]"
+                />
+              </div>
+            </div>
+          </div>
+
+          {merchantQuery.trim().length === 0 && (
+            <StateCard title="Search for a merchant" description="Type a merchant name to see monthly spend." />
+          )}
+          {merchantQuery.trim().length > 0 && merchantTrendsLoading && (
+            <StateCard title="Loading merchant trend" description="Pulling monthly spend data." variant="loading" />
+          )}
+          {merchantQuery.trim().length > 0 && merchantTrendsError && (
+            <StateCard title="Error loading merchant trend" description={merchantTrendsError.message} variant="error" />
+          )}
+          {merchantQuery.trim().length > 0 && !merchantTrendsLoading && !merchantTrendsError && (
+            <>
+              {merchantTrendSeries.length === 0 ? (
+                <StateCard title="No matching transactions" description="Try a different merchant name or range." />
+              ) : (
+                <ChartContainer config={chartConfig} className="h-[320px] w-full">
+                  <LineChart data={merchantTrendSeries}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="month" tickFormatter={formatMonthWithYear} tick={{ fontSize: 12 }} />
+                    <YAxis
+                      tickFormatter={(value) => formatAxisCurrency(value, merchantTrendMax)}
+                      tick={{ fontSize: 12 }}
+                      domain={[0, () => {
+                        const max = Math.max(...merchantTrendSeries.map(d => d.total));
+                        return Math.ceil(max * 1.1) || 1000;
+                      }]}
+                    />
+                    <Tooltip
+                      cursor={false}
+                      formatter={(value: number) => formatCurrency(value)}
+                      labelFormatter={(label) => formatMonthWithYear(label)}
+                    />
+                    <Line
+                      type="linear"
+                      dataKey="total"
+                      stroke={COLORS[0]}
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      activeDot={{ r: 4 }}
+                    />
+                  </LineChart>
+                </ChartContainer>
+              )}
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -1114,7 +1390,6 @@ export default function TrendsPage() {
                   // Calculate YTD totals
                   const ytdActual = chartData.reduce((sum, d) => sum + d.actual, 0);
                   const ytdBudget = monthlyBudget * 12; // Full year budget
-                  const ytdVariance = ytdBudget - ytdActual;
                   const ytdVariancePercent = ytdBudget > 0 ? ((ytdActual - ytdBudget) / ytdBudget) * 100 : 0;
                   const isOverBudget = ytdActual > ytdBudget;
 
@@ -1240,6 +1515,13 @@ export default function TrendsPage() {
         onClose={() => setDrilldownCategory(null)}
         category={drilldownCategory || ''}
         transactions={drilldownTransactions}
+        subtitle={drilldownSubtitle || undefined}
+      />
+      <CategoryDrilldownModal
+        isOpen={merchantTransactionsOpen}
+        onClose={() => setMerchantTransactionsOpen(false)}
+        category={(merchantTrends?.merchant || merchantQuery.trim() || 'Merchant')}
+        transactions={merchantTransactions}
       />
     </div>
   );

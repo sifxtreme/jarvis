@@ -1,6 +1,6 @@
 # Jarvis
 
-Personal finance tracker with automatic bank sync and spending insights.
+Personal finance + calendar hub with bank sync, spending insights, and scheduling.
 
 ## Features
 
@@ -19,14 +19,14 @@ Personal finance tracker with automatic bank sync and spending insights.
 - **Teller Repair Tool** - Built-in tool to fix disconnected bank connections (MFA)
 - **Supported Banks** - Chase, Amex, Bank of America, Citi, Capital One, 5000+ others
 
-### Jarvis Extensions (2026-01-02)
+### Calendar + Automation
+- **Calendar Sync** [Live] — Personal events + busy-only work calendars. See docs/features/CALENDAR_SYNC.md.
+- **Calendar UI** [Live] — /calendar page with day/week/2-week/month views. See docs/features/CALENDAR_UI.md.
+- **Calendar Chat (Web)** [Live] — In-app chat to create events (text only). See docs/features/JARVIS_CHAT.md.
+- **Calendar Delete** [Live] — Delete calendar events from the UI (syncs to Google).
 - **Slack Bot** [Live] — Screenshot + text ingestion for calendar events. See docs/features/SLACK_BOT.md.
 - **Gemini Extraction** [Live] — Intent + extraction with cost logging. See docs/features/GEMINI_EXTRACTION.md.
 - **Google Auth** [Live] — Google Sign-In + session auth for the API. See docs/features/GOOGLE_AUTH.md.
-- **Calendar Sync** [Live] — Personal events + busy-only work calendars. See docs/features/CALENDAR_SYNC.md.
-- **Calendar UI** [Live] — New /calendar page with day/week/2-week/month views. See docs/features/CALENDAR_UI.md.
-- **Calendar Chat (Web)** [Live] — In-app chat to create events (text only). See docs/features/JARVIS_CHAT.md.
-- **Calendar Delete** [Live] — Delete calendar events from the UI (syncs to Google).
 - **Calendar Future** [Planned] — Bulk actions + chat panel improvements. See docs/features/CALENDAR_FUTURE.md.
 
 ### Planned / Not Live Yet
