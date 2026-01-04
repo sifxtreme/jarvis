@@ -21,12 +21,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChatPanel } from "@/components/ChatPanel";
 import { StateCard } from "@/components/StateCard";
 import { PanelRightClose, PanelRightOpen, Repeat } from "lucide-react";
 
-type ViewMode = "day" | "week" | "2weeks" | "month";
+type ViewMode = "day" | "week" | "month";
 
 type CalendarEntry = {
   id: number;
@@ -44,11 +44,10 @@ type CalendarEntry = {
   isWork: boolean;
 };
 
-const viewOptions: { value: ViewMode; label: string; days: number }[] = [
-  { value: "day", label: "Day", days: 1 },
-  { value: "week", label: "Week", days: 7 },
-  { value: "2weeks", label: "2 Weeks", days: 14 },
-  { value: "month", label: "Month", days: 30 },
+const viewOptions: { value: ViewMode; label: string; days: number; tooltip: string }[] = [
+  { value: "day", label: "D", days: 1, tooltip: "Day" },
+  { value: "week", label: "W", days: 7, tooltip: "Week" },
+  { value: "month", label: "M", days: 30, tooltip: "Month" },
 ];
 
 const GEO_CACHE_KEY = "jarvis_geo";
@@ -276,7 +275,7 @@ export default function CalendarPage() {
       }
       return;
     }
-    if (view === "week" || view === "2weeks") {
+    if (view === "week") {
       setAnchorDate((current) => startOfWeek(current, { weekStartsOn: 0 }));
     }
   }, [view]);
@@ -502,16 +501,12 @@ export default function CalendarPage() {
       return [startOfDay(anchorDate)];
     }
     const start = startOfWeek(anchorDate, { weekStartsOn: 0 });
-    const days = view === "2weeks" ? 14 : 7;
-    return Array.from({ length: days }, (_, index) => addDays(start, index));
+    return Array.from({ length: 7 }, (_, index) => addDays(start, index));
   }, [anchorDate, view]);
 
   const weekSections = useMemo(() => {
-    if (view === "2weeks" && !isMobile) {
-      return [viewDays.slice(0, 7), viewDays.slice(7, 14)];
-    }
     return [viewDays];
-  }, [view, viewDays, isMobile]);
+  }, [viewDays]);
 
   const entriesByDay = useMemo(() => {
     const map = new Map<string, CalendarEntry[]>();
@@ -763,7 +758,7 @@ export default function CalendarPage() {
                       >
                         <span className={cn("h-2 w-2 rounded-full", palette.dotPersonal)} />
                         <span className="md:hidden">{mobileLabel}</span>
-                        <span className="hidden md:inline">{label}</span>
+                        <span className="hidden md:inline">{label} 💼</span>
                       </button>
                     );
                   })}
@@ -809,23 +804,38 @@ export default function CalendarPage() {
             </div>
           </div>
           {!isMobile && (
-            <ToggleGroup
-              type="single"
-              value={view}
-              onValueChange={(value) => value && setView(value as ViewMode)}
-              className="flex flex-wrap items-center gap-1"
-            >
-              {viewOptions.map((option) => (
-                <ToggleGroupItem
-                  key={option.value}
-                  value={option.value}
-                  size="sm"
-                  className="px-3"
-                >
-                  {option.label}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
+            <TooltipProvider delayDuration={150}>
+              <div className="inline-flex scale-[0.92] origin-left md:scale-100">
+                {viewOptions.map((option, index) => {
+                  const isActive = view === option.value;
+                  const isFirst = index === 0;
+                  const isLast = index === viewOptions.length - 1;
+                  return (
+                    <Tooltip key={option.value}>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() => setView(option.value)}
+                          className={cn(
+                            "border px-2.5 py-1 text-xs font-semibold transition",
+                            isFirst && "rounded-l-md",
+                            isLast && "rounded-r-md",
+                            !isLast && "border-r-0",
+                            isActive
+                              ? "border-slate-300 bg-slate-900 text-white"
+                              : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300"
+                          )}
+                          aria-pressed={isActive}
+                        >
+                          {option.label}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>{option.tooltip}</TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </div>
+            </TooltipProvider>
           )}
         </div>
 
@@ -914,7 +924,7 @@ export default function CalendarPage() {
         {!loading && !error && !isMobile && view !== "month" && (
           <div className="space-y-4">
             {weekSections.map((days, sectionIndex) => {
-              const stickyHeader = view !== "2weeks";
+              const stickyHeader = true;
               return (
                 <div key={`week-${sectionIndex}`} className="rounded-xl border border-slate-200/70 bg-white shadow-sm overflow-hidden dark:border-slate-700/70 dark:bg-slate-950">
                   <div
