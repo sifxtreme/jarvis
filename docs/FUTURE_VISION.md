@@ -1,6 +1,9 @@
 # Jarvis: Future Vision & Implementation Plan
+Date: 2026-01-02
 
 > "The single most commercially valuable application of LLMs is turning unstructured content into structured data." — [Simon Willison](https://simonwillison.net/2025/Feb/28/llm-schemas/)
+
+Status: Vision document. Most items are not implemented in the current codebase.
 
 Jarvis evolves from a finance tracker into a true personal AI assistant — your digital butler for life's recurring tasks. Inspired by [Geoffrey Litt's Stevens](https://www.geoffreylitt.com/2025/04/12/how-i-made-a-useful-ai-assistant-with-one-sqlite-table-and-a-handful-of-cron-jobs), we embrace simplicity: one flexible memory table, cron jobs for data ingestion, and LLMs to make sense of it all.
 

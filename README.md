@@ -38,7 +38,6 @@ Personal finance + calendar hub with bank sync, spending insights, and schedulin
 jarvis/
 ├── backend/                 # Rails API + background workers
 ├── finance-tracker-app/     # React frontend (SPA)
-├── teller/                  # Teller mTLS credentials (gitignored)
 ├── docs/                    # Documentation
 └── docker-compose.yml       # Container orchestration
 ```
@@ -182,7 +181,7 @@ JARVIS_GMAIL_EMAIL=your-email@gmail.com
 JARVIS_GMAIL_PASSWORD=app-password
 ```
 
-Teller credentials (certificates) go in the `teller/` folder - see [docs/teller.md](docs/teller.md).
+Teller credentials (certificates) go in `backend/app/lib/teller/` - see [docs/teller.md](docs/teller.md).
 
 ## Background Jobs
 
@@ -237,9 +236,7 @@ docker-compose logs -f worker
 - [Progress Log](docs/progress.md) - Ongoing development notes
 
 ### Config & Setup
-- [Google Auth (Overview)](docs/GOOGLE_AUTH.md) - High-level auth setup
 - [Slack Setup](docs/SLACK_SETUP.md) - Slack app and event wiring
-- [Calendar Sync (Overview)](docs/CALENDAR_SYNC.md) - High-level sync notes
 - [Gemini Config + Testing](docs/GEMINI_CONFIGURATION_AND_TESTING.md) - Local setup and validation
 
 ### Features

@@ -1,6 +1,7 @@
-# Slack Setup (Stub Replies Only)
+# Slack Setup (Calendar Event Extraction)
+Date: 2026-01-02
 
-This config gets Slack wired up with simple test responses.
+This config wires Slack to extract calendar events and create them in Google Calendar.
 
 ## Slack App Setup
 
@@ -39,7 +40,7 @@ GEMINI_INTENT_MODEL=gemini-2.0-flash
 ## Run App Setup
 
 ```bash
-cd /Users/asifahmed/code/experiments/jarvis/backend
+cd backend
 bundle install
 docker-compose run api rake db:migrate
 ```
@@ -47,6 +48,7 @@ docker-compose run api rake db:migrate
 Slack events are handled by `SlackEventsController`, which inherits from
 `WebhookController` so webhooks rely on Slack signatures (not the auth header).
 
-Gemini is used to extract event details from both text and images.
+Gemini is used to extract event details from both text and images, and events
+are created on the user's primary Google Calendar.
 
 Then restart your backend services and test by DMing or @mentioning the Slack bot.

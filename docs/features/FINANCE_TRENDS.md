@@ -1,4 +1,5 @@
 # Feature: Finance Trends & Insights
+Date: 2026-01-02
 
 > Visualize spending patterns over time with interactive charts
 
@@ -93,8 +94,12 @@ For Trends, we'll aggregate server-side:
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
 | `year` | integer | current year | Year to analyze |
-| `compare_year` | integer | null | Optional year for comparison |
 | `category` | string | null | Filter to specific category |
+
+**Notes:**
+- Excludes hidden transactions.
+- Income is identified by category containing "income".
+- Amortized transactions are split across `amortized_months` within the target year.
 
 **Response:**
 ```json
@@ -102,202 +107,29 @@ For Trends, we'll aggregate server-side:
   "period": {
     "year": 2025,
     "total_transactions": 1247,
-    "total_spent": 45678.90,
-    "total_income": 52000.00,
-    "net_savings": 6321.10
+    "total_spent": 45678.9,
+    "total_income": 52000.0,
+    "net_savings": 6321.1
   },
-
   "monthly_totals": [
-    {
-      "month": "2025-01",
-      "spent": 4523.45,
-      "income": 4800.00,
-      "transaction_count": 87,
-      "top_category": "Groceries"
-    },
-    { "month": "2025-02", "spent": 3891.23, "income": 4800.00, "transaction_count": 72, "top_category": "Restaurants" }
+    { "month": "2025-01", "spent": 4523.45, "transaction_count": 87 }
   ],
-
   "by_category": [
-    {
-      "category": "Groceries",
-      "total": 8234.56,
-      "transaction_count": 145,
-      "budget": 8000.00,
-      "variance": -234.56,
-      "monthly_avg": 686.21
-    },
-    { "category": "Restaurants", "total": 2892.34, "transaction_count": 67, "budget": 2500.00, "variance": -392.34, "monthly_avg": 241.03 }
+    { "category": "Groceries", "total": 8234.56, "transaction_count": 145, "budget": 96000.0, "variance": 87765.44, "monthly_avg": 686.21 }
   ],
-
   "by_merchant": [
-    {
-      "merchant": "Amazon",
-      "total": 2567.89,
-      "transaction_count": 42,
-      "categories": ["Shopping", "Groceries", "Electronics"],
-      "last_transaction": "2025-01-15"
-    },
-    { "merchant": "Costco", "total": 1456.78, "transaction_count": 12, "categories": ["Groceries"], "last_transaction": "2025-01-20" }
+    { "merchant": "Amazon", "total": 2567.89, "transaction_count": 42, "categories": ["Shopping"], "last_transaction": "2025-01-15" }
   ],
-
   "budget_comparison": [
-    {
-      "category": "Groceries",
-      "budget": 8000.00,
-      "actual": 8234.56,
-      "variance": -234.56,
-      "variance_percent": -2.9,
-      "on_track": false
-    }
+    { "category": "Groceries", "budget": 96000.0, "actual": 8234.56, "variance": 87765.44, "variance_percent": 91.4, "on_track": true }
   ],
-
-  "comparison": null  // Populated if compare_year provided
+  "monthly_by_category": [
+    { "category": "Groceries", "months": [{ "month": "2025-01", "total": 512.12 }] }
+  ],
+  "monthly_by_merchant": [
+    { "merchant": "Amazon", "months": [{ "month": "2025-01", "total": 120.45, "transaction_count": 3 }] }
+  ]
 }
-```
-
-### Backend Implementation
-
-```ruby
-# app/controllers/financial_transactions_controller.rb
-
-def trends
-  year = (params[:year] || Date.current.year).to_i
-  compare_year = params[:compare_year]&.to_i
-  category_filter = params[:category]
-
-  base_scope = FinancialTransaction
-    .where('extract(year from transacted_at) = ?', year)
-    .where(hidden: false)
-
-  base_scope = base_scope.where(category: category_filter) if category_filter.present?
-
-  render json: {
-    period: period_summary(base_scope, year),
-    monthly_totals: monthly_breakdown(base_scope),
-    by_category: category_breakdown(base_scope),
-    by_merchant: merchant_breakdown(base_scope),
-    budget_comparison: budget_comparison(base_scope, year),
-    comparison: compare_year ? build_comparison(year, compare_year) : nil
-  }
-end
-
-private
-
-def period_summary(scope, year)
-  expenses = scope.where('amount > 0')
-  income = scope.where('amount < 0')  # Income stored as negative
-
-  {
-    year: year,
-    total_transactions: scope.count,
-    total_spent: expenses.sum(:amount).to_f.round(2),
-    total_income: income.sum(:amount).to_f.abs.round(2),
-    net_savings: (income.sum(:amount).abs - expenses.sum(:amount)).to_f.round(2)
-  }
-end
-
-def monthly_breakdown(scope)
-  scope
-    .where('amount > 0')  # Expenses only for spending chart
-    .group("to_char(transacted_at, 'YYYY-MM')")
-    .select(
-      "to_char(transacted_at, 'YYYY-MM') as month",
-      "SUM(amount) as spent",
-      "COUNT(*) as transaction_count"
-    )
-    .order('month')
-    .map do |row|
-      {
-        month: row.month,
-        spent: row.spent.to_f.round(2),
-        transaction_count: row.transaction_count
-      }
-    end
-end
-
-def category_breakdown(scope)
-  # Get totals by category
-  totals = scope
-    .where('amount > 0')
-    .where.not(category: [nil, ''])
-    .group(:category)
-    .select(
-      "category",
-      "SUM(amount) as total",
-      "COUNT(*) as transaction_count",
-      "AVG(amount) as avg_amount"
-    )
-    .order('total DESC')
-    .limit(20)
-
-  # Join with budgets
-  budgets = Budget.where(expense_type: 'expense').index_by(&:name)
-
-  totals.map do |row|
-    budget = budgets[row.category]
-    budget_amount = budget&.amount&.to_f || 0
-    variance = budget_amount > 0 ? budget_amount - row.total.to_f : nil
-
-    {
-      category: row.category,
-      total: row.total.to_f.round(2),
-      transaction_count: row.transaction_count,
-      budget: budget_amount.round(2),
-      variance: variance&.round(2),
-      monthly_avg: (row.total.to_f / 12).round(2)
-    }
-  end
-end
-
-def merchant_breakdown(scope)
-  scope
-    .where('amount > 0')
-    .group("COALESCE(NULLIF(merchant_name, ''), plaid_name)")
-    .select(
-      "COALESCE(NULLIF(merchant_name, ''), plaid_name) as merchant",
-      "SUM(amount) as total",
-      "COUNT(*) as transaction_count",
-      "array_agg(DISTINCT category) as categories",
-      "MAX(transacted_at) as last_transaction"
-    )
-    .order('total DESC')
-    .limit(15)
-    .map do |row|
-      {
-        merchant: row.merchant,
-        total: row.total.to_f.round(2),
-        transaction_count: row.transaction_count,
-        categories: row.categories.compact.uniq,
-        last_transaction: row.last_transaction&.to_date&.iso8601
-      }
-    end
-end
-
-def budget_comparison(scope, year)
-  # Calculate actual spending per category
-  actuals = scope
-    .where('amount > 0')
-    .where.not(category: [nil, ''])
-    .group(:category)
-    .sum(:amount)
-
-  # Get budgets valid for this year
-  Budget.where(expense_type: 'expense').map do |budget|
-    actual = actuals[budget.name]&.to_f || 0
-    annual_budget = budget.amount.to_f * 12  # Assuming monthly budgets
-    variance = annual_budget - actual
-
-    {
-      category: budget.name,
-      budget: annual_budget.round(2),
-      actual: actual.round(2),
-      variance: variance.round(2),
-      variance_percent: annual_budget > 0 ? ((variance / annual_budget) * 100).round(1) : 0,
-      on_track: variance >= 0
-    }
-  end.sort_by { |b| b[:variance] }
-end
 ```
 
 ---

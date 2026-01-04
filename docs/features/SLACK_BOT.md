@@ -22,8 +22,8 @@ Date: 2026-01-02
   - SLACK_SIGNING_SECRET
 
 ## Decisions
-- Slack is the primary chat interface for now.
-- Slack user resolution uses Slack member ID (stored on User).
+- Slack is one chat interface; web chat is also supported.
+- Slack user resolution uses Slack member ID (stored on User), with email fallback.
 - Image files are downloaded via Slack API and passed to Gemini.
 
 ## Next Steps

@@ -1,4 +1,5 @@
 # Next Features
+Date: 2026-01-02
 
 ## Chat
 - Image uploads + extraction (ActiveStorage/S3, paste + drag/drop, persistent previews).

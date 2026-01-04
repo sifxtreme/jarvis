@@ -1,4 +1,5 @@
 # Teller Integration
+Date: 2026-01-02
 
 Teller is the primary API for syncing bank transactions (replaced Plaid for most accounts).
 
@@ -7,8 +8,8 @@ Teller is the primary API for syncing bank transactions (replaced Plaid for most
 ### Key Files
 - `backend/app/lib/teller/api.rb` - Teller API client
 - `backend/app/jobs/sync_transactions_for_banks.rb` - Background job that runs every 3 hours
-- `teller/certificate.pem` - mTLS certificate (NOT committed to repo)
-- `teller/private_key.pem` - mTLS private key (NOT committed to repo)
+- `backend/app/lib/teller/certificate.pem` - mTLS certificate (NOT committed to repo)
+- `backend/app/lib/teller/private_key.pem` - mTLS private key (NOT committed to repo)
 - `finance-tracker-app/.../pages/TellerRepairPage.tsx` - In-app tool to repair disconnected enrollments
 
 ### Authentication
@@ -25,6 +26,7 @@ Multi-account support is managed via the `bank_connections` database table:
 - `account_id` - Teller account ID (acc_xxx)
 - `sync_from_date` - Optional date to limit transaction sync
 - `is_active` - Toggle syncing on/off
+- `provider` - `teller` or `plaid` (Teller rows should be `teller`)
 
 ## Supported Banks
 Teller supports 5,000+ US institutions including:
@@ -64,7 +66,7 @@ The bank connection has become stale. Banks periodically require re-authenticati
 
 5. Copy the new access token shown after success
 
-6. Update the token in the `bank_connections` database table (or in `backend/app/lib/teller/api.rb` if still hardcoded)
+6. Update the token in the `bank_connections` database table
 
 **Important:** The repair tool uses `environment: 'development'` which is free (up to 100 enrollments). Production requires payment setup.
 
@@ -87,7 +89,7 @@ You're using production environment. The in-app Teller Repair tool is hardcoded 
 When your Teller certificates expire:
 1. Go to [teller.io/dashboard](https://teller.io/dashboard)
 2. Download new certificate bundle
-3. Extract `certificate.pem` and `private_key.pem` to the `teller/` folder
+3. Extract `certificate.pem` and `private_key.pem` to `backend/app/lib/teller/`
 4. Restart the API/worker containers
 
 ## API Reference
@@ -98,9 +100,8 @@ When your Teller certificates expire:
 
 ### Transaction Filtering
 The sync only imports:
-- Type: `card_payment` or `refund`
 - Status: `posted` (not pending)
-- Date: After the hardcoded date limit
+- Date: After `bank_connections.sync_from_date` if set
 
 ### Rate Limits
 Teller has rate limits. The job runs every 3 hours (`0 */3 * * *` in `config/resque_schedule.yml`).

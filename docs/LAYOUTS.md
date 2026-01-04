@@ -1,4 +1,5 @@
 # Layout Standards
+Date: 2026-01-02
 
 We standardize on two primary page layouts. Use these names when describing or implementing UI work.
 

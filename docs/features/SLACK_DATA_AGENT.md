@@ -1,6 +1,10 @@
 # Slack Data Agent
+Date: 2026-01-02
 
 Query your Jarvis database using natural language in Slack.
+
+Status: Future concept only. Not implemented in the current codebase.
+Current Slack integration handles calendar event extraction via `SlackEventsController` + `SlackMessageJob`.
 
 ## Product Vision
 
@@ -27,7 +31,7 @@ Key insight from their implementation: The AI needs **two tools**:
 
 This allows the AI to self-correct and refine queries before returning results.
 
-## Our Implementation (Rails + Gemini)
+## Proposed Implementation (Rails + Gemini)
 
 We adapt this for our simpler stack without DuckDB:
 
@@ -220,7 +224,7 @@ settings:
 - `SLACK_BOT_TOKEN` (xoxb-...) - OAuth & Permissions page
 - `SLACK_SIGNING_SECRET` - Basic Information page
 
-### 2. Rails Controller
+### 2. Rails Controller (Concept)
 
 ```ruby
 # app/controllers/slack_controller.rb

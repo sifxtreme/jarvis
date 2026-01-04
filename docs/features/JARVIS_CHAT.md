@@ -1,8 +1,14 @@
 # Feature: Jarvis Chat
+Date: 2026-01-02
 
 > Your AI assistant for life's recurring tasks, starting with screenshots → calendar events
 
 ---
+
+## Status (Current vs Future)
+
+- Implemented: Slack + web chat flows using Gemini for intent + extraction.
+- Future/UX vision: Full chat UI with rich previews and edit/confirm flows (mockups below).
 
 ## Product Vision
 

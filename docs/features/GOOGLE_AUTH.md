@@ -3,7 +3,7 @@ Date: 2026-01-02
 
 ## Short Spec
 - Frontend uses Google Sign-In.
-- Backend verifies Google ID token and issues a long-lived session cookie.
+- Backend verifies Google ID token and issues a session cookie.
 - Existing endpoints accept session or legacy header (legacy kept for now).
 - New endpoints can be Google-only by inheriting GoogleAuthController.
 
@@ -14,14 +14,36 @@ Date: 2026-01-02
 - Env:
   - GOOGLE_OAUTH_CLIENT_ID
   - GOOGLE_OAUTH_CLIENT_SECRET
+  - GOOGLE_AUTH_ALLOWED_EMAILS (fallback allowlist if no users exist)
   - FRONTEND_URL=https://finances.sifxtre.me
 - Users allowlist:
-  - Stored in users table (active=true).
+  - Stored in users table (active=true), fallback to `GOOGLE_AUTH_ALLOWED_EMAILS` if no users exist.
 
 ## Decisions
-- HTTP-only cookie session to avoid hourly ID-token reauth.
+- HTTP-only cookie session to avoid hourly ID-token reauth (no persistence unless `expire_after` is added).
 - Allowlist stored in DB for future calendar sync.
 - Legacy auth left in place for existing endpoints.
+
+## Frontend Configuration
+
+- Authorized JS origins:
+  - https://finances.sifxtre.me
+  - http://localhost:3001 (dev)
+- Env:
+  - VITE_GOOGLE_CLIENT_ID=your_google_oauth_client_id
+
+## Client Usage
+
+Send the Google ID token in the `Authorization` header:
+
+```
+Authorization: Bearer <id_token>
+```
+
+## Session Cookie
+
+- `POST /auth/session` with `id_token` sets `session[:user_email]` (cookie store).
+- Cookie store is client-side (no Redis) and is a session cookie (expires on browser close).
 
 ## Auth Matrix
 ### Global mechanisms
