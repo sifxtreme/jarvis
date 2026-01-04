@@ -119,8 +119,8 @@ const DEFAULT_PALETTE_COLORS = {
 type GeoPoint = { lat: number; lng: number };
 
 const getWorkCalendarLabel = (calendarId: string, summary?: string | null) => {
-  if (calendarId === "asif@sevensevensix.com") return "Asif (Work)";
-  if (calendarId === "hafsa.sayyeda@goodrx.com") return "Hafsa (Work)";
+  if (calendarId === "asif@sevensevensix.com") return "Asif";
+  if (calendarId === "hafsa.sayyeda@goodrx.com") return "Hafsa";
   return summary || calendarId;
 };
 
@@ -741,6 +741,7 @@ export default function CalendarPage() {
                   })
                   .map((user) => {
                     const label = userMap.get(user.id) || user.email;
+                    const personalLabel = `${label} 🏠`;
                     const email = user.email;
                     const palette = USER_PALETTE[email] || DEFAULT_PALETTE;
                     const personalActive = userFilters[user.id] ?? true;
@@ -758,8 +759,8 @@ export default function CalendarPage() {
                         )}
                       >
                         <span className={cn("h-2 w-2 rounded-full", palette.dotPersonal)} />
-                        <span className="md:hidden">{mobileLabel}</span>
-                        <span className="hidden md:inline">{label} 💼</span>
+                        <span className="md:hidden">{mobileLabel} 🏠</span>
+                        <span className="hidden md:inline">{personalLabel}</span>
                       </button>
                     );
                   })}
@@ -797,7 +798,7 @@ export default function CalendarPage() {
                         <span className="md:hidden">
                           {mobileLabel} 💼
                         </span>
-                        <span className="hidden md:inline">{label}</span>
+                        <span className="hidden md:inline">{label} 💼</span>
                       </button>
                     );
                   })}
