@@ -9,6 +9,49 @@ Jarvis evolves from a finance tracker into a true personal AI assistant — your
 
 ---
 
+## Robust Product Spec (Phase 1)
+
+This section reflects current desired behavior and priorities for the first robust iteration.
+
+### Daily Brief
+- Time: 7:00 AM local.
+- Channel: Slack DMs (separate DM to each user).
+- Tone: Butler-ish.
+- Includes:
+  - Today’s calendar with event titles by default.
+  - Privacy toggle to switch calendar display to busy-only.
+  - Weather forecast (short).
+  - Task/reminder summary (overdue + due today).
+  - Finance alert: budget drift only (trigger when >25% over budget **and** >$200 over).
+- Excludes:
+  - Package/mail status.
+  - Large transaction alerts.
+  - Upcoming bills.
+  - Unusual category alerts.
+  - Low cash balance alerts.
+- No “what changed since yesterday” section.
+
+### Reminders
+- Source: Apple Reminders (iCloud).
+- Sync cadence: daily.
+- Show only overdue and due-today items in the brief.
+- Stored separately from memories (own table/model).
+
+### Calendar
+- Auto-create events is supported.
+- If LLM confidence is low, require a confirmation step before creation.
+- Support both detailed and busy-only display.
+
+### Users & Privacy
+- User-scoped data by default with an optional shared layer.
+- Private items must never appear in shared views or shared summaries.
+
+### Memory Retention
+- Keep memories indefinitely unless explicitly invalidated.
+
+### Queries
+- No ad-hoc query interface in Phase 1.
+
 ## Table of Contents
 
 1. [Core Architecture](#core-architecture)
