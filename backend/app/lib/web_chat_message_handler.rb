@@ -1,14 +1,49 @@
+require 'base64'
+require 'image_processing/mini_magick'
+require 'stringio'
+
 class WebChatMessageHandler
-  def initialize(user:, message:, text:)
+  CONFIDENCE_ORDER = { 'low' => 0, 'medium' => 1, 'high' => 2 }.freeze
+  CALENDAR_WINDOW_PAST_DAYS = 30
+  CALENDAR_WINDOW_FUTURE_DAYS = 90
+  MAX_GEMINI_DIMENSION = 1568
+
+  def initialize(user:, message:, text:, image: nil, thread:)
     @user = user
     @message = message
     @text = text.to_s
+    @image = image
+    @thread = thread
   end
 
   def process!
-    intent = classify_intent
+    return handle_pending_action if pending_action?
 
-    case intent['intent']
+    if image_attached? && @text.strip.empty?
+      return ask_image_intent
+    end
+
+    intent = classify_intent
+    intent_name = intent['intent'] || 'create_event'
+    intent_confidence = normalize_confidence(intent['confidence'])
+
+    if intent_confidence == 'low'
+      return ask_intent_clarification
+    end
+
+    case intent_name
+    when 'create_event'
+      handle_create_event
+    when 'update_event'
+      handle_update_event
+    when 'delete_event'
+      handle_delete_event
+    when 'create_transaction'
+      handle_create_transaction
+    when 'create_memory'
+      handle_create_memory
+    when 'search_memory'
+      handle_search_memory
     when 'list_events'
       build_response("I can list upcoming events soon. (Calendar querying comes next.)")
     when 'digest'
@@ -16,28 +51,559 @@ class WebChatMessageHandler
     when 'help'
       build_response("Send event details and I’ll add it to your calendar.")
     else
-      if @text.strip.empty?
-        build_response("Send event details and I’ll add it to your calendar.")
-      else
-        extract_from_text
-      end
+      build_response("Tell me what you’d like to do with your calendar or finances.")
     end
   end
 
   private
 
+  def pending_action?
+    thread_state['pending_action'].present?
+  end
+
+  def thread_state
+    @thread.state ||= {}
+  end
+
+  def update_thread_state(next_state)
+    @thread.update!(state: next_state)
+  end
+
+  def clear_thread_state
+    update_thread_state({})
+  end
+
+  def set_pending_action(action, payload = {})
+    update_thread_state({
+      'pending_action' => action,
+      'payload' => payload
+    })
+  end
+
+  def ask_image_intent
+    set_pending_action('clarify_image_intent', { 'image_message_id' => @message.id })
+    build_response("Is this image for a calendar event or a transaction?")
+  end
+
+  def ask_intent_clarification
+    set_pending_action('clarify_intent', { 'image_message_id' => image_attached? ? @message.id : nil })
+    build_response("Do you want me to add or update a calendar event, delete an event, add a transaction, or save a memory?")
+  end
+
+  def handle_pending_action
+    action = thread_state['pending_action']
+    payload = thread_state['payload'] || {}
+
+    case action
+    when 'clarify_image_intent', 'clarify_intent'
+      return handle_clarified_intent(payload)
+    when 'clarify_event_fields'
+      return handle_event_correction(payload)
+    when 'confirm_event'
+      return handle_event_confirmation(payload)
+    when 'clarify_transaction_fields'
+      return handle_transaction_correction(payload)
+    when 'confirm_transaction'
+      return handle_transaction_confirmation(payload)
+    when 'select_event_for_delete'
+      return handle_event_selection(payload, action_type: 'delete')
+    when 'confirm_delete'
+      return handle_delete_confirmation(payload)
+    when 'select_event_for_update'
+      return handle_event_selection(payload, action_type: 'update')
+    when 'confirm_update'
+      return handle_update_confirmation(payload)
+    when 'clarify_update_target'
+      return handle_update_target_clarification(payload)
+    when 'clarify_memory_fields'
+      return handle_memory_correction(payload)
+    when 'confirm_memory'
+      return handle_memory_confirmation(payload)
+    else
+      clear_thread_state
+      build_response("Let’s start over. What would you like to do?")
+    end
+  end
+
+  def handle_clarified_intent(payload)
+    intent = resolve_intent_from_text
+    image_message_id = payload['image_message_id']
+    clear_thread_state
+
+    case intent
+    when 'create_transaction'
+      handle_create_transaction(image_message_id: image_message_id)
+    when 'create_memory'
+      handle_create_memory
+    when 'search_memory'
+      handle_search_memory
+    when 'delete_event'
+      handle_delete_event
+    when 'update_event'
+      handle_update_event
+    else
+      handle_create_event(image_message_id: image_message_id)
+    end
+  end
+
+  def handle_create_memory
+    urls = extract_urls(@text)
+    if image_attached? && @text.strip.empty?
+      return create_memory({ 'content' => 'Saved image', 'category' => 'image', 'urls' => urls })
+    end
+
+    if urls.any? && strip_urls(@text).strip.empty?
+      return create_memory({ 'content' => 'Saved link', 'category' => 'link', 'urls' => urls })
+    end
+
+    result = gemini.extract_memory_from_text(@text)
+    log_ai_request(@message, result[:usage], request_kind: 'memory', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
+    data = result[:event] || {}
+    data['urls'] = urls if urls.any?
+
+    if data['error']
+      return build_response(data['message'] || "I couldn't find a memory to save.")
+    end
+
+    content = data['content'].to_s.strip
+    confidence = normalize_confidence(data['confidence'])
+    if content.empty?
+      set_pending_action('clarify_memory_fields', { 'memory' => data })
+      return build_response("What should I remember?")
+    end
+
+    if confidence != 'high'
+      set_pending_action('confirm_memory', { 'memory' => data })
+      return build_response("Should I save this memory?\n\n#{format_memory(data)}")
+    end
+
+    create_memory(data)
+  rescue StandardError => e
+    build_response("Memory error: #{e.message}")
+  end
+
+  def handle_memory_correction(payload)
+    result = gemini.extract_memory_from_text(@text)
+    log_ai_request(@message, result[:usage], request_kind: 'memory', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
+    updated = result[:event] || {}
+
+    if updated['error']
+      return build_response(updated['message'] || "I couldn't update that memory.")
+    end
+
+    urls = extract_urls(@text)
+    updated['urls'] = urls if urls.any?
+
+    content = updated['content'].to_s.strip
+    confidence = normalize_confidence(updated['confidence'])
+    if content.empty?
+      set_pending_action('clarify_memory_fields', { 'memory' => updated })
+      return build_response("What should I remember?")
+    end
+
+    if confidence != 'high'
+      set_pending_action('confirm_memory', { 'memory' => updated })
+      return build_response("Should I save this memory?\n\n#{format_memory(updated)}")
+    end
+
+    create_memory(updated)
+  rescue StandardError => e
+    build_response("Memory error: #{e.message}")
+  end
+
+  def handle_memory_confirmation(payload)
+    data = payload['memory'] || {}
+    if affirmative?
+      clear_thread_state
+      return create_memory(data)
+    end
+
+    clear_thread_state
+    build_response("Okay, tell me what you want to remember.")
+  end
+
+  def handle_search_memory
+    result = gemini.extract_memory_query_from_text(@text)
+    log_ai_request(@message, result[:usage], request_kind: 'memory_query', model: gemini_intent_model, status: result[:event]['error'] ? 'error' : 'success')
+    query = result[:event] || {}
+
+    if query['error'] || query['query'].to_s.strip.empty?
+      return build_response("What should I search for in your memories?")
+    end
+
+    memories = search_memories(query['query'])
+    return build_response("I couldn't find any memories about that.") if memories.empty?
+
+    answer = gemini.answer_with_memories(@text, memories)
+    log_ai_request(@message, answer[:usage], request_kind: 'memory_answer', model: gemini_extract_model, status: answer[:text].to_s.empty? ? 'error' : 'success')
+    build_response(answer[:text].presence || format_memory_list(memories))
+  rescue StandardError => e
+    build_response("Memory search error: #{e.message}")
+  end
+
+  def handle_create_event(image_message_id: nil)
+    result = if image_message_id
+      extract_event_from_message(image_message_id)
+    elsif image_attached?
+      extract_from_image
+    else
+      extract_from_text
+    end
+
+    return result if result.is_a?(Hash) && result[:text]
+
+    event = result[:event] || {}
+    if event['error']
+      clear_thread_state
+      return build_response(event['message'] || "I couldn't find event details.")
+    end
+    missing = missing_event_fields(event)
+    confidence = normalize_confidence(event['confidence'])
+
+    if missing.any?
+      set_pending_action('clarify_event_fields', { 'event' => event, 'missing_fields' => missing })
+      return build_response("I need #{missing.join(', ')} to add this event.")
+    end
+
+    if confidence != 'high'
+      set_pending_action('confirm_event', { 'event' => event })
+      return build_response("I found this event:\n\n#{format_event(event)}\n\nShould I add it?")
+    end
+
+    create_event(event)
+  end
+
+  def handle_event_correction(payload)
+    event = payload['event'] || {}
+    result = gemini.apply_event_correction(event, @text)
+    log_ai_request(@message, result[:usage], request_kind: 'event_correction', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
+
+    updated = result[:event]
+    if updated['error']
+      clear_thread_state
+      return build_response(updated['message'] || "I couldn't update the transaction.")
+    end
+    if updated['error']
+      clear_thread_state
+      return build_response(updated['message'] || "I couldn't update the event details.")
+    end
+    missing = missing_event_fields(updated)
+    confidence = normalize_confidence(updated['confidence'])
+
+    if missing.any?
+      set_pending_action('clarify_event_fields', { 'event' => updated, 'missing_fields' => missing })
+      return build_response("I still need #{missing.join(', ')}.")
+    end
+
+    if confidence != 'high'
+      set_pending_action('confirm_event', { 'event' => updated })
+      return build_response("Got it. Here’s the event:\n\n#{format_event(updated)}\n\nShould I add it?")
+    end
+
+    create_event(updated)
+  rescue StandardError => e
+    clear_thread_state
+    build_response("Event correction error: #{e.message}")
+  end
+
+  def handle_event_confirmation(payload)
+    event = payload['event'] || {}
+    if affirmative?
+      clear_thread_state
+      return create_event(event)
+    end
+
+    clear_thread_state
+    build_response("Okay, what should I change?")
+  end
+
+  def handle_update_event
+    result = gemini.extract_event_update_from_text(@text)
+    log_ai_request(@message, result[:usage], request_kind: 'event_update', model: gemini_intent_model, status: result[:event]['error'] ? 'error' : 'success')
+    data = result[:event]
+
+    if data['error']
+      set_pending_action('clarify_update_target', { 'changes' => {} })
+      return build_response("Which event should I update? Please share the title and date.")
+    end
+
+    changes = (data['changes'] || {}).compact
+    changes['confidence'] = data['confidence'] if data['confidence']
+    if changes.empty?
+      set_pending_action('clarify_update_target', { 'changes' => {} })
+      return build_response("What should I change about the event?")
+    end
+
+    target = (data['target'] || {}).compact
+    if target.empty?
+      set_pending_action('clarify_update_target', { 'changes' => changes })
+      return build_response("Which event should I update? Please share the title and date.")
+    end
+
+    candidates = find_event_candidates(target)
+    return build_response("I couldn't find that event. Can you share the title and date?") if candidates.empty?
+
+    if candidates.length > 1
+      set_pending_action('select_event_for_update', { 'candidates' => serialize_candidates(candidates), 'changes' => changes })
+      return build_response("Which event should I update?\n#{format_candidates(candidates)}")
+    end
+
+    event_record = candidates.first[:event]
+    confirm_or_update_event(event_record, changes)
+  rescue StandardError => e
+    build_response("Update error: #{e.message}")
+  end
+
+  def handle_update_target_clarification(payload)
+    changes = payload['changes'] || {}
+    query = gemini.extract_event_query_from_text(@text)
+    log_ai_request(@message, query[:usage], request_kind: 'event_query', model: gemini_intent_model, status: query[:event]['error'] ? 'error' : 'success')
+    data = query[:event]
+
+    if data['error']
+      return build_response("I still need the event title or date.")
+    end
+
+    candidates = find_event_candidates(data)
+    return build_response("I couldn't find that event. Can you share the title and date?") if candidates.empty?
+
+    if candidates.length > 1
+      set_pending_action('select_event_for_update', { 'candidates' => serialize_candidates(candidates), 'changes' => changes })
+      return build_response("Which event should I update?\n#{format_candidates(candidates)}")
+    end
+
+    clear_thread_state
+    confirm_or_update_event(candidates.first[:event], changes)
+  rescue StandardError => e
+    build_response("Update error: #{e.message}")
+  end
+
+  def handle_update_confirmation(payload)
+    event_id = payload['event_id']
+    changes = payload['changes'] || {}
+    event_record = CalendarEvent.find_by(id: event_id)
+    return build_response("I couldn't find that event anymore.") unless event_record
+
+    if affirmative?
+      clear_thread_state
+      return apply_event_update(event_record, changes)
+    end
+
+    clear_thread_state
+    build_response("Okay, let me know what you want updated.")
+  end
+
+  def confirm_or_update_event(event_record, changes)
+    confidence = normalize_confidence(changes['confidence'])
+    if confidence != 'high'
+      set_pending_action('confirm_update', { 'event_id' => event_record.id, 'changes' => changes })
+      return build_response("I plan to update:\n#{format_event_changes(event_record, changes)}\n\nShould I apply this?")
+    end
+
+    apply_event_update(event_record, changes)
+  end
+
+  def handle_delete_event
+    query = gemini.extract_event_query_from_text(@text)
+    log_ai_request(@message, query[:usage], request_kind: 'event_query', model: gemini_intent_model, status: query[:event]['error'] ? 'error' : 'success')
+    data = query[:event]
+
+    if data['error']
+      return build_response("Which event should I delete? Please share the title and date.")
+    end
+
+    candidates = find_event_candidates(data)
+    return build_response("I couldn't find that event. Can you share the title and date?") if candidates.empty?
+
+    if candidates.length > 1
+      set_pending_action('select_event_for_delete', { 'candidates' => serialize_candidates(candidates) })
+      return build_response("Which event should I delete?\n#{format_candidates(candidates)}")
+    end
+
+    confirm_or_delete_event(candidates.first[:event])
+  rescue StandardError => e
+    build_response("Delete error: #{e.message}")
+  end
+
+  def handle_event_selection(payload, action_type:)
+    candidates = (payload['candidates'] || []).map { |entry| symbolize_candidate(entry) }.compact
+    selected = pick_candidate(candidates)
+
+    unless selected
+      return build_response("Reply with the number of the event you want.")
+    end
+
+    clear_thread_state
+    if action_type == 'delete'
+      confirm_or_delete_event(selected[:event])
+    else
+      changes = payload['changes'] || {}
+      confirm_or_update_event(selected[:event], changes)
+    end
+  end
+
+  def confirm_or_delete_event(event_record)
+    set_pending_action('confirm_delete', { 'event_id' => event_record.id })
+    build_response("Delete this event?\n#{format_event_record(event_record)}")
+  end
+
+  def handle_delete_confirmation(payload)
+    event_id = payload['event_id']
+    event_record = CalendarEvent.find_by(id: event_id)
+    return build_response("I couldn't find that event anymore.") unless event_record
+
+    if affirmative?
+      clear_thread_state
+      return delete_event(event_record)
+    end
+
+    clear_thread_state
+    build_response("Okay, I won’t delete it.")
+  end
+
+  def handle_create_transaction(image_message_id: nil)
+    result = if image_message_id
+      extract_transaction_from_message(image_message_id)
+    elsif image_attached?
+      extract_transaction_from_image
+    else
+      extract_transaction_from_text
+    end
+
+    return result if result.is_a?(Hash) && result[:text]
+
+    transaction = result[:event] || {}
+    if transaction['error']
+      clear_thread_state
+      return build_response(transaction['message'] || "I couldn't find a transaction.")
+    end
+    missing = missing_transaction_fields(transaction)
+    confidence = normalize_confidence(transaction['confidence'])
+
+    if missing.any?
+      set_pending_action('clarify_transaction_fields', { 'transaction' => transaction, 'missing_fields' => missing })
+      if missing.include?('a source') && image_attached?
+        return build_response("Which source should I use? Most screenshots are `bofa` — is that correct?")
+      end
+      if missing.include?('a valid source')
+        return build_response("Which source should I use? Options: #{TransactionSources.prompt_list}.")
+      end
+      return build_response("I need #{missing.join(', ')} to add this transaction.")
+    end
+
+    if confidence != 'high'
+      set_pending_action('confirm_transaction', { 'transaction' => transaction })
+      return build_response("I found this transaction:\n\n#{format_transaction(transaction)}\n\nShould I add it?")
+    end
+
+    create_transaction(transaction)
+  end
+
+  def handle_transaction_correction(payload)
+    transaction = payload['transaction'] || {}
+    result = gemini.apply_transaction_correction(transaction, @text)
+    log_ai_request(@message, result[:usage], request_kind: 'transaction_correction', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
+
+    updated = result[:event]
+    missing = missing_transaction_fields(updated)
+    confidence = normalize_confidence(updated['confidence'])
+
+    if missing.any?
+      set_pending_action('clarify_transaction_fields', { 'transaction' => updated, 'missing_fields' => missing })
+      if missing.include?('a source') && image_attached?
+        return build_response("Which source should I use? Most screenshots are `bofa` — is that correct?")
+      end
+      if missing.include?('a valid source')
+        return build_response("Which source should I use? Options: #{TransactionSources.prompt_list}.")
+      end
+      return build_response("I still need #{missing.join(', ')}.")
+    end
+
+    if confidence != 'high'
+      set_pending_action('confirm_transaction', { 'transaction' => updated })
+      return build_response("Got it. Here’s the transaction:\n\n#{format_transaction(updated)}\n\nShould I add it?")
+    end
+
+    create_transaction(updated)
+  rescue StandardError => e
+    clear_thread_state
+    build_response("Transaction correction error: #{e.message}")
+  end
+
+  def handle_transaction_confirmation(payload)
+    transaction = payload['transaction'] || {}
+    if affirmative?
+      clear_thread_state
+      return create_transaction(transaction)
+    end
+
+    clear_thread_state
+    build_response("Okay, what should I change?")
+  end
+
   def extract_from_text
     result = gemini.extract_event_from_text(@text)
     log_ai_request(@message, result[:usage], request_kind: 'text', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
-    handle_event_creation(result[:event])
+    result
   rescue StandardError => e
     log_ai_request(@message, {}, request_kind: 'text', model: gemini_extract_model, status: 'error', error_message: e.message)
-    build_response("Text extraction error: #{e.message}")
+    { text: "Text extraction error: #{e.message}" }
   end
 
-  def handle_event_creation(event)
+  def extract_from_image
+    image_base64, mime_type = gemini_image_payload(@image)
+    result = gemini.extract_event_from_image(image_base64, mime_type: mime_type)
+    log_ai_request(@message, result[:usage], request_kind: 'image', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
+    result
+  rescue StandardError => e
+    log_ai_request(@message, {}, request_kind: 'image', model: gemini_extract_model, status: 'error', error_message: e.message)
+    { text: "Image extraction error: #{e.message}" }
+  end
+
+  def extract_event_from_message(message_id)
+    message = ChatMessage.find_by(id: message_id)
+    return { text: "I couldn't find that image anymore." } unless message&.image&.attached?
+
+    image_base64, mime_type = gemini_image_payload(message.image)
+    result = gemini.extract_event_from_image(image_base64, mime_type: mime_type)
+    log_ai_request(@message, result[:usage], request_kind: 'image', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
+    result
+  rescue StandardError => e
+    { text: "Image extraction error: #{e.message}" }
+  end
+
+  def extract_transaction_from_text
+    result = gemini.extract_transaction_from_text(@text)
+    log_ai_request(@message, result[:usage], request_kind: 'transaction_text', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
+    result
+  rescue StandardError => e
+    { text: "Transaction extraction error: #{e.message}" }
+  end
+
+  def extract_transaction_from_image
+    image_base64, mime_type = gemini_image_payload(@image)
+    result = gemini.extract_transaction_from_image(image_base64, mime_type: mime_type)
+    log_ai_request(@message, result[:usage], request_kind: 'transaction_image', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
+    result
+  rescue StandardError => e
+    { text: "Transaction extraction error: #{e.message}" }
+  end
+
+  def extract_transaction_from_message(message_id)
+    message = ChatMessage.find_by(id: message_id)
+    return { text: "I couldn't find that image anymore." } unless message&.image&.attached?
+
+    image_base64, mime_type = gemini_image_payload(message.image)
+    result = gemini.extract_transaction_from_image(image_base64, mime_type: mime_type)
+    log_ai_request(@message, result[:usage], request_kind: 'transaction_image', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
+    result
+  rescue StandardError => e
+    { text: "Transaction extraction error: #{e.message}" }
+  end
+
+  def create_event(event)
     if event['error']
-      log_action(@message, calendar_event_id: nil, calendar_id: 'primary', status: 'error', metadata: { error: event['message'] })
+      log_action(@message, calendar_event_id: nil, calendar_id: 'primary', status: 'error', action_type: 'create_calendar_event', metadata: { error: event['message'] })
       return build_response(render_extraction_result(event))
     end
     return build_response("Please connect your calendar at https://finances.sifxtre.me first.") if @user.google_refresh_token.to_s.empty?
@@ -60,7 +626,7 @@ class WebChatMessageHandler
       source: 'web'
     )
 
-    log_action(@message, calendar_event_id: calendar_event.id, calendar_id: calendar_event.calendar_id, status: 'success')
+    log_action(@message, calendar_event_id: calendar_event.id, calendar_id: calendar_event.calendar_id, status: 'success', action_type: 'create_calendar_event')
 
     build_response([
       "Added to your calendar! ✅",
@@ -68,10 +634,79 @@ class WebChatMessageHandler
       "Date: #{event_date(result)}",
       "Time: #{event_time(result)}",
       "Link: #{result.html_link}"
-    ].compact.join("\n"), event_created: true)
+    ].compact.join("\n"), event_created: true, action: 'calendar_event_created')
   rescue GoogleCalendarClient::CalendarError => e
-    log_action(@message, calendar_event_id: nil, calendar_id: 'primary', status: 'error', metadata: { error: e.message })
+    log_action(@message, calendar_event_id: nil, calendar_id: 'primary', status: 'error', action_type: 'create_calendar_event', metadata: { error: e.message })
     build_response("Calendar error: #{e.message}")
+  end
+
+  def apply_event_update(event_record, changes)
+    return build_response("Please connect your calendar at https://finances.sifxtre.me first.") if @user.google_refresh_token.to_s.empty?
+
+    updates = build_event_updates(event_record, changes)
+    if updates.nil?
+      return build_response("I need a new date or time to update the event.")
+    end
+
+    client = GoogleCalendarClient.new(@user)
+    result = client.update_event(calendar_id: event_record.calendar_id, event_id: event_record.event_id, updates: updates)
+
+    event_record.update!(
+      title: result.summary,
+      description: result.description,
+      location: result.location,
+      start_at: result.start&.date_time || result.start&.date,
+      end_at: result.end&.date_time || result.end&.date,
+      raw_event: result.to_h,
+      status: 'active'
+    )
+
+    log_action(@message, calendar_event_id: event_record.id, calendar_id: event_record.calendar_id, status: 'success', action_type: 'update_calendar_event')
+
+    build_response("Updated the event. ✅", event_created: true, action: 'calendar_event_updated')
+  rescue GoogleCalendarClient::CalendarError => e
+    log_action(@message, calendar_event_id: event_record.id, calendar_id: event_record.calendar_id, status: 'error', action_type: 'update_calendar_event', metadata: { error: e.message })
+    build_response("Calendar update error: #{e.message}")
+  end
+
+  def delete_event(event_record)
+    return build_response("Please connect your calendar at https://finances.sifxtre.me first.") if @user.google_refresh_token.to_s.empty?
+
+    client = GoogleCalendarClient.new(@user)
+    client.delete_event(calendar_id: event_record.calendar_id, event_id: event_record.event_id)
+    event_record.update!(status: 'cancelled')
+
+    log_action(@message, calendar_event_id: event_record.id, calendar_id: event_record.calendar_id, status: 'success', action_type: 'delete_calendar_event')
+    build_response("Deleted the event. ✅", event_created: true, action: 'calendar_event_deleted')
+  rescue GoogleCalendarClient::CalendarError => e
+    log_action(@message, calendar_event_id: event_record.id, calendar_id: event_record.calendar_id, status: 'error', action_type: 'delete_calendar_event', metadata: { error: e.message })
+    build_response("Calendar delete error: #{e.message}")
+  end
+
+  def create_transaction(transaction)
+    if transaction['error']
+      log_action(@message, calendar_event_id: nil, calendar_id: nil, status: 'error', action_type: 'create_transaction', metadata: { error: transaction['message'] })
+      return build_response(transaction['message'] || "I couldn't find a transaction.")
+    end
+
+    record = FinancialTransaction.create!(
+      plaid_id: nil,
+      plaid_name: transaction['merchant'],
+      merchant_name: transaction['merchant'],
+      category: transaction['category'],
+      amount: transaction['amount'].to_f,
+      transacted_at: parse_transaction_date(transaction['date']),
+      source: normalize_source(transaction['source']),
+      hidden: false,
+      reviewed: true
+    )
+
+    log_action(@message, calendar_event_id: nil, calendar_id: nil, status: 'success', action_type: 'create_transaction', metadata: { transaction_id: record.id })
+
+    build_response("Added the transaction. ✅", action: 'transaction_created')
+  rescue StandardError => e
+    log_action(@message, calendar_event_id: nil, calendar_id: nil, status: 'error', action_type: 'create_transaction', metadata: { error: e.message })
+    build_response("Transaction error: #{e.message}")
   end
 
   def render_extraction_result(event)
@@ -97,13 +732,346 @@ class WebChatMessageHandler
     lines.join("\n")
   end
 
+  def format_event_record(event)
+    [
+      "Title: #{event.title}",
+      (event.start_at ? "Date: #{event.start_at.to_date}" : nil),
+      (event.start_at ? "Time: #{event.start_at.strftime('%H:%M')}" : nil)
+    ].compact.join("\n")
+  end
+
+  def format_event_changes(event_record, changes)
+    lines = []
+    lines << "Title: #{changes['title'] || event_record.title}"
+    date = changes['date'] || event_record.start_at&.to_date
+    lines << "Date: #{date}" if date
+    time = changes['start_time'] || event_record.start_at&.strftime('%H:%M')
+    lines << "Time: #{time}" if time
+    if changes['location'] || event_record.location
+      lines << "Location: #{changes['location'] || event_record.location}"
+    end
+    if changes['description'] || event_record.description
+      lines << "Details: #{changes['description'] || event_record.description}"
+    end
+    lines.join("\n")
+  end
+
+  def format_transaction(transaction)
+    lines = []
+    lines << "Merchant: #{transaction['merchant']}" if transaction['merchant'].present?
+    lines << "Amount: #{transaction['amount']}" if transaction['amount'].present?
+    lines << "Date: #{transaction['date']}" if transaction['date'].present?
+    lines << "Category: #{transaction['category']}" if transaction['category'].present?
+    lines << "Source: #{transaction['source']}" if transaction['source'].present?
+    lines.join("\n")
+  end
+
+  def create_memory(data)
+    memory = Memory.create!(
+      user: @user,
+      content: data['content'],
+      category: data['category'],
+      source: 'chat',
+      status: 'active',
+      metadata: memory_metadata(data)
+    )
+    attach_memory_image(memory)
+
+    log_action(@message, calendar_event_id: nil, calendar_id: nil, status: 'success', action_type: 'create_memory', metadata: { memory_id: memory.id })
+    build_response("Saved that memory. ✅", action: 'memory_created')
+  rescue StandardError => e
+    log_action(@message, calendar_event_id: nil, calendar_id: nil, status: 'error', action_type: 'create_memory', metadata: { error: e.message })
+    build_response("Memory error: #{e.message}")
+  end
+
+  def search_memories(query_text)
+    memories = Memory.where(user: @user, status: 'active')
+
+    terms = query_text.to_s.split(/\s+/).map(&:strip).reject(&:empty?)
+    terms.each do |term|
+      memories = memories.where("content ILIKE ? OR category ILIKE ?", "%#{term}%", "%#{term}%")
+    end
+
+    memories.order(created_at: :desc).limit(10).map do |memory|
+      {
+        content: memory.content,
+        category: memory.category,
+        urls: memory.metadata['urls']
+      }
+    end
+  end
+
+  def format_memory(memory)
+    lines = []
+    lines << "Content: #{memory['content']}" if memory['content'].present?
+    lines << "Category: #{memory['category']}" if memory['category'].present?
+    if memory['urls'].is_a?(Array) && memory['urls'].any?
+      lines << "Links: #{memory['urls'].join(', ')}"
+    end
+    lines.join("\n")
+  end
+
+  def format_memory_list(memories)
+    memories.map do |memory|
+      label = memory[:category] ? "[#{memory[:category]}] " : ""
+      url_part = memory[:urls]&.any? ? " (#{memory[:urls].join(', ')})" : ""
+      "• #{label}#{memory[:content]}#{url_part}"
+    end.join("\n")
+  end
+
+  def memory_metadata(data)
+    metadata = (data['metadata'] || {}).dup
+    urls = Array(data['urls']).map(&:to_s).map(&:strip).reject(&:empty?)
+    metadata['urls'] = urls if urls.any?
+    metadata['chat_message_id'] = @message.id
+    metadata
+  end
+
+  def attach_memory_image(memory)
+    return unless image_attached?
+
+    memory.image.attach(@message.image.blob)
+  end
+
+  def extract_urls(text)
+    text.to_s.scan(%r{https?://[^\s]+}i).uniq
+  end
+
+  def strip_urls(text)
+    text.to_s.gsub(%r{https?://[^\s]+}i, '').strip
+  end
+
   def classify_intent
-    result = gemini.classify_intent(text: @text, has_image: false)
+    result = gemini.classify_intent(text: @text, has_image: image_attached?)
     log_ai_request(@message, result[:usage], request_kind: 'intent', model: gemini_intent_model, status: result[:event]['error'] ? 'error' : 'success')
     result[:event]
   rescue StandardError => e
     log_ai_request(@message, {}, request_kind: 'intent', model: gemini_intent_model, status: 'error', error_message: e.message)
-    { 'intent' => 'create_event' }
+    { 'intent' => 'create_event', 'confidence' => 'low' }
+  end
+
+  def normalize_confidence(value)
+    return 'medium' if value.to_s.empty?
+
+    normalized = value.to_s.downcase
+    return normalized if CONFIDENCE_ORDER.key?(normalized)
+
+    'medium'
+  end
+
+  def resolve_intent_from_text
+    text = @text.downcase
+    return 'create_memory' if text.match?(/remember|note this|save this|keep in mind/)
+    return 'search_memory' if text.match?(/do you remember|what do you know|what did we decide|what's the note/)
+    return 'delete_event' if text.match?(/delete|remove|cancel/)
+    return 'update_event' if text.match?(/update|change|move|reschedule/)
+    return 'create_transaction' if text.match?(/transaction|expense|spent|charge|paid|receipt|purchase/)
+
+    'create_event'
+  end
+
+  def missing_event_fields(event)
+    missing = []
+    missing << 'a title' if event['title'].to_s.strip.empty?
+    missing << 'a date' if event['date'].to_s.strip.empty?
+    missing
+  end
+
+  def missing_transaction_fields(transaction)
+    missing = []
+    missing << 'a merchant' if transaction['merchant'].to_s.strip.empty?
+    missing << 'an amount' if transaction['amount'].to_s.strip.empty?
+    missing << 'a date' if transaction['date'].to_s.strip.empty?
+    if transaction['source'].to_s.strip.empty?
+      missing << 'a source'
+    elsif !TransactionSources.valid?(transaction['source'])
+      missing << 'a valid source'
+    end
+    missing
+  end
+
+  def find_event_candidates(query)
+    title = query['title'].to_s.strip
+    date = query['date'].to_s.strip
+    time = query['start_time'].to_s.strip
+
+    return [] if title.empty? && date.empty?
+
+    scope = CalendarEvent.where(user: @user).where.not(status: 'cancelled')
+    if date.present?
+      day = Date.parse(date) rescue nil
+      if day
+        scope = scope.where(start_at: day.beginning_of_day..day.end_of_day)
+      end
+    else
+      start_at = Time.zone.today - CALENDAR_WINDOW_PAST_DAYS.days
+      end_at = Time.zone.today + CALENDAR_WINDOW_FUTURE_DAYS.days
+      scope = scope.where(start_at: start_at.beginning_of_day..end_at.end_of_day)
+    end
+
+    events = scope.limit(50).to_a
+    scored = events.map do |event|
+      score = 0
+      if title.present?
+        score += 2 if event.title.to_s.downcase.include?(title.downcase)
+      end
+      if date.present? && event.start_at
+        begin
+          target_date = Date.parse(date)
+          score += 2 if event.start_at.to_date == target_date
+        rescue ArgumentError
+        end
+      end
+      if time.present? && event.start_at
+        target_time = Time.zone.parse("#{event.start_at.to_date} #{time}") rescue nil
+        if target_time
+          diff = (event.start_at - target_time).abs
+          score += 1 if diff <= 90.minutes
+        end
+      end
+      { event: event, score: score }
+    end
+
+    scored.select { |entry| entry[:score] > 0 }
+      .sort_by { |entry| -entry[:score] }
+  end
+
+  def serialize_candidates(candidates)
+    candidates.map do |entry|
+      event = entry[:event]
+      {
+        'id' => event.id,
+        'title' => event.title,
+        'start_at' => event.start_at&.iso8601
+      }
+    end
+  end
+
+  def format_candidates(candidates)
+    candidates.first(5).each_with_index.map do |entry, idx|
+      event = entry[:event]
+      time_label = event.start_at ? event.start_at.strftime('%b %d %H:%M') : 'Unknown time'
+      "#{idx + 1}) #{event.title} — #{time_label}"
+    end.join("\n")
+  end
+
+  def pick_candidate(candidates)
+    match = @text.to_s.match(/\b(\d+)\b/)
+    if match
+      index = match[1].to_i - 1
+      return candidates[index] if index >= 0 && index < candidates.length
+    end
+
+    lowered = @text.downcase
+    candidates.find { |entry| entry[:event].title.to_s.downcase.include?(lowered) }
+  end
+
+  def symbolize_candidate(entry)
+    event = CalendarEvent.find_by(id: entry['id'])
+    return nil unless event
+
+    { event: event, score: 0 }
+  end
+
+  def build_event_updates(event_record, changes)
+    date = changes['date'].presence || event_record.start_at&.to_date&.iso8601
+    start_time = changes['start_time'].presence || event_record.start_at&.strftime('%H:%M')
+    end_time = changes['end_time'].presence || event_record.end_at&.strftime('%H:%M')
+
+    return nil if date.to_s.empty?
+
+    {
+      'title' => changes['title'].presence || event_record.title,
+      'date' => date,
+      'start_time' => start_time,
+      'end_time' => end_time,
+      'location' => changes['location'].presence || event_record.location,
+      'description' => changes['description'].presence || event_record.description
+    }
+  end
+
+  def parse_transaction_date(date_str)
+    Date.parse(date_str)
+  rescue ArgumentError
+    Date.current
+  end
+
+
+  def normalize_source(source)
+    TransactionSources.normalize(source)
+  end
+
+  def affirmative?
+    @text.match?(/\b(yes|yep|yeah|sure|do it|ok|okay|confirm)\b/i)
+  end
+
+  def image_attached?
+    @image&.attached?
+  end
+
+  def image_mime_type
+    @image&.content_type || 'image/png'
+  end
+
+  def gemini_image_payload(image)
+    raw = image.download
+    resized = resize_image_bytes(raw, image.content_type)
+    [Base64.strict_encode64(resized), image.content_type || 'image/png']
+  end
+
+  def resize_image_bytes(bytes, content_type)
+    return bytes unless content_type.to_s.start_with?('image/')
+
+    ImageProcessing::MiniMagick
+      .source(StringIO.new(bytes))
+      .resize_to_limit(MAX_GEMINI_DIMENSION, MAX_GEMINI_DIMENSION)
+      .call
+      .tap(&:rewind)
+      .read
+  rescue StandardError
+    bytes
+  end
+
+  def gemini_extract_model
+    ENV.fetch('GEMINI_EXTRACT_MODEL', 'gemini-3-flash-preview')
+  end
+
+  def gemini_intent_model
+    ENV.fetch('GEMINI_INTENT_MODEL', 'gemini-2.0-flash')
+  end
+
+  def gemini
+    @gemini ||= GeminiVision.new
+  end
+
+  def spouse_emails(user)
+    User.where(active: true).where.not(id: user.id).pluck(:email)
+  end
+
+  def event_date(result)
+    if result.start&.date
+      result.start.date
+    else
+      result.start&.date_time&.to_date
+    end
+  end
+
+  def event_time(result)
+    return nil if result.start&.date
+
+    result.start&.date_time&.strftime('%H:%M')
+  end
+
+  def log_action(message, calendar_event_id:, calendar_id:, status:, action_type:, metadata: {})
+    ChatAction.create!(
+      chat_message: message,
+      calendar_event_id: calendar_event_id,
+      calendar_id: calendar_id,
+      transport: 'web',
+      action_type: action_type,
+      status: status,
+      metadata: metadata
+    )
   end
 
   def log_ai_request(message, usage, request_kind:, model:, status:, error_message: nil)
@@ -144,49 +1112,7 @@ class WebChatMessageHandler
     end
   end
 
-  def gemini_extract_model
-    ENV.fetch('GEMINI_EXTRACT_MODEL', 'gemini-3-flash-preview')
-  end
-
-  def gemini_intent_model
-    ENV.fetch('GEMINI_INTENT_MODEL', 'gemini-2.0-flash')
-  end
-
-  def gemini
-    @gemini ||= GeminiVision.new
-  end
-
-  def spouse_emails(user)
-    User.where(active: true).where.not(id: user.id).pluck(:email)
-  end
-
-  def event_date(result)
-    if result.start&.date
-      result.start.date
-    else
-      result.start&.date_time&.to_date
-    end
-  end
-
-  def event_time(result)
-    return nil if result.start&.date
-
-    result.start&.date_time&.strftime('%H:%M')
-  end
-
-  def log_action(message, calendar_event_id:, calendar_id:, status:, metadata: {})
-    ChatAction.create!(
-      chat_message: message,
-      calendar_event_id: calendar_event_id,
-      calendar_id: calendar_id,
-      transport: 'web',
-      action_type: 'create_calendar_event',
-      status: status,
-      metadata: metadata
-    )
-  end
-
-  def build_response(text, event_created: false)
-    { text: text, event_created: event_created }
+  def build_response(text, event_created: false, action: nil)
+    { text: text, event_created: event_created, action: action }.compact
   end
 end

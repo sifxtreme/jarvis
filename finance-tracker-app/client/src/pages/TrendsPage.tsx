@@ -123,7 +123,7 @@ export default function TrendsPage() {
   const [drilldownSubtitle, setDrilldownSubtitle] = useState<string | null>(null);
 
   // Fetch current year trends
-  const { data: trends, isLoading, error } = useQuery({
+  const { data: trends, isLoading, error, refetch: refetchTrends } = useQuery({
     queryKey: ['trends', filters],
     queryFn: () => getTrends(filters),
     retry: 2,
@@ -137,13 +137,13 @@ export default function TrendsPage() {
   });
 
   // Fetch transactions to get unique sources
-  const { data: transactions } = useQuery({
+  const { data: transactions, refetch: refetchTransactions } = useQuery({
     queryKey: ['transactions-for-sources', filters.year],
     queryFn: () => getTransactions({ year: filters.year, show_hidden: false, show_needs_review: false, query: '' }),
   });
 
   // Fetch budgets for per-category charts
-  const { data: budgets } = useQuery({
+  const { data: budgets, refetch: refetchBudgets } = useQuery({
     queryKey: ['budgets-for-trends', filters.year],
     queryFn: () => getBudgets({ year: filters.year, show_hidden: false, show_needs_review: false }),
   });
@@ -166,6 +166,7 @@ export default function TrendsPage() {
   const {
     data: merchantTransactions = [],
     isLoading: merchantTransactionsLoading,
+    refetch: refetchMerchantTransactions,
   } = useQuery({
     queryKey: [
       'merchant-transactions',
@@ -197,6 +198,19 @@ export default function TrendsPage() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    const handleRefresh = () => {
+      refetchTrends();
+      refetchTransactions();
+      refetchBudgets();
+      if (merchantTransactionsOpen) {
+        refetchMerchantTransactions();
+      }
+    };
+    window.addEventListener("jarvis:transactions-changed", handleRefresh);
+    return () => window.removeEventListener("jarvis:transactions-changed", handleRefresh);
+  }, [refetchTrends, refetchTransactions, refetchBudgets, refetchMerchantTransactions, merchantTransactionsOpen]);
 
   useEffect(() => {
     if (merchantQuery.trim().length > 1 && (merchantSuggestions?.suggestions?.length || 0) > 0) {

@@ -18,3 +18,11 @@ calendar_busy_sync:
   queue: calendar
   args:
   description: "Sync events or busy blocks from connected calendars"
+
+slack_daily_digest:
+  cron: "0 7 * * *"
+  timezone: "America/Los_Angeles"
+  class: "SlackDailyDigest"
+  queue: default
+  args:
+  description: "Post daily digest to Slack"

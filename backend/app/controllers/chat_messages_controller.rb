@@ -1,4 +1,6 @@
 class ChatMessagesController < ApplicationController
+  include Rails.application.routes.url_helpers
+
   def index
     user = current_user
     return render json: { error: 'Unauthorized' }, status: :unauthorized unless user
@@ -16,9 +18,11 @@ class ChatMessagesController < ApplicationController
     return render json: { error: 'Unauthorized' }, status: :unauthorized unless user
 
     text = params[:text].to_s.strip
-    return render json: { error: 'Text is required' }, status: :unprocessable_entity if text.empty?
+    image = params[:image]
+    return render json: { error: 'Text or image is required' }, status: :unprocessable_entity if text.empty? && image.blank?
 
     thread_id = "web-#{user.id}"
+    thread = ChatThread.find_or_create_by!(user: user, transport: 'web', thread_id: thread_id)
     user_message = ChatMessage.create!(
       transport: 'web',
       external_id: user.id.to_s,
@@ -26,12 +30,19 @@ class ChatMessagesController < ApplicationController
       sender_id: user.id.to_s,
       sender_email: user.email,
       text: text,
-      has_image: false,
+      has_image: image.present?,
       role: 'user',
       raw_payload: { text: text }
     )
+    user_message.image.attach(image) if image.present?
 
-    response = WebChatMessageHandler.new(user: user, message: user_message, text: text).process!
+    response = WebChatMessageHandler.new(
+      user: user,
+      message: user_message,
+      text: text,
+      image: user_message.image,
+      thread: thread
+    ).process!
     assistant_message = ChatMessage.create!(
       transport: 'web',
       external_id: user.id.to_s,
@@ -46,7 +57,7 @@ class ChatMessagesController < ApplicationController
 
     render json: {
       message: serialize(user_message),
-      reply: serialize(assistant_message).merge(event_created: response[:event_created])
+      reply: serialize(assistant_message).merge(event_created: response[:event_created], action: response[:action])
     }
   rescue StandardError => e
     Rails.logger.error "[Chat] Failed to process message: #{e.message}"
@@ -60,7 +71,14 @@ class ChatMessagesController < ApplicationController
       id: message.id,
       role: message.role,
       text: message.text,
+      image_url: image_url(message),
       created_at: message.created_at&.iso8601
-    }
+    }.compact
+  end
+
+  def image_url(message)
+    return nil unless message.image.attached?
+
+    rails_blob_path(message.image, only_path: true)
   end
 end

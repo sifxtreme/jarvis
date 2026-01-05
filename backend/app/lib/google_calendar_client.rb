@@ -105,6 +105,39 @@ class GoogleCalendarClient
     raise CalendarError, e.message
   end
 
+  def update_event(calendar_id:, event_id:, updates:)
+    event = @service.get_event(calendar_id, event_id)
+    event.summary = updates['title'] if updates['title']
+    event.location = updates['location'] if updates['location']
+    event.description = updates['description'] if updates['description']
+
+    if updates['date']
+      start_time = parse_datetime(updates['date'], updates['start_time'])
+      end_time = parse_datetime(updates['date'], updates['end_time'])
+
+      if start_time.nil?
+        start_date = Date.parse(updates['date'])
+        end_date = start_date + 1.day
+        event.start = Google::Apis::CalendarV3::EventDateTime.new(date: start_date.iso8601)
+        event.end = Google::Apis::CalendarV3::EventDateTime.new(date: end_date.iso8601)
+      else
+        end_time ||= start_time + 1.hour
+        event.start = Google::Apis::CalendarV3::EventDateTime.new(
+          date_time: start_time.iso8601,
+          time_zone: time_zone
+        )
+        event.end = Google::Apis::CalendarV3::EventDateTime.new(
+          date_time: end_time.iso8601,
+          time_zone: time_zone
+        )
+      end
+    end
+
+    @service.update_event(calendar_id, event_id, event)
+  rescue Google::Apis::Error => e
+    raise CalendarError, e.message
+  end
+
   private
 
   def build_oauth_client

@@ -308,7 +308,7 @@ export default function YearlyBudgetPage() {
   });
 
   // Fetch transactions for the selected year (we'll fetch all months at once)
-  const { data: yearTransactions = [], isLoading: isLoadingTransactions } = useQuery({
+  const { data: yearTransactions = [], isLoading: isLoadingTransactions, refetch: refetchTransactions } = useQuery({
     queryKey: ['year-transactions', selectedYear, months.length],
     queryFn: async () => {
       // Fetch transactions for each month of the year
@@ -333,6 +333,12 @@ export default function YearlyBudgetPage() {
       return monthlyTransactions;
     },
   });
+
+  useEffect(() => {
+    const handleRefresh = () => refetchTransactions();
+    window.addEventListener("jarvis:transactions-changed", handleRefresh);
+    return () => window.removeEventListener("jarvis:transactions-changed", handleRefresh);
+  }, [refetchTransactions]);
 
   // Get all unique budget categories across all months
   const allCategories = new Set<string>();

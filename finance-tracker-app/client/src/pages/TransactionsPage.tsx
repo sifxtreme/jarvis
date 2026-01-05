@@ -69,6 +69,12 @@ export default function TransactionsPage() {
     queryFn: () => getBudgets(filters),
   });
 
+  useEffect(() => {
+    const handleRefresh = () => refetch();
+    window.addEventListener("jarvis:transactions-changed", handleRefresh);
+    return () => window.removeEventListener("jarvis:transactions-changed", handleRefresh);
+  }, [refetch]);
+
   const handleSearch = (newFilters: Partial<TransactionFilters>) => {
     setFilters(current => ({
       ...current,

@@ -16,6 +16,9 @@ Rails.application.routes.draw do
   get 'chat/messages', to: 'chat_messages#index'
   post 'chat/messages', to: 'chat_messages#create'
 
+  resources :memories, only: [:index, :create, :destroy]
+  resources :user_locations, only: [:index, :create, :update, :destroy]
+
   post 'slack/events', to: 'slack_events#events'
 
   get 'auth/google_oauth2/callback', to: 'google_calendar_auth#callback'

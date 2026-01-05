@@ -1,5 +1,7 @@
 FROM ruby:2.7.8
 
+RUN apt-get update -qq && apt-get install -y --no-install-recommends imagemagick && rm -rf /var/lib/apt/lists/*
+
 RUN mkdir /jarvis
 WORKDIR /jarvis
 ADD Gemfile /jarvis/Gemfile

@@ -6,6 +6,7 @@ import TrendsPage from './pages/TrendsPage';
 import TellerRepairPage from './pages/TellerRepairPage';
 import CalendarPage from './pages/CalendarPage';
 import { AuthModal } from '@/components/AuthModal';
+import { ChatWidget } from '@/components/ChatWidget';
 import { Navbar } from '@/components/Navbar';
 import { Toaster } from '@/components/ui/toaster';
 import { verifyAuthentication, useAuthStore } from '@/lib/api';
@@ -79,6 +80,7 @@ function App() {
               <Route path="/teller-repair" element={<TellerRepairPage />} />
             </Routes>
           </div>
+          <ChatWidget />
         </div>
       ) : (
         // Show login prompt only if not authenticated and modal not already showing

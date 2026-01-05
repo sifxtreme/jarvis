@@ -2,26 +2,74 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { Send } from "lucide-react";
-import { createChatMessage, getChatMessages, type ChatMessage as ChatMessageDTO } from "@/lib/api";
+import { ImagePlus, Send, X } from "lucide-react";
+import { API_BASE_URL, createChatMessage, getChatMessages, type ChatMessage as ChatMessageDTO } from "@/lib/api";
 
 type ChatMessage = {
   id: number | string;
   role: "user" | "assistant";
   text: string;
+  imageUrl?: string | null;
   createdAt: string;
   pending?: boolean;
+};
+
+const resolveImageUrl = (imageUrl?: string | null) => {
+  if (!imageUrl) return null;
+  if (imageUrl.startsWith("http")) return imageUrl;
+  return `${API_BASE_URL}${imageUrl}`;
 };
 
 const mapMessage = (message: ChatMessageDTO): ChatMessage => ({
   id: message.id,
   role: message.role,
   text: message.text || "",
+  imageUrl: resolveImageUrl(message.image_url),
   createdAt: message.created_at,
 });
 
 type ChatPanelProps = {
   onEventCreated?: () => void;
+};
+
+const MAX_IMAGE_DIMENSION = 1568;
+
+const resizeImage = async (file: File, maxDimension = MAX_IMAGE_DIMENSION): Promise<File> => {
+  if (!file.type.startsWith("image/")) return file;
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+  if (scale === 1) {
+    bitmap.close();
+    return file;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    bitmap.close();
+    return file;
+  }
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob((result) => resolve(result), file.type || "image/jpeg", 0.9)
+  );
+  if (!blob) return file;
+
+  return new File([blob], file.name, { type: blob.type, lastModified: Date.now() });
+};
+
+const dispatchDataRefresh = (action?: string | null) => {
+  if (!action) return;
+  if (action.startsWith("calendar_event_")) {
+    window.dispatchEvent(new CustomEvent("jarvis:calendar-changed"));
+  }
+  if (action.startsWith("transaction_")) {
+    window.dispatchEvent(new CustomEvent("jarvis:transactions-changed"));
+  }
 };
 
 export function ChatPanel({ onEventCreated }: ChatPanelProps) {
@@ -31,7 +79,11 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
   const [isSending, setIsSending] = useState(false);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const shouldAutoScrollRef = useRef(true);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+  const [isPreparingImage, setIsPreparingImage] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -51,6 +103,25 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
       mounted = false;
     };
   }, []);
+
+  const handleSelectImage = async (file: File | null) => {
+    if (selectedImageUrl) {
+      URL.revokeObjectURL(selectedImageUrl);
+    }
+    if (!file) {
+      setSelectedImage(null);
+      setSelectedImageUrl(null);
+      return;
+    }
+    setIsPreparingImage(true);
+    try {
+      const resized = await resizeImage(file);
+      setSelectedImage(resized);
+      setSelectedImageUrl(URL.createObjectURL(resized));
+    } finally {
+      setIsPreparingImage(false);
+    }
+  };
 
   useEffect(() => {
     const container = scrollRef.current;
@@ -72,15 +143,18 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
   const handleSend = async (event?: FormEvent) => {
     event?.preventDefault();
     const trimmed = draft.trim();
-    if (!trimmed || isSending) return;
+    if ((!trimmed && !selectedImage) || isSending || isPreparingImage) return;
 
     const now = new Date().toISOString();
     const pendingUserId = `pending-user-${Date.now()}`;
     const pendingAssistantId = `pending-assistant-${Date.now()}`;
+    const imageFile = selectedImage;
+    const pendingImageUrl = selectedImageUrl;
     const pendingUserMessage: ChatMessage = {
       id: pendingUserId,
       role: "user",
       text: trimmed,
+      imageUrl: pendingImageUrl,
       createdAt: now,
       pending: true,
     };
@@ -94,16 +168,19 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
 
     setMessages((prev) => [...prev, pendingUserMessage, pendingAssistantMessage]);
     setDraft("");
+    setSelectedImage(null);
+    setSelectedImageUrl(null);
     setIsSending(true);
 
     try {
-      const response = await createChatMessage(trimmed);
+      const response = await createChatMessage(trimmed, imageFile ?? undefined);
       setMessages((prev) => {
         const withoutPending = prev.filter(
           (message) => message.id !== pendingUserId && message.id !== pendingAssistantId
         );
         return [...withoutPending, mapMessage(response.message), mapMessage(response.reply)];
       });
+      dispatchDataRefresh(response.reply.action ?? null);
       if (response.reply.event_created) {
         onEventCreated?.();
       }
@@ -124,6 +201,9 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
         ];
       });
     } finally {
+      if (pendingImageUrl) {
+        URL.revokeObjectURL(pendingImageUrl);
+      }
       setIsSending(false);
     }
   };
@@ -200,7 +280,16 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
                           ))}
                         </div>
                       ) : (
-                        <div className="whitespace-pre-wrap">{message.text}</div>
+                        <div className="space-y-2">
+                          {message.imageUrl && (
+                            <img
+                              src={message.imageUrl}
+                              alt="Chat upload"
+                              className="max-h-64 w-full rounded-lg object-cover"
+                            />
+                          )}
+                          {message.text && <div className="whitespace-pre-wrap">{message.text}</div>}
+                        </div>
                       )}
                     </div>
                     {!groupedWithNext && (
@@ -243,7 +332,51 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
             </span>
           </div>
         )}
+        {selectedImageUrl && (
+          <div className="mb-2 flex items-center gap-3 rounded-lg border border-border/60 bg-muted/40 px-3 py-2">
+            <img
+              src={selectedImageUrl}
+              alt="Selected upload"
+              className="h-12 w-12 rounded-md object-cover"
+            />
+            <div className="flex-1 text-xs text-muted-foreground">
+              {isPreparingImage ? "Optimizing image…" : selectedImage?.name || "Selected image"}
+            </div>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              onClick={() => handleSelectImage(null)}
+              className="h-8 w-8"
+              aria-label="Remove image"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
         <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0] || null;
+              void handleSelectImage(file && file.type.startsWith("image/") ? file : null);
+              event.target.value = "";
+            }}
+          />
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            className="shrink-0"
+            onClick={() => fileInputRef.current?.click()}
+            aria-label="Add image"
+            disabled={isPreparingImage}
+          >
+            <ImagePlus className="h-4 w-4" />
+          </Button>
           <Textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
@@ -252,12 +385,12 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
             rows={2}
             className="min-h-[56px] flex-1 resize-none"
           />
-          <Button type="submit" size="icon" className="shrink-0" disabled={isSending}>
+          <Button type="submit" size="icon" className="shrink-0" disabled={isSending || isPreparingImage}>
             <Send className="h-4 w-4" />
           </Button>
         </div>
         <div className="mt-2 text-[11px] text-muted-foreground">
-          Enter to send • Shift+Enter for a new line
+          Enter to send • Shift+Enter for a new line • Try “Remember that…” or “What do you remember about…?”
         </div>
       </form>
     </div>

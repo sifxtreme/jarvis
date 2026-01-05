@@ -179,8 +179,10 @@ export type ChatMessage = {
   id: number;
   role: "user" | "assistant";
   text: string | null;
+  image_url?: string | null;
   created_at: string;
   event_created?: boolean;
+  action?: string | null;
 };
 
 // Category used for transactions that don't match any budget category
@@ -231,8 +233,21 @@ export const getChatMessages = async (): Promise<ChatMessage[]> => {
 };
 
 export const createChatMessage = async (
-  text: string
-): Promise<{ message: ChatMessage; reply: ChatMessage & { event_created?: boolean } }> => {
+  text: string,
+  imageFile?: File
+): Promise<{ message: ChatMessage; reply: ChatMessage & { event_created?: boolean; action?: string | null } }> => {
+  if (imageFile) {
+    const formData = new FormData();
+    formData.append('text', text);
+    formData.append('image', imageFile);
+    const response = await axiosInstance.post<{ message: ChatMessage; reply: ChatMessage & { event_created?: boolean } }>(
+      '/chat/messages',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return response.data;
+  }
+
   const response = await axiosInstance.post<{ message: ChatMessage; reply: ChatMessage & { event_created?: boolean } }>(
     '/chat/messages',
     { text }

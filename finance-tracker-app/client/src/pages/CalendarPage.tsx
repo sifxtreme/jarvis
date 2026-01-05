@@ -17,15 +17,12 @@ import {
 } from "date-fns";
 import { CalendarOverviewResponse, CalendarItem, deleteCalendarEvent, getCalendarOverview } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChatPanel } from "@/components/ChatPanel";
 import { StateCard } from "@/components/StateCard";
-import { PanelRightClose, PanelRightOpen, Repeat } from "lucide-react";
+import { Repeat } from "lucide-react";
 
 type ViewMode = "day" | "week" | "month";
 
@@ -193,16 +190,11 @@ export default function CalendarPage() {
   const [geo, setGeo] = useState<GeoPoint | null>(null);
   const [geoDenied, setGeoDenied] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [mobilePane, setMobilePane] = useState<"agenda" | "chat">("agenda");
   const isMobile = useIsMobile();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [scrollbarWidth, setScrollbarWidth] = useState(0);
   const pendingDayRef = useRef<Date | null>(null);
   const [deletingEventId, setDeletingEventId] = useState<number | null>(null);
-  const [isChatPanelOpen, setIsChatPanelOpen] = useState(true);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [rightPanelWidth, setRightPanelWidth] = useState(320);
-  const resizingRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -224,6 +216,16 @@ export default function CalendarPage() {
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 60 * 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const handleCreated = () => setRefreshKey((current) => current + 1);
+    window.addEventListener("jarvis:calendar-event-created", handleCreated);
+    window.addEventListener("jarvis:calendar-changed", handleCreated);
+    return () => {
+      window.removeEventListener("jarvis:calendar-event-created", handleCreated);
+      window.removeEventListener("jarvis:calendar-changed", handleCreated);
+    };
   }, []);
 
   useEffect(() => {
@@ -686,10 +688,8 @@ export default function CalendarPage() {
 
   return (
     <div className="h-full">
-      <div className="h-full flex min-h-0" ref={containerRef}>
-        <div className="min-w-0 flex-1">
-          <div className="h-full overflow-auto p-4 md:p-6">
-            <div className="space-y-6">
+      <div className="h-full overflow-auto p-4 md:p-6">
+        <div className="space-y-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-6">
             <div className="flex items-baseline gap-2">
@@ -1212,117 +1212,37 @@ export default function CalendarPage() {
           </div>
         )}
         {!loading && !error && isMobile && view === "day" && (
-          <div className="space-y-3">
-            <ToggleGroup
-              type="single"
-              value={mobilePane}
-              onValueChange={(value: string) => value && setMobilePane(value as "agenda" | "chat")}
-              className="flex w-full items-center justify-start gap-1"
-            >
-              <ToggleGroupItem value="agenda" size="sm" className="flex-1">
-                Agenda
-              </ToggleGroupItem>
-              <ToggleGroupItem value="chat" size="sm" className="flex-1">
-                Chat
-              </ToggleGroupItem>
-            </ToggleGroup>
-
-            {mobilePane === "agenda" ? (
-              <div className="rounded-xl border border-border/60 bg-white px-4 py-3 shadow-sm dark:border-slate-700/70 dark:bg-slate-950">
-                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                  Agenda
-                </div>
-                <div className="mt-3 space-y-2">
-                  {(entriesByDay.get(format(anchorDate, "yyyy-MM-dd")) || [])
-                    .filter((item) => isSameDay(item.startAt, anchorDate))
-                    .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
-                    .map((item) => {
-                      const label = item.isWork
-                        ? workCalendarLabelMap.get(item.calendarId) || item.calendarSummary || item.calendarId
-                        : item.userIds.map((id) => userMap.get(id)).filter(Boolean).join(" + ");
-                      return (
-                        <div
-                          key={`agenda-${item.key}`}
-                          className="flex items-start justify-between gap-3 rounded-lg border border-border/60 bg-background/80 px-3 py-2"
-                        >
-                          <div>
-                            <div className="text-sm font-semibold">{item.title}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {format(item.startAt, "h:mm a")} – {format(item.endAt, "h:mm a")}
-                            </div>
-                          </div>
-                          {label && <div className="text-xs text-muted-foreground">{label}</div>}
+          <div className="rounded-xl border border-border/60 bg-white px-4 py-3 shadow-sm dark:border-slate-700/70 dark:bg-slate-950">
+            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              Agenda
+            </div>
+            <div className="mt-3 space-y-2">
+              {(entriesByDay.get(format(anchorDate, "yyyy-MM-dd")) || [])
+                .filter((item) => isSameDay(item.startAt, anchorDate))
+                .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
+                .map((item) => {
+                  const label = item.isWork
+                    ? workCalendarLabelMap.get(item.calendarId) || item.calendarSummary || item.calendarId
+                    : item.userIds.map((id) => userMap.get(id)).filter(Boolean).join(" + ");
+                  return (
+                    <div
+                      key={`agenda-${item.key}`}
+                      className="flex items-start justify-between gap-3 rounded-lg border border-border/60 bg-background/80 px-3 py-2"
+                    >
+                      <div>
+                        <div className="text-sm font-semibold">{item.title}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {format(item.startAt, "h:mm a")} – {format(item.endAt, "h:mm a")}
                         </div>
-                      );
-                    })}
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-xl border border-border/60 bg-white shadow-sm dark:border-slate-700/70 dark:bg-slate-950">
-                <div className="h-[65vh] overflow-hidden">
-                  <ChatPanel onEventCreated={() => setRefreshKey((current) => current + 1)} />
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+                      </div>
+                      {label && <div className="text-xs text-muted-foreground">{label}</div>}
+                    </div>
+                  );
+                })}
             </div>
           </div>
+        )}
         </div>
-        {!isMobile && (
-          <>
-            <div
-              className="relative hidden md:block w-2 bg-border hover:bg-primary/10 transition-colors cursor-col-resize"
-              onPointerDown={(event) => {
-                if (!isChatPanelOpen) return;
-                resizingRef.current = { startX: event.clientX, startWidth: rightPanelWidth };
-                const handleMove = (moveEvent: PointerEvent) => {
-                  if (!resizingRef.current) return;
-                  const delta = moveEvent.clientX - resizingRef.current.startX;
-                  const next = resizingRef.current.startWidth - delta;
-                  const containerWidth = containerRef.current?.clientWidth || 0;
-                  const maxWidth = Math.max(200, containerWidth - 240);
-                  setRightPanelWidth(Math.min(Math.max(0, next), maxWidth));
-                };
-                const handleUp = () => {
-                  resizingRef.current = null;
-                  window.removeEventListener("pointermove", handleMove);
-                  window.removeEventListener("pointerup", handleUp);
-                };
-                window.addEventListener("pointermove", handleMove);
-                window.addEventListener("pointerup", handleUp);
-              }}
-            >
-              <div className="absolute inset-y-3 left-1/2 w-px -translate-x-1/2 bg-border/80" />
-              <button
-                type="button"
-                onClick={() => setIsChatPanelOpen((current) => !current)}
-                className="absolute left-1/2 top-1/2 flex h-10 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background shadow-sm"
-                aria-label={isChatPanelOpen ? "Hide chat panel" : "Show chat panel"}
-              >
-                {isChatPanelOpen ? (
-                  <PanelRightClose className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <PanelRightOpen className="h-4 w-4 text-muted-foreground" />
-                )}
-              </button>
-            </div>
-            <div
-              className={cn("hidden md:block h-full overflow-hidden", !isChatPanelOpen && "w-0")}
-              style={{ width: isChatPanelOpen ? `${rightPanelWidth}px` : "0px" }}
-            >
-              <div className="h-full overflow-hidden p-4">
-                <Card className="flex h-full flex-col">
-                  <CardContent className="flex-1 overflow-hidden p-0">
-                    {isChatPanelOpen && (
-                      <ChatPanel onEventCreated={() => setRefreshKey((current) => current + 1)} />
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </>
-        )}
       </div>
     </div>
   );
