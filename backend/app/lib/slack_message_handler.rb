@@ -19,6 +19,22 @@ class SlackMessageHandler
     )
   rescue StandardError => e
     Rails.logger.error "[Slack] Failed to process message: #{e.message}"
+    if defined?(message) && message
+      ChatAction.create!(
+        chat_message: message,
+        calendar_event_id: nil,
+        calendar_id: nil,
+        transport: 'slack',
+        action_type: 'chat_error',
+        status: 'error',
+        metadata: {
+          error: e.message,
+          error_code: 'chat_processing_failed',
+          correlation_id: @correlation_id,
+          backtrace: e.backtrace&.first(10)
+        }
+      )
+    end
     client.chat_postMessage(
       channel: channel,
       thread_ts: thread_ts,

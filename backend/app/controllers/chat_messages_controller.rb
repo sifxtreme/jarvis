@@ -61,6 +61,22 @@ class ChatMessagesController < ApplicationController
     }
   rescue StandardError => e
     Rails.logger.error "[Chat] Failed to process message: #{e.message}"
+    if defined?(user_message) && user_message
+      ChatAction.create!(
+        chat_message: user_message,
+        calendar_event_id: nil,
+        calendar_id: nil,
+        transport: 'web',
+        action_type: 'chat_error',
+        status: 'error',
+        metadata: {
+          error: e.message,
+          error_code: 'chat_processing_failed',
+          request_id: request.request_id,
+          backtrace: e.backtrace&.first(10)
+        }
+      )
+    end
     render json: { error: e.message }, status: :internal_server_error
   end
 
