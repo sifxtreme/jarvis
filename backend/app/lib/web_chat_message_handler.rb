@@ -1503,7 +1503,7 @@ class WebChatMessageHandler
   end
 
   def primary_calendar_id
-    CalendarConnection.where(user: @user, primary: true).pick(:calendar_id) || @user.email || 'primary'
+    CalendarConnection.where(user: @user, primary: true).limit(1).pluck(:calendar_id).first || @user.email || 'primary'
   end
 
   def normalize_title(title)
