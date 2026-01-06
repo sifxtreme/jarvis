@@ -25,18 +25,18 @@ export function ChatWidget() {
   };
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3">
+    <div className="fixed inset-0 z-50 flex flex-col items-end gap-3 sm:bottom-5 sm:right-5 sm:inset-auto">
       <div
         className={cn(
-          "w-[calc(100vw-2.5rem)] max-w-sm transition-all duration-200 sm:w-[380px]",
+          "w-full transition-all duration-200 sm:w-[380px]",
           isOpen ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-4 opacity-0"
         )}
       >
-        <Card className="flex h-[70vh] flex-col overflow-hidden shadow-xl sm:h-[560px]">
+        <Card className="flex h-[100dvh] flex-col overflow-hidden rounded-none shadow-xl sm:h-[560px] sm:rounded-lg">
           <div className="flex items-center justify-between border-b border-border/60 bg-background/95 px-4 py-3">
             <div>
               <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Jarvis Assistant</div>
-              <div className="text-[11px] text-muted-foreground">Ask me to update your calendar or finances.</div>
+              <div className="text-[11px] text-muted-foreground">Ask me anything.</div>
             </div>
             <Button
               type="button"
@@ -58,7 +58,7 @@ export function ChatWidget() {
       <Button
         type="button"
         size="lg"
-        className="h-12 rounded-full px-5 shadow-lg"
+        className={cn("h-12 rounded-full px-5 shadow-lg sm:flex", isOpen ? "hidden" : "flex")}
         onClick={() => setIsOpen((prev) => !prev)}
         aria-label={isOpen ? "Hide chat" : "Open chat"}
       >

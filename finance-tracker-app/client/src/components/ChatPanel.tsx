@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -79,7 +80,6 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
   const [isSending, setIsSending] = useState(false);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const shouldAutoScrollRef = useRef(true);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
@@ -122,6 +122,19 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
       setIsPreparingImage(false);
     }
   };
+
+  const { getRootProps, getInputProps, open, isDragActive } = useDropzone({
+    onDrop: async (acceptedFiles) => {
+      if (isPreparingImage) return;
+      const file = acceptedFiles[0];
+      if (!file) return;
+      await handleSelectImage(file);
+    },
+    accept: { "image/*": [] },
+    multiple: false,
+    noClick: true,
+    noKeyboard: true,
+  });
 
   useEffect(() => {
     const container = scrollRef.current;
@@ -213,6 +226,17 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
       event.preventDefault();
       void handleSend();
     }
+  };
+
+  const handlePaste = async (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (isPreparingImage) return;
+    const items = Array.from(event.clipboardData?.items || []);
+    const imageItem = items.find((item) => item.type.startsWith("image/"));
+    if (!imageItem) return;
+    const file = imageItem.getAsFile();
+    if (!file) return;
+    event.preventDefault();
+    await handleSelectImage(file);
   };
 
   const groupedMessages = useMemo(() => {
@@ -354,24 +378,21 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
             </Button>
           </div>
         )}
-        <div className="flex items-center gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(event) => {
-              const file = event.target.files?.[0] || null;
-              void handleSelectImage(file && file.type.startsWith("image/") ? file : null);
-              event.target.value = "";
-            }}
-          />
+        <div
+          {...getRootProps({
+            className: cn(
+              "flex items-center gap-2 rounded-lg transition-colors",
+              isDragActive && "bg-blue-50 ring-1 ring-blue-200"
+            ),
+          })}
+        >
+          <input {...getInputProps()} />
           <Button
             type="button"
             size="icon"
             variant="outline"
             className="shrink-0"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={open}
             aria-label="Add image"
             disabled={isPreparingImage}
           >
@@ -381,16 +402,17 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder="Type a message…"
-            rows={2}
-            className="min-h-[56px] flex-1 resize-none"
+            rows={3}
+            className="min-h-[80px] flex-1 resize-none"
           />
           <Button type="submit" size="icon" className="shrink-0" disabled={isSending || isPreparingImage}>
             <Send className="h-4 w-4" />
           </Button>
         </div>
         <div className="mt-2 text-[11px] text-muted-foreground">
-          Enter to send • Shift+Enter for a new line • Try “Remember that…” or “What do you remember about…?”
+          Enter to send • Shift+Enter for a new line • Paste or drag an image
         </div>
       </form>
     </div>

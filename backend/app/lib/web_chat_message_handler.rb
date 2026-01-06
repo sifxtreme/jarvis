@@ -4,7 +4,6 @@ require 'stringio'
 
 class WebChatMessageHandler
   CONFIDENCE_ORDER = { 'low' => 0, 'medium' => 1, 'high' => 2 }.freeze
-  CALENDAR_WINDOW_PAST_DAYS = 30
   CALENDAR_WINDOW_FUTURE_DAYS = 90
   MAX_GEMINI_DIMENSION = 1568
 
@@ -69,15 +68,27 @@ class WebChatMessageHandler
     @thread.update!(state: next_state)
   end
 
+  def merge_thread_state(patch)
+    update_thread_state(thread_state.merge(patch))
+  end
+
   def clear_thread_state
-    update_thread_state({})
+    update_thread_state(thread_state.slice('last_event_id'))
   end
 
   def set_pending_action(action, payload = {})
-    update_thread_state({
-      'pending_action' => action,
-      'payload' => payload
-    })
+    merge_thread_state('pending_action' => action, 'payload' => payload)
+  end
+
+  def remember_last_event(event_id)
+    merge_thread_state('last_event_id' => event_id)
+  end
+
+  def last_event_record
+    event_id = thread_state['last_event_id']
+    return nil if event_id.blank?
+
+    CalendarEvent.find_by(id: event_id)
   end
 
   def ask_image_intent
@@ -113,6 +124,8 @@ class WebChatMessageHandler
       return handle_event_selection(payload, action_type: 'update')
     when 'confirm_update'
       return handle_update_confirmation(payload)
+    when 'clarify_update_changes'
+      return handle_update_changes_clarification(payload)
     when 'clarify_update_target'
       return handle_update_target_clarification(payload)
     when 'clarify_memory_fields'
@@ -318,24 +331,24 @@ class WebChatMessageHandler
   end
 
   def handle_update_event
-    result = gemini.extract_event_update_from_text(@text)
+    result = gemini.extract_event_update_from_text(@text, context: recent_context_text)
     log_ai_request(@message, result[:usage], request_kind: 'event_update', model: gemini_intent_model, status: result[:event]['error'] ? 'error' : 'success')
-    data = result[:event]
-
-    if data['error']
-      set_pending_action('clarify_update_target', { 'changes' => {} })
-      return build_response("Which event should I update? Please share the title and date.")
-    end
+    data = result[:event] || {}
 
     changes = (data['changes'] || {}).compact
     changes['confidence'] = data['confidence'] if data['confidence']
+    duration_minutes = parse_duration_minutes(@text)
+    changes['duration_minutes'] = duration_minutes if duration_minutes
     if changes.empty?
-      set_pending_action('clarify_update_target', { 'changes' => {} })
+      set_pending_action('clarify_update_changes', { 'target' => (data['target'] || {}).compact })
       return build_response("What should I change about the event?")
     end
 
     target = (data['target'] || {}).compact
     if target.empty?
+      if (recent_event = last_event_record)
+        return confirm_or_update_event(recent_event, changes)
+      end
       set_pending_action('clarify_update_target', { 'changes' => changes })
       return build_response("Which event should I update? Please share the title and date.")
     end
@@ -356,16 +369,62 @@ class WebChatMessageHandler
 
   def handle_update_target_clarification(payload)
     changes = payload['changes'] || {}
-    query = gemini.extract_event_query_from_text(@text)
+    query = gemini.extract_event_query_from_text(@text, context: recent_context_text)
     log_ai_request(@message, query[:usage], request_kind: 'event_query', model: gemini_intent_model, status: query[:event]['error'] ? 'error' : 'success')
     data = query[:event]
 
     if data['error']
+      if (recent_event = last_event_record)
+        clear_thread_state
+        return confirm_or_update_event(recent_event, changes)
+      end
       return build_response("I still need the event title or date.")
     end
 
     candidates = find_event_candidates(data)
     return build_response("I couldn't find that event. Can you share the title and date?") if candidates.empty?
+
+    if candidates.length > 1
+      set_pending_action('select_event_for_update', { 'candidates' => serialize_candidates(candidates), 'changes' => changes })
+      return build_response("Which event should I update?\n#{format_candidates(candidates)}")
+    end
+
+    clear_thread_state
+    confirm_or_update_event(candidates.first[:event], changes)
+  rescue StandardError => e
+    build_response("Update error: #{e.message}")
+  end
+
+  def handle_update_changes_clarification(payload)
+    target = (payload['target'] || {}).compact
+    result = gemini.extract_event_update_from_text(@text, context: recent_context_text)
+    log_ai_request(@message, result[:usage], request_kind: 'event_update', model: gemini_intent_model, status: result[:event]['error'] ? 'error' : 'success')
+    data = result[:event] || {}
+
+    changes = (data['changes'] || {}).compact
+    changes['confidence'] = data['confidence'] if data['confidence']
+    duration_minutes = parse_duration_minutes(@text)
+    changes['duration_minutes'] = duration_minutes if duration_minutes
+
+    if changes.empty?
+      return build_response("I still need what to change (time, date, title, etc.).")
+    end
+
+    target = (data['target'] || {}).compact if target.empty?
+    if target.empty?
+      if (recent_event = last_event_record)
+        clear_thread_state
+        return confirm_or_update_event(recent_event, changes)
+      end
+      set_pending_action('clarify_update_target', { 'changes' => changes })
+      return build_response("Which event should I update? Please share the title and date.")
+    end
+
+    candidates = find_event_candidates(target)
+    if candidates.empty?
+      set_pending_action('clarify_update_target', { 'changes' => changes })
+      return build_response("I couldn't find that event. Can you share the title and date?")
+    end
 
     if candidates.length > 1
       set_pending_action('select_event_for_update', { 'candidates' => serialize_candidates(candidates), 'changes' => changes })
@@ -404,7 +463,7 @@ class WebChatMessageHandler
   end
 
   def handle_delete_event
-    query = gemini.extract_event_query_from_text(@text)
+    query = gemini.extract_event_query_from_text(@text, context: recent_context_text)
     log_ai_request(@message, query[:usage], request_kind: 'event_query', model: gemini_intent_model, status: query[:event]['error'] ? 'error' : 'success')
     data = query[:event]
 
@@ -603,18 +662,19 @@ class WebChatMessageHandler
 
   def create_event(event)
     if event['error']
-      log_action(@message, calendar_event_id: nil, calendar_id: 'primary', status: 'error', action_type: 'create_calendar_event', metadata: { error: event['message'] })
+      log_action(@message, calendar_event_id: nil, calendar_id: primary_calendar_id, status: 'error', action_type: 'create_calendar_event', metadata: { error: event['message'] })
       return build_response(render_extraction_result(event))
     end
     return build_response("Please connect your calendar at https://finances.sifxtre.me first.") if @user.google_refresh_token.to_s.empty?
 
+    calendar_id = primary_calendar_id
     calendar = GoogleCalendarClient.new(@user)
     attendees = (spouse_emails(@user) + [@user.email]).uniq
-    result = calendar.create_event(event, attendees: attendees, guests_can_modify: true)
+    result = calendar.create_event(event, calendar_id: calendar_id, attendees: attendees, guests_can_modify: true)
 
     calendar_event = CalendarEvent.create!(
       user: @user,
-      calendar_id: 'primary',
+      calendar_id: calendar_id,
       event_id: result.id,
       title: result.summary,
       description: result.description,
@@ -627,6 +687,7 @@ class WebChatMessageHandler
     )
 
     log_action(@message, calendar_event_id: calendar_event.id, calendar_id: calendar_event.calendar_id, status: 'success', action_type: 'create_calendar_event')
+    remember_last_event(calendar_event.id)
 
     build_response([
       "Added to your calendar! ✅",
@@ -636,7 +697,7 @@ class WebChatMessageHandler
       "Link: #{result.html_link}"
     ].compact.join("\n"), event_created: true, action: 'calendar_event_created')
   rescue GoogleCalendarClient::CalendarError => e
-    log_action(@message, calendar_event_id: nil, calendar_id: 'primary', status: 'error', action_type: 'create_calendar_event', metadata: { error: e.message })
+    log_action(@message, calendar_event_id: nil, calendar_id: primary_calendar_id, status: 'error', action_type: 'create_calendar_event', metadata: { error: e.message })
     build_response("Calendar error: #{e.message}")
   end
 
@@ -662,6 +723,7 @@ class WebChatMessageHandler
     )
 
     log_action(@message, calendar_event_id: event_record.id, calendar_id: event_record.calendar_id, status: 'success', action_type: 'update_calendar_event')
+    remember_last_event(event_record.id)
 
     build_response("Updated the event. ✅", event_created: true, action: 'calendar_event_updated')
   rescue GoogleCalendarClient::CalendarError => e
@@ -746,7 +808,13 @@ class WebChatMessageHandler
     date = changes['date'] || event_record.start_at&.to_date
     lines << "Date: #{date}" if date
     time = changes['start_time'] || event_record.start_at&.strftime('%H:%M')
-    lines << "Time: #{time}" if time
+    end_time = changes['end_time'] || event_record.end_at&.strftime('%H:%M')
+    if end_time.to_s.empty? && changes['duration_minutes'].present? && date && time
+      base_time = Time.zone.parse("#{date} #{time}")
+      end_time = (base_time + changes['duration_minutes'].to_i.minutes).strftime('%H:%M') if base_time
+    end
+    time_range = [time, end_time].compact.join(' - ')
+    lines << "Time: #{time_range}" if time_range.present?
     if changes['location'] || event_record.location
       lines << "Location: #{changes['location'] || event_record.location}"
     end
@@ -904,21 +972,31 @@ class WebChatMessageHandler
         scope = scope.where(start_at: day.beginning_of_day..day.end_of_day)
       end
     else
-      start_at = Time.zone.today - CALENDAR_WINDOW_PAST_DAYS.days
+      start_at = Time.zone.today
       end_at = Time.zone.today + CALENDAR_WINDOW_FUTURE_DAYS.days
       scope = scope.where(start_at: start_at.beginning_of_day..end_at.end_of_day)
     end
 
     events = scope.limit(50).to_a
+    normalized_query = normalize_title(title)
+    query_tokens = tokenize_title(title)
     scored = events.map do |event|
+      event_title = event.title.to_s
+      normalized_event = normalize_title(event_title)
+      event_tokens = tokenize_title(event_title)
       score = 0
-      if title.present?
-        score += 2 if event.title.to_s.downcase.include?(title.downcase)
+      if normalized_query.present?
+        score += 5 if normalized_event == normalized_query
+        score += 3 if normalized_event.include?(normalized_query)
+        overlap = (event_tokens & query_tokens).length
+        coverage = query_tokens.empty? ? 0 : overlap.to_f / query_tokens.length
+        score += overlap
+        score += (coverage * 3).round
       end
       if date.present? && event.start_at
         begin
           target_date = Date.parse(date)
-          score += 2 if event.start_at.to_date == target_date
+          score += 3 if event.start_at.to_date == target_date
         rescue ArgumentError
         end
       end
@@ -926,14 +1004,16 @@ class WebChatMessageHandler
         target_time = Time.zone.parse("#{event.start_at.to_date} #{time}") rescue nil
         if target_time
           diff = (event.start_at - target_time).abs
-          score += 1 if diff <= 90.minutes
+          score += 2 if diff <= 60.minutes
+          score += 1 if diff <= 15.minutes
         end
       end
-      { event: event, score: score }
+      distance = event.start_at ? (event.start_at - Time.zone.now).abs : 10.years
+      { event: event, score: score, distance: distance }
     end
 
     scored.select { |entry| entry[:score] > 0 }
-      .sort_by { |entry| -entry[:score] }
+      .sort_by { |entry| [-entry[:score], entry[:distance]] }
   end
 
   def serialize_candidates(candidates)
@@ -955,6 +1035,34 @@ class WebChatMessageHandler
     end.join("\n")
   end
 
+  def recent_context_text(limit: 10)
+    scope = ChatMessage.where(transport: @message.transport)
+    if @thread.thread_id.present?
+      scope = scope.where(thread_id: @thread.thread_id)
+    else
+      scope = scope.where(external_id: @message.external_id)
+    end
+
+    messages = scope.where.not(id: @message.id)
+      .order(created_at: :desc)
+      .limit(limit)
+      .to_a
+      .reverse
+
+    lines = messages.map { |msg| format_context_line(msg) }.compact
+    lines.join("\n")
+  end
+
+  def format_context_line(message)
+    content = message.text.to_s.strip
+    content = "[image]" if content.empty? && message.has_image
+    return nil if content.empty?
+
+    content = "#{content[0, 200]}..." if content.length > 200
+    label = message.role == 'assistant' ? 'Assistant' : 'User'
+    "#{label}: #{content}"
+  end
+
   def pick_candidate(candidates)
     match = @text.to_s.match(/\b(\d+)\b/)
     if match
@@ -966,6 +1074,18 @@ class WebChatMessageHandler
     candidates.find { |entry| entry[:event].title.to_s.downcase.include?(lowered) }
   end
 
+  def primary_calendar_id
+    CalendarConnection.where(user: @user, primary: true).pick(:calendar_id) || @user.email || 'primary'
+  end
+
+  def normalize_title(title)
+    title.to_s.downcase.gsub(/[^a-z0-9\s]/, ' ').squeeze(' ').strip
+  end
+
+  def tokenize_title(title)
+    normalize_title(title).split(' ').reject(&:empty?)
+  end
+
   def symbolize_candidate(entry)
     event = CalendarEvent.find_by(id: entry['id'])
     return nil unless event
@@ -973,12 +1093,43 @@ class WebChatMessageHandler
     { event: event, score: 0 }
   end
 
+  def parse_duration_minutes(text)
+    return nil if text.to_s.strip.empty?
+
+    normalized = text.downcase
+    hours_match = normalized.match(/(\d+(?:\.\d+)?)\s*(hours?|hrs?|hr)\b/)
+    if hours_match
+      hours = hours_match[1].to_f
+      return (hours * 60).round if hours.positive?
+    end
+
+    minutes_match = normalized.match(/(\d+)\s*(minutes?|mins?|min)\b/)
+    if minutes_match
+      minutes = minutes_match[1].to_i
+      return minutes if minutes.positive?
+    end
+
+    nil
+  end
+
   def build_event_updates(event_record, changes)
     date = changes['date'].presence || event_record.start_at&.to_date&.iso8601
     start_time = changes['start_time'].presence || event_record.start_at&.strftime('%H:%M')
     end_time = changes['end_time'].presence || event_record.end_at&.strftime('%H:%M')
+    duration_minutes = changes['duration_minutes'].to_i if changes['duration_minutes'].present?
 
     return nil if date.to_s.empty?
+
+    if end_time.to_s.empty? && duration_minutes.to_i.positive?
+      base_time = if changes['start_time'].present?
+        Time.zone.parse("#{date} #{start_time}")
+      else
+        event_record.start_at
+      end
+      if base_time
+        end_time = (base_time + duration_minutes.minutes).strftime('%H:%M')
+      end
+    end
 
     {
       'title' => changes['title'].presence || event_record.title,

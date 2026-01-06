@@ -78,7 +78,7 @@ export const verifyAuthentication = async (): Promise<boolean> => {
   try {
     // Verify session cookie
     await axiosInstance.get('/auth/session', {
-      timeout: 3000 // Set a timeout to prevent long waits
+      timeout: 15000 // Allow slower cold starts before showing errors
     });
     return true;
   } catch (error) {

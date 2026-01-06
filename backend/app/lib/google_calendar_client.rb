@@ -26,7 +26,7 @@ class GoogleCalendarClient
     raise CalendarError, e.message
   end
 
-  def create_event(event, attendees: [], guests_can_modify: true)
+  def create_event(event, calendar_id: 'primary', attendees: [], guests_can_modify: true)
     start_time = parse_datetime(event['date'], event['start_time'])
     end_time = parse_datetime(event['date'], event['end_time'])
 
@@ -59,7 +59,7 @@ class GoogleCalendarClient
       guests_can_see_other_guests: true
     )
 
-    @service.insert_event('primary', calendar_event)
+    @service.insert_event(calendar_id, calendar_event)
   rescue Google::Apis::Error => e
     raise CalendarError, e.message
   end

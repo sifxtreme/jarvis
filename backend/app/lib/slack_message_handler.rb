@@ -109,13 +109,14 @@ class SlackMessageHandler
     end
     return "Please connect your calendar at https://finances.sifxtre.me first." if user.google_refresh_token.to_s.empty?
 
+    calendar_id = primary_calendar_id_for(user)
     calendar = GoogleCalendarClient.new(user)
     attendees = (spouse_emails(user) + [user.email]).uniq
-    result = calendar.create_event(event, attendees: attendees, guests_can_modify: true)
+    result = calendar.create_event(event, calendar_id: calendar_id, attendees: attendees, guests_can_modify: true)
 
     calendar_event = CalendarEvent.create!(
       user: user,
-      calendar_id: 'primary',
+      calendar_id: calendar_id,
       event_id: result.id,
       title: result.summary,
       description: result.description,
@@ -139,6 +140,10 @@ class SlackMessageHandler
   rescue GoogleCalendarClient::CalendarError => e
     log_action(message, calendar_event: nil, status: 'error', metadata: { error: e.message })
     "Calendar error: #{e.message}"
+  end
+
+  def primary_calendar_id_for(user)
+    CalendarConnection.where(user: user, primary: true).pick(:calendar_id) || user.email || 'primary'
   end
 
   def format_event(event)

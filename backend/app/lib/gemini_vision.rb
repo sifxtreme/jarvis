@@ -69,15 +69,15 @@ class GeminiVision
     parse_json_response(response)
   end
 
-  def extract_event_query_from_text(text)
-    parts = [{ text: event_query_prompt(text) }]
+  def extract_event_query_from_text(text, context: nil)
+    parts = [{ text: event_query_prompt(text, context: context) }]
 
     response = make_request(parts: parts, model: DEFAULT_INTENT_MODEL)
     parse_json_response(response)
   end
 
-  def extract_event_update_from_text(text)
-    parts = [{ text: event_update_prompt(text) }]
+  def extract_event_update_from_text(text, context: nil)
+    parts = [{ text: event_update_prompt(text, context: context) }]
 
     response = make_request(parts: parts, model: DEFAULT_INTENT_MODEL)
     parse_json_response(response)
@@ -372,9 +372,10 @@ class GeminiVision
     PROMPT
   end
 
-  def event_query_prompt(text)
+  def event_query_prompt(text, context: nil)
+    context_block = format_context_block(context)
     <<~PROMPT
-      Extract the calendar event the user is referring to. Return JSON:
+      #{context_block}Extract the calendar event the user is referring to. Return JSON:
       {
         "title": "Event title or keywords",
         "date": "YYYY-MM-DD",
@@ -393,9 +394,10 @@ class GeminiVision
     PROMPT
   end
 
-  def event_update_prompt(text)
+  def event_update_prompt(text, context: nil)
+    context_block = format_context_block(context)
     <<~PROMPT
-      Extract which event to update and the requested changes. Return JSON:
+      #{context_block}Extract which event to update and the requested changes. Return JSON:
       {
         "confidence": "low|medium|high",
         "target": {
@@ -408,6 +410,7 @@ class GeminiVision
           "date": "YYYY-MM-DD",
           "start_time": "HH:MM",
           "end_time": "HH:MM",
+          "duration_minutes": 120,
           "location": "New location",
           "description": "New description"
         }
@@ -422,6 +425,13 @@ class GeminiVision
       Text:
       "#{text}"
     PROMPT
+  end
+
+  def format_context_block(context)
+    context_text = context.to_s.strip
+    return "" if context_text.empty?
+
+    "Recent conversation context:\n#{context_text}\n\n"
   end
 end
   def extract_memory_from_text(text)
