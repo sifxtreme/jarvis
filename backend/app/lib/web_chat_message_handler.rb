@@ -1,11 +1,14 @@
 require 'base64'
+require 'digest'
 require 'image_processing/mini_magick'
+require 'securerandom'
 require 'stringio'
 
 class WebChatMessageHandler
   CONFIDENCE_ORDER = { 'low' => 0, 'medium' => 1, 'high' => 2 }.freeze
   CALENDAR_WINDOW_FUTURE_DAYS = 90
   MAX_GEMINI_DIMENSION = 1568
+  IDEMPOTENCY_WINDOW_SECONDS = 120
 
   def initialize(user:, message:, text:, image: nil, thread:)
     @user = user
@@ -13,6 +16,7 @@ class WebChatMessageHandler
     @text = text.to_s
     @image = image
     @thread = thread
+    @correlation_id = SecureRandom.hex(10)
   end
 
   def process!
@@ -170,7 +174,14 @@ class WebChatMessageHandler
     end
 
     result = gemini.extract_memory_from_text(@text)
-    log_ai_request(@message, result[:usage], request_kind: 'memory', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
+    log_ai_request(
+      @message,
+      result[:usage],
+      request_kind: 'memory',
+      model: gemini_extract_model,
+      status: result[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: result[:event])
+    )
     data = result[:event] || {}
     data['urls'] = urls if urls.any?
 
@@ -197,7 +208,14 @@ class WebChatMessageHandler
 
   def handle_memory_correction(payload)
     result = gemini.extract_memory_from_text(@text)
-    log_ai_request(@message, result[:usage], request_kind: 'memory', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
+    log_ai_request(
+      @message,
+      result[:usage],
+      request_kind: 'memory',
+      model: gemini_extract_model,
+      status: result[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: result[:event])
+    )
     updated = result[:event] || {}
 
     if updated['error']
@@ -237,7 +255,14 @@ class WebChatMessageHandler
 
   def handle_search_memory
     result = gemini.extract_memory_query_from_text(@text)
-    log_ai_request(@message, result[:usage], request_kind: 'memory_query', model: gemini_intent_model, status: result[:event]['error'] ? 'error' : 'success')
+    log_ai_request(
+      @message,
+      result[:usage],
+      request_kind: 'memory_query',
+      model: gemini_intent_model,
+      status: result[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: result[:event])
+    )
     query = result[:event] || {}
 
     if query['error'] || query['query'].to_s.strip.empty?
@@ -248,7 +273,14 @@ class WebChatMessageHandler
     return build_response("I couldn't find any memories about that.") if memories.empty?
 
     answer = gemini.answer_with_memories(@text, memories)
-    log_ai_request(@message, answer[:usage], request_kind: 'memory_answer', model: gemini_extract_model, status: answer[:text].to_s.empty? ? 'error' : 'success')
+    log_ai_request(
+      @message,
+      answer[:usage],
+      request_kind: 'memory_answer',
+      model: gemini_extract_model,
+      status: answer[:text].to_s.empty? ? 'error' : 'success',
+      metadata: ai_metadata(response: { text: answer[:text] })
+    )
     build_response(answer[:text].presence || format_memory_list(memories))
   rescue StandardError => e
     build_response("Memory search error: #{e.message}")
@@ -289,7 +321,14 @@ class WebChatMessageHandler
   def handle_event_correction(payload)
     event = payload['event'] || {}
     result = gemini.apply_event_correction(event, @text)
-    log_ai_request(@message, result[:usage], request_kind: 'event_correction', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
+    log_ai_request(
+      @message,
+      result[:usage],
+      request_kind: 'event_correction',
+      model: gemini_extract_model,
+      status: result[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: result[:event])
+    )
 
     updated = result[:event]
     if updated['error']
@@ -332,7 +371,14 @@ class WebChatMessageHandler
 
   def handle_update_event
     result = gemini.extract_event_update_from_text(@text, context: recent_context_text)
-    log_ai_request(@message, result[:usage], request_kind: 'event_update', model: gemini_intent_model, status: result[:event]['error'] ? 'error' : 'success')
+    log_ai_request(
+      @message,
+      result[:usage],
+      request_kind: 'event_update',
+      model: gemini_intent_model,
+      status: result[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: result[:event])
+    )
     data = result[:event] || {}
 
     changes = (data['changes'] || {}).compact
@@ -370,7 +416,14 @@ class WebChatMessageHandler
   def handle_update_target_clarification(payload)
     changes = payload['changes'] || {}
     query = gemini.extract_event_query_from_text(@text, context: recent_context_text)
-    log_ai_request(@message, query[:usage], request_kind: 'event_query', model: gemini_intent_model, status: query[:event]['error'] ? 'error' : 'success')
+    log_ai_request(
+      @message,
+      query[:usage],
+      request_kind: 'event_query',
+      model: gemini_intent_model,
+      status: query[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: query[:event])
+    )
     data = query[:event]
 
     if data['error']
@@ -398,7 +451,14 @@ class WebChatMessageHandler
   def handle_update_changes_clarification(payload)
     target = (payload['target'] || {}).compact
     result = gemini.extract_event_update_from_text(@text, context: recent_context_text)
-    log_ai_request(@message, result[:usage], request_kind: 'event_update', model: gemini_intent_model, status: result[:event]['error'] ? 'error' : 'success')
+    log_ai_request(
+      @message,
+      result[:usage],
+      request_kind: 'event_update',
+      model: gemini_intent_model,
+      status: result[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: result[:event])
+    )
     data = result[:event] || {}
 
     changes = (data['changes'] || {}).compact
@@ -440,12 +500,24 @@ class WebChatMessageHandler
   def handle_update_confirmation(payload)
     event_id = payload['event_id']
     changes = payload['changes'] || {}
+    snapshot = payload['snapshot']
     event_record = CalendarEvent.find_by(id: event_id)
-    return build_response("I couldn't find that event anymore.") unless event_record
+    unless event_record
+      calendar_id = snapshot.is_a?(Hash) ? (snapshot['calendar_id'] || snapshot[:calendar_id]) : nil
+      log_action(
+        @message,
+        calendar_event_id: nil,
+        calendar_id: calendar_id,
+        status: 'error',
+        action_type: 'update_calendar_event',
+        metadata: { error_code: 'event_not_found', event_id: event_id, snapshot: snapshot, correlation_id: @correlation_id }
+      )
+      return build_response("I couldn't find that event anymore.", error_code: 'event_not_found')
+    end
 
     if affirmative?
       clear_thread_state
-      return apply_event_update(event_record, changes)
+      return apply_event_update(event_record, changes, snapshot: snapshot)
     end
 
     clear_thread_state
@@ -454,17 +526,25 @@ class WebChatMessageHandler
 
   def confirm_or_update_event(event_record, changes)
     confidence = normalize_confidence(changes['confidence'])
+    snapshot = event_snapshot(event_record)
     if confidence != 'high'
-      set_pending_action('confirm_update', { 'event_id' => event_record.id, 'changes' => changes })
+      set_pending_action('confirm_update', { 'event_id' => event_record.id, 'changes' => changes, 'snapshot' => snapshot })
       return build_response("I plan to update:\n#{format_event_changes(event_record, changes)}\n\nShould I apply this?")
     end
 
-    apply_event_update(event_record, changes)
+    apply_event_update(event_record, changes, snapshot: snapshot)
   end
 
   def handle_delete_event
     query = gemini.extract_event_query_from_text(@text, context: recent_context_text)
-    log_ai_request(@message, query[:usage], request_kind: 'event_query', model: gemini_intent_model, status: query[:event]['error'] ? 'error' : 'success')
+    log_ai_request(
+      @message,
+      query[:usage],
+      request_kind: 'event_query',
+      model: gemini_intent_model,
+      status: query[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: query[:event])
+    )
     data = query[:event]
 
     if data['error']
@@ -492,24 +572,54 @@ class WebChatMessageHandler
       return build_response("Reply with the number of the event you want.")
     end
 
+    event_record = selected[:event]
+    selection_index = selection_index_from_text(candidates.length)
+    log_action(
+      @message,
+      calendar_event_id: event_record.id,
+      calendar_id: event_record.calendar_id,
+      status: 'success',
+      action_type: 'select_calendar_event',
+      metadata: {
+        selection_kind: action_type,
+        selection_index: selection_index,
+        candidates: payload['candidates'],
+        selected_event: event_snapshot(event_record),
+        changes: payload['changes'],
+        correlation_id: @correlation_id
+      }.compact
+    )
+
     clear_thread_state
     if action_type == 'delete'
-      confirm_or_delete_event(selected[:event])
+      confirm_or_delete_event(event_record)
     else
       changes = payload['changes'] || {}
-      confirm_or_update_event(selected[:event], changes)
+      confirm_or_update_event(event_record, changes)
     end
   end
 
   def confirm_or_delete_event(event_record)
-    set_pending_action('confirm_delete', { 'event_id' => event_record.id })
+    set_pending_action('confirm_delete', { 'event_id' => event_record.id, 'snapshot' => event_snapshot(event_record) })
     build_response("Delete this event?\n#{format_event_record(event_record)}")
   end
 
   def handle_delete_confirmation(payload)
     event_id = payload['event_id']
+    snapshot = payload['snapshot']
     event_record = CalendarEvent.find_by(id: event_id)
-    return build_response("I couldn't find that event anymore.") unless event_record
+    unless event_record
+      calendar_id = snapshot.is_a?(Hash) ? (snapshot['calendar_id'] || snapshot[:calendar_id]) : nil
+      log_action(
+        @message,
+        calendar_event_id: nil,
+        calendar_id: calendar_id,
+        status: 'error',
+        action_type: 'delete_calendar_event',
+        metadata: { error_code: 'event_not_found', event_id: event_id, snapshot: snapshot, correlation_id: @correlation_id }
+      )
+      return build_response("I couldn't find that event anymore.", error_code: 'event_not_found')
+    end
 
     if affirmative?
       clear_thread_state
@@ -561,7 +671,14 @@ class WebChatMessageHandler
   def handle_transaction_correction(payload)
     transaction = payload['transaction'] || {}
     result = gemini.apply_transaction_correction(transaction, @text)
-    log_ai_request(@message, result[:usage], request_kind: 'transaction_correction', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
+    log_ai_request(
+      @message,
+      result[:usage],
+      request_kind: 'transaction_correction',
+      model: gemini_extract_model,
+      status: result[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: result[:event])
+    )
 
     updated = result[:event]
     missing = missing_transaction_fields(updated)
@@ -602,20 +719,50 @@ class WebChatMessageHandler
 
   def extract_from_text
     result = gemini.extract_event_from_text(@text)
-    log_ai_request(@message, result[:usage], request_kind: 'text', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
+    log_ai_request(
+      @message,
+      result[:usage],
+      request_kind: 'text',
+      model: gemini_extract_model,
+      status: result[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: result[:event])
+    )
     result
   rescue StandardError => e
-    log_ai_request(@message, {}, request_kind: 'text', model: gemini_extract_model, status: 'error', error_message: e.message)
+    log_ai_request(
+      @message,
+      {},
+      request_kind: 'text',
+      model: gemini_extract_model,
+      status: 'error',
+      error_message: e.message,
+      metadata: ai_metadata
+    )
     { text: "Text extraction error: #{e.message}" }
   end
 
   def extract_from_image
     image_base64, mime_type = gemini_image_payload(@image)
     result = gemini.extract_event_from_image(image_base64, mime_type: mime_type)
-    log_ai_request(@message, result[:usage], request_kind: 'image', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
+    log_ai_request(
+      @message,
+      result[:usage],
+      request_kind: 'image',
+      model: gemini_extract_model,
+      status: result[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: result[:event])
+    )
     result
   rescue StandardError => e
-    log_ai_request(@message, {}, request_kind: 'image', model: gemini_extract_model, status: 'error', error_message: e.message)
+    log_ai_request(
+      @message,
+      {},
+      request_kind: 'image',
+      model: gemini_extract_model,
+      status: 'error',
+      error_message: e.message,
+      metadata: ai_metadata
+    )
     { text: "Image extraction error: #{e.message}" }
   end
 
@@ -625,7 +772,14 @@ class WebChatMessageHandler
 
     image_base64, mime_type = gemini_image_payload(message.image)
     result = gemini.extract_event_from_image(image_base64, mime_type: mime_type)
-    log_ai_request(@message, result[:usage], request_kind: 'image', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
+    log_ai_request(
+      @message,
+      result[:usage],
+      request_kind: 'image',
+      model: gemini_extract_model,
+      status: result[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: result[:event])
+    )
     result
   rescue StandardError => e
     { text: "Image extraction error: #{e.message}" }
@@ -633,7 +787,14 @@ class WebChatMessageHandler
 
   def extract_transaction_from_text
     result = gemini.extract_transaction_from_text(@text)
-    log_ai_request(@message, result[:usage], request_kind: 'transaction_text', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
+    log_ai_request(
+      @message,
+      result[:usage],
+      request_kind: 'transaction_text',
+      model: gemini_extract_model,
+      status: result[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: result[:event])
+    )
     result
   rescue StandardError => e
     { text: "Transaction extraction error: #{e.message}" }
@@ -642,7 +803,14 @@ class WebChatMessageHandler
   def extract_transaction_from_image
     image_base64, mime_type = gemini_image_payload(@image)
     result = gemini.extract_transaction_from_image(image_base64, mime_type: mime_type)
-    log_ai_request(@message, result[:usage], request_kind: 'transaction_image', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
+    log_ai_request(
+      @message,
+      result[:usage],
+      request_kind: 'transaction_image',
+      model: gemini_extract_model,
+      status: result[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: result[:event])
+    )
     result
   rescue StandardError => e
     { text: "Transaction extraction error: #{e.message}" }
@@ -654,7 +822,14 @@ class WebChatMessageHandler
 
     image_base64, mime_type = gemini_image_payload(message.image)
     result = gemini.extract_transaction_from_image(image_base64, mime_type: mime_type)
-    log_ai_request(@message, result[:usage], request_kind: 'transaction_image', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
+    log_ai_request(
+      @message,
+      result[:usage],
+      request_kind: 'transaction_image',
+      model: gemini_extract_model,
+      status: result[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: result[:event])
+    )
     result
   rescue StandardError => e
     { text: "Transaction extraction error: #{e.message}" }
@@ -665,11 +840,36 @@ class WebChatMessageHandler
       log_action(@message, calendar_event_id: nil, calendar_id: primary_calendar_id, status: 'error', action_type: 'create_calendar_event', metadata: { error: event['message'] })
       return build_response(render_extraction_result(event))
     end
-    return build_response("Please connect your calendar at https://finances.sifxtre.me first.") if @user.google_refresh_token.to_s.empty?
+    if @user.google_refresh_token.to_s.empty?
+      log_action(
+        @message,
+        calendar_event_id: nil,
+        calendar_id: primary_calendar_id,
+        status: 'error',
+        action_type: 'create_calendar_event',
+        metadata: { error_code: 'insufficient_permissions', correlation_id: @correlation_id }
+      )
+      return build_response("Please connect your calendar at https://finances.sifxtre.me first.", error_code: 'insufficient_permissions')
+    end
 
     calendar_id = primary_calendar_id
     calendar = GoogleCalendarClient.new(@user)
     attendees = (spouse_emails(@user) + [@user.email]).uniq
+
+    idempotency_payload = { event: event, attendees: attendees, calendar_id: calendar_id }
+    signature = idempotency_signature('create_calendar_event', idempotency_payload)
+    if duplicate_action?('create_calendar_event', signature)
+      log_action(
+        @message,
+        calendar_event_id: nil,
+        calendar_id: calendar_id,
+        status: 'duplicate',
+        action_type: 'create_calendar_event',
+        metadata: { error_code: 'duplicate_request', event: event, correlation_id: @correlation_id }
+      )
+      return build_response("I already added that event. ✅", action: 'calendar_event_created')
+    end
+
     result = calendar.create_event(event, calendar_id: calendar_id, attendees: attendees, guests_can_modify: true)
 
     calendar_event = CalendarEvent.create!(
@@ -686,8 +886,23 @@ class WebChatMessageHandler
       source: 'web'
     )
 
-    log_action(@message, calendar_event_id: calendar_event.id, calendar_id: calendar_event.calendar_id, status: 'success', action_type: 'create_calendar_event')
+    log_action(
+      @message,
+      calendar_event_id: calendar_event.id,
+      calendar_id: calendar_event.calendar_id,
+      status: 'success',
+      action_type: 'create_calendar_event',
+      metadata: {
+        event_id: calendar_event.event_id,
+        title: calendar_event.title,
+        confidence: event['confidence'],
+        calendar_request: { event: event, attendees: attendees, calendar_id: calendar_id },
+        calendar_response: result.to_h,
+        correlation_id: @correlation_id
+      }.compact
+    )
     remember_last_event(calendar_event.id)
+    remember_idempotency!('create_calendar_event', signature)
 
     build_response([
       "Added to your calendar! ✅",
@@ -697,52 +912,174 @@ class WebChatMessageHandler
       "Link: #{result.html_link}"
     ].compact.join("\n"), event_created: true, action: 'calendar_event_created')
   rescue GoogleCalendarClient::CalendarError => e
-    log_action(@message, calendar_event_id: nil, calendar_id: primary_calendar_id, status: 'error', action_type: 'create_calendar_event', metadata: { error: e.message })
-    build_response("Calendar error: #{e.message}")
+    log_action(
+      @message,
+      calendar_event_id: nil,
+      calendar_id: primary_calendar_id,
+      status: 'error',
+      action_type: 'create_calendar_event',
+      metadata: { error_code: 'calendar_create_failed', error: e.message, correlation_id: @correlation_id }
+    )
+    build_response("Calendar error: #{e.message}", error_code: 'calendar_create_failed')
   end
 
-  def apply_event_update(event_record, changes)
-    return build_response("Please connect your calendar at https://finances.sifxtre.me first.") if @user.google_refresh_token.to_s.empty?
+  def apply_event_update(event_record, changes, snapshot: nil)
+    if @user.google_refresh_token.to_s.empty?
+      log_action(
+        @message,
+        calendar_event_id: event_record.id,
+        calendar_id: event_record.calendar_id,
+        status: 'error',
+        action_type: 'update_calendar_event',
+        metadata: { error_code: 'insufficient_permissions', event_id: event_record.event_id, correlation_id: @correlation_id }
+      )
+      return build_response("Please connect your calendar at https://finances.sifxtre.me first.", error_code: 'insufficient_permissions')
+    end
 
     updates = build_event_updates(event_record, changes)
     if updates.nil?
-      return build_response("I need a new date or time to update the event.")
+      return build_response("I need a new date or time to update the event.", error_code: 'missing_event_update_fields')
+    end
+
+    idempotency_payload = { event_id: event_record.event_id, changes: changes }
+    signature = idempotency_signature('update_calendar_event', idempotency_payload)
+    if duplicate_action?('update_calendar_event', signature)
+      log_action(
+        @message,
+        calendar_event_id: event_record.id,
+        calendar_id: event_record.calendar_id,
+        status: 'duplicate',
+        action_type: 'update_calendar_event',
+        metadata: { error_code: 'duplicate_request', event_id: event_record.event_id, changes: changes, correlation_id: @correlation_id }
+      )
+      return build_response("I already applied that update. ✅", action: 'calendar_event_updated')
     end
 
     client = GoogleCalendarClient.new(@user)
     result = client.update_event(calendar_id: event_record.calendar_id, event_id: event_record.event_id, updates: updates)
 
+    verified_event = nil
+    verification = { verified: false }
+    begin
+      verified_event = client.get_event(calendar_id: event_record.calendar_id, event_id: event_record.event_id)
+      verification = verify_event_updates(verified_event, updates)
+    rescue GoogleCalendarClient::CalendarError => e
+      verification = { verified: false, error: e.message }
+    end
+
+    event_source = verified_event || result
     event_record.update!(
-      title: result.summary,
-      description: result.description,
-      location: result.location,
-      start_at: result.start&.date_time || result.start&.date,
-      end_at: result.end&.date_time || result.end&.date,
-      raw_event: result.to_h,
+      title: event_source.summary,
+      description: event_source.description,
+      location: event_source.location,
+      start_at: event_source.start&.date_time || event_source.start&.date,
+      end_at: event_source.end&.date_time || event_source.end&.date,
+      raw_event: event_source.to_h,
       status: 'active'
     )
 
-    log_action(@message, calendar_event_id: event_record.id, calendar_id: event_record.calendar_id, status: 'success', action_type: 'update_calendar_event')
+    log_action(
+      @message,
+      calendar_event_id: event_record.id,
+      calendar_id: event_record.calendar_id,
+      status: 'success',
+      action_type: 'update_calendar_event',
+      metadata: {
+        event_id: event_record.event_id,
+        title: event_record.title,
+        changes: changes,
+        updates: updates,
+        snapshot: snapshot,
+        calendar_response: event_source.to_h,
+        verification: verification,
+        correlation_id: @correlation_id
+      }.compact
+    )
     remember_last_event(event_record.id)
+    remember_idempotency!('update_calendar_event', signature)
+
+    if verification[:mismatches].to_a.any?
+      return build_response(
+        "Updated the event, but these fields may not have changed: #{verification[:mismatches].join(', ')}.",
+        action: 'calendar_event_updated',
+        error_code: 'calendar_update_partial'
+      )
+    end
 
     build_response("Updated the event. ✅", event_created: true, action: 'calendar_event_updated')
   rescue GoogleCalendarClient::CalendarError => e
-    log_action(@message, calendar_event_id: event_record.id, calendar_id: event_record.calendar_id, status: 'error', action_type: 'update_calendar_event', metadata: { error: e.message })
-    build_response("Calendar update error: #{e.message}")
+    log_action(
+      @message,
+      calendar_event_id: event_record.id,
+      calendar_id: event_record.calendar_id,
+      status: 'error',
+      action_type: 'update_calendar_event',
+      metadata: {
+        error_code: 'calendar_update_failed',
+        error: e.message,
+        event_id: event_record.event_id,
+        changes: changes,
+        correlation_id: @correlation_id
+      }
+    )
+    build_response("Calendar update error: #{e.message}", error_code: 'calendar_update_failed')
   end
 
   def delete_event(event_record)
-    return build_response("Please connect your calendar at https://finances.sifxtre.me first.") if @user.google_refresh_token.to_s.empty?
+    if @user.google_refresh_token.to_s.empty?
+      log_action(
+        @message,
+        calendar_event_id: event_record.id,
+        calendar_id: event_record.calendar_id,
+        status: 'error',
+        action_type: 'delete_calendar_event',
+        metadata: { error_code: 'insufficient_permissions', event_id: event_record.event_id, correlation_id: @correlation_id }
+      )
+      return build_response("Please connect your calendar at https://finances.sifxtre.me first.", error_code: 'insufficient_permissions')
+    end
+
+    signature = idempotency_signature('delete_calendar_event', { event_id: event_record.event_id })
+    if duplicate_action?('delete_calendar_event', signature)
+      log_action(
+        @message,
+        calendar_event_id: event_record.id,
+        calendar_id: event_record.calendar_id,
+        status: 'duplicate',
+        action_type: 'delete_calendar_event',
+        metadata: { error_code: 'duplicate_request', event_id: event_record.event_id, correlation_id: @correlation_id }
+      )
+      return build_response("I already deleted that event. ✅", action: 'calendar_event_deleted')
+    end
 
     client = GoogleCalendarClient.new(@user)
     client.delete_event(calendar_id: event_record.calendar_id, event_id: event_record.event_id)
     event_record.update!(status: 'cancelled')
 
-    log_action(@message, calendar_event_id: event_record.id, calendar_id: event_record.calendar_id, status: 'success', action_type: 'delete_calendar_event')
+    log_action(
+      @message,
+      calendar_event_id: event_record.id,
+      calendar_id: event_record.calendar_id,
+      status: 'success',
+      action_type: 'delete_calendar_event',
+      metadata: {
+        event_id: event_record.event_id,
+        title: event_record.title,
+        calendar_request: { calendar_id: event_record.calendar_id, event_id: event_record.event_id },
+        correlation_id: @correlation_id
+      }
+    )
+    remember_idempotency!('delete_calendar_event', signature)
     build_response("Deleted the event. ✅", event_created: true, action: 'calendar_event_deleted')
   rescue GoogleCalendarClient::CalendarError => e
-    log_action(@message, calendar_event_id: event_record.id, calendar_id: event_record.calendar_id, status: 'error', action_type: 'delete_calendar_event', metadata: { error: e.message })
-    build_response("Calendar delete error: #{e.message}")
+    log_action(
+      @message,
+      calendar_event_id: event_record.id,
+      calendar_id: event_record.calendar_id,
+      status: 'error',
+      action_type: 'delete_calendar_event',
+      metadata: { error_code: 'calendar_delete_failed', error: e.message, event_id: event_record.event_id, correlation_id: @correlation_id }
+    )
+    build_response("Calendar delete error: #{e.message}", error_code: 'calendar_delete_failed')
   end
 
   def create_transaction(transaction)
@@ -808,11 +1145,12 @@ class WebChatMessageHandler
     date = changes['date'] || event_record.start_at&.to_date
     lines << "Date: #{date}" if date
     time = changes['start_time'] || event_record.start_at&.strftime('%H:%M')
-    end_time = changes['end_time'] || event_record.end_at&.strftime('%H:%M')
+    end_time = changes['end_time']
     if end_time.to_s.empty? && changes['duration_minutes'].present? && date && time
       base_time = Time.zone.parse("#{date} #{time}")
       end_time = (base_time + changes['duration_minutes'].to_i.minutes).strftime('%H:%M') if base_time
     end
+    end_time = event_record.end_at&.strftime('%H:%M') if end_time.to_s.empty?
     time_range = [time, end_time].compact.join(' - ')
     lines << "Time: #{time_range}" if time_range.present?
     if changes['location'] || event_record.location
@@ -911,10 +1249,25 @@ class WebChatMessageHandler
 
   def classify_intent
     result = gemini.classify_intent(text: @text, has_image: image_attached?)
-    log_ai_request(@message, result[:usage], request_kind: 'intent', model: gemini_intent_model, status: result[:event]['error'] ? 'error' : 'success')
+    log_ai_request(
+      @message,
+      result[:usage],
+      request_kind: 'intent',
+      model: gemini_intent_model,
+      status: result[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: result[:event])
+    )
     result[:event]
   rescue StandardError => e
-    log_ai_request(@message, {}, request_kind: 'intent', model: gemini_intent_model, status: 'error', error_message: e.message)
+    log_ai_request(
+      @message,
+      {},
+      request_kind: 'intent',
+      model: gemini_intent_model,
+      status: 'error',
+      error_message: e.message,
+      metadata: ai_metadata
+    )
     { 'intent' => 'create_event', 'confidence' => 'low' }
   end
 
@@ -1035,6 +1388,81 @@ class WebChatMessageHandler
     end.join("\n")
   end
 
+  def selection_index_from_text(max_count)
+    match = @text.to_s.match(/\b(\d+)\b/)
+    return nil unless match
+
+    index = match[1].to_i
+    return nil if index < 1 || index > max_count
+
+    index
+  end
+
+  def event_snapshot(event)
+    {
+      id: event.id,
+      event_id: event.event_id,
+      title: event.title,
+      start_at: event.start_at&.iso8601,
+      end_at: event.end_at&.iso8601,
+      calendar_id: event.calendar_id,
+      updated_at: event.updated_at&.iso8601
+    }
+  end
+
+  def idempotency_signature(action_type, payload)
+    Digest::SHA256.hexdigest([action_type, @user.id, payload.to_json].join('|'))
+  end
+
+  def duplicate_action?(action_type, signature)
+    info = thread_state['last_action']
+    return false unless info.is_a?(Hash)
+    return false unless info['action_type'] == action_type
+    return false unless info['signature'] == signature
+
+    timestamp = Time.zone.parse(info['created_at'].to_s) rescue nil
+    return false unless timestamp
+
+    timestamp > (Time.zone.now - IDEMPOTENCY_WINDOW_SECONDS)
+  end
+
+  def remember_idempotency!(action_type, signature)
+    merge_thread_state(
+      'last_action' => {
+        'action_type' => action_type,
+        'signature' => signature,
+        'created_at' => Time.zone.now.iso8601
+      }
+    )
+  end
+
+  def verify_event_updates(event, updates)
+    return { verified: false, error: 'missing_event' } unless event
+
+    mismatches = []
+    mismatches << 'title' if updates['title'] && event.summary.to_s != updates['title'].to_s
+    mismatches << 'location' if updates['location'] && event.location.to_s != updates['location'].to_s
+    mismatches << 'description' if updates['description'] && event.description.to_s != updates['description'].to_s
+
+    actual_date = event.start&.date || event.start&.date_time&.to_date&.iso8601
+    actual_start_time = event.start&.date_time&.strftime('%H:%M')
+    actual_end_time = event.end&.date_time&.strftime('%H:%M')
+
+    mismatches << 'date' if updates['date'] && actual_date.to_s != updates['date'].to_s
+    mismatches << 'start_time' if updates['start_time'] && actual_start_time.to_s != updates['start_time'].to_s
+    mismatches << 'end_time' if updates['end_time'] && actual_end_time.to_s != updates['end_time'].to_s
+
+    {
+      verified: true,
+      mismatches: mismatches,
+      actual: {
+        date: actual_date,
+        start_time: actual_start_time,
+        end_time: actual_end_time
+      }
+    }
+  end
+
   def recent_context_text(limit: 10)
     scope = ChatMessage.where(transport: @message.transport)
     if @thread.thread_id.present?
@@ -1115,8 +1543,8 @@ class WebChatMessageHandler
   def build_event_updates(event_record, changes)
     date = changes['date'].presence || event_record.start_at&.to_date&.iso8601
     start_time = changes['start_time'].presence || event_record.start_at&.strftime('%H:%M')
-    end_time = changes['end_time'].presence || event_record.end_at&.strftime('%H:%M')
     duration_minutes = changes['duration_minutes'].to_i if changes['duration_minutes'].present?
+    end_time = changes['end_time'].presence
 
     return nil if date.to_s.empty?
 
@@ -1130,6 +1558,7 @@ class WebChatMessageHandler
         end_time = (base_time + duration_minutes.minutes).strftime('%H:%M')
       end
     end
+    end_time = event_record.end_at&.strftime('%H:%M') if end_time.to_s.empty?
 
     {
       'title' => changes['title'].presence || event_record.title,
@@ -1214,6 +1643,8 @@ class WebChatMessageHandler
   end
 
   def log_action(message, calendar_event_id:, calendar_id:, status:, action_type:, metadata: {})
+    metadata = metadata.dup
+    metadata[:correlation_id] = @correlation_id unless metadata.key?(:correlation_id) || metadata.key?('correlation_id')
     ChatAction.create!(
       chat_message: message,
       calendar_event_id: calendar_event_id,
@@ -1225,7 +1656,13 @@ class WebChatMessageHandler
     )
   end
 
-  def log_ai_request(message, usage, request_kind:, model:, status:, error_message: nil)
+  def ai_metadata(response: nil, request: nil, extra: {})
+    base_request = request || { text: @text, has_image: image_attached? }
+    { request: base_request, response: response, correlation_id: @correlation_id }.merge(extra).compact
+  end
+
+  def log_ai_request(message, usage, request_kind:, model:, status:, error_message: nil, metadata: {})
+    usage ||= {}
     AiRequest.create!(
       chat_message: message,
       transport: 'web',
@@ -1237,7 +1674,7 @@ class WebChatMessageHandler
       cost_usd: estimate_cost(usage, model),
       status: status,
       error_message: error_message,
-      usage_metadata: usage
+      usage_metadata: usage.merge('context' => metadata)
     )
   end
 
@@ -1263,7 +1700,7 @@ class WebChatMessageHandler
     end
   end
 
-  def build_response(text, event_created: false, action: nil)
-    { text: text, event_created: event_created, action: action }.compact
+  def build_response(text, event_created: false, action: nil, error_code: nil)
+    { text: text, event_created: event_created, action: action, error_code: error_code }.compact
   end
 end

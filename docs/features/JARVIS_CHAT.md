@@ -10,6 +10,14 @@ Date: 2026-01-02
 - Implemented: Slack + web chat flows using Gemini for intent + extraction.
 - Future/UX vision: Full chat UI with rich previews and edit/confirm flows (mockups below).
 
+## Reliability + Observability (Current)
+
+- Idempotency for create/update/delete within a short window to avoid duplicate actions.
+- Event selection snapshots are stored at selection time to prevent drift before confirmation.
+- Post-update verification re-fetches the event and flags partial updates.
+- Structured error codes are returned and logged for calendar actions.
+- Gemini + Google Calendar requests/responses are logged with correlation IDs for traceability.
+
 ## Product Vision
 
 ### Why Chat?

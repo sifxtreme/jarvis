@@ -105,6 +105,12 @@ class GoogleCalendarClient
     raise CalendarError, e.message
   end
 
+  def get_event(calendar_id:, event_id:)
+    @service.get_event(calendar_id, event_id)
+  rescue Google::Apis::Error => e
+    raise CalendarError, e.message
+  end
+
   def update_event(calendar_id:, event_id:, updates:)
     event = @service.get_event(calendar_id, event_id)
     event.summary = updates['title'] if updates['title']

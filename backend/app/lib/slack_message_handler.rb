@@ -1,9 +1,11 @@
 require 'base64'
 require 'net/http'
+require 'securerandom'
 
 class SlackMessageHandler
   def initialize(payload)
     @payload = payload.deep_stringify_keys
+    @correlation_id = SecureRandom.hex(10)
   end
 
   def process!
@@ -62,16 +64,38 @@ class SlackMessageHandler
     file = image_files.first
     base64 = download_file(file['url_private_download'] || file['url_private'])
     result = gemini.extract_event_from_image(base64, mime_type: file['mimetype'])
-    log_ai_request(message, result[:usage], request_kind: 'image', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
+    log_ai_request(
+      message,
+      result[:usage],
+      request_kind: 'image',
+      model: gemini_extract_model,
+      status: result[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: result[:event])
+    )
     handle_event_creation(message, result[:event])
   rescue StandardError => e
-    log_ai_request(message, {}, request_kind: 'image', model: gemini_extract_model, status: 'error', error_message: e.message)
+    log_ai_request(
+      message,
+      {},
+      request_kind: 'image',
+      model: gemini_extract_model,
+      status: 'error',
+      error_message: e.message,
+      metadata: ai_metadata
+    )
     "Image extraction error: #{e.message}"
   end
 
   def extract_from_text(message)
     result = gemini.extract_event_from_text(cleaned_text)
-    log_ai_request(message, result[:usage], request_kind: 'text', model: gemini_extract_model, status: result[:event]['error'] ? 'error' : 'success')
+    log_ai_request(
+      message,
+      result[:usage],
+      request_kind: 'text',
+      model: gemini_extract_model,
+      status: result[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: result[:event])
+    )
     handle_event_creation(message, result[:event])
   end
 
@@ -89,7 +113,7 @@ class SlackMessageHandler
 
   def handle_event_creation(message, event)
     if event['error']
-      log_action(message, calendar_event: nil, status: 'error', metadata: { error: event['message'] })
+    log_action(message, calendar_event: nil, status: 'error', metadata: { error: event['message'], correlation_id: @correlation_id })
       return render_extraction_result(event)
     end
 
@@ -128,7 +152,18 @@ class SlackMessageHandler
       source: 'slack'
     )
 
-    log_action(message, calendar_event: calendar_event, status: 'success')
+    log_action(
+      message,
+      calendar_event: calendar_event,
+      status: 'success',
+      metadata: {
+        event_id: calendar_event.event_id,
+        title: calendar_event.title,
+        calendar_request: { event: event, attendees: attendees, calendar_id: calendar_id },
+        calendar_response: result.to_h,
+        correlation_id: @correlation_id
+      }
+    )
 
     [
       "Added to your calendar! ✅",
@@ -206,7 +241,13 @@ class SlackMessageHandler
     )
   end
 
-  def log_ai_request(message, usage, request_kind:, model:, status:, error_message: nil)
+  def ai_metadata(response: nil, request: nil, extra: {})
+    base_request = request || { text: cleaned_text, has_image: image_files.any? }
+    { request: base_request, response: response, correlation_id: @correlation_id }.merge(extra).compact
+  end
+
+  def log_ai_request(message, usage, request_kind:, model:, status:, error_message: nil, metadata: {})
+    usage ||= {}
     AiRequest.create!(
       chat_message: message,
       transport: 'slack',
@@ -218,7 +259,7 @@ class SlackMessageHandler
       cost_usd: estimate_cost(usage, model),
       status: status,
       error_message: error_message,
-      usage_metadata: usage
+      usage_metadata: usage.merge('context' => metadata)
     )
   end
 
@@ -254,10 +295,25 @@ class SlackMessageHandler
 
   def classify_intent(message)
     result = gemini.classify_intent(text: cleaned_text, has_image: image_files.any?)
-    log_ai_request(message, result[:usage], request_kind: 'intent', model: gemini_intent_model, status: result[:event]['error'] ? 'error' : 'success')
+    log_ai_request(
+      message,
+      result[:usage],
+      request_kind: 'intent',
+      model: gemini_intent_model,
+      status: result[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: result[:event])
+    )
     result[:event]
   rescue StandardError => e
-    log_ai_request(message, {}, request_kind: 'intent', model: gemini_intent_model, status: 'error', error_message: e.message)
+    log_ai_request(
+      message,
+      {},
+      request_kind: 'intent',
+      model: gemini_intent_model,
+      status: 'error',
+      error_message: e.message,
+      metadata: ai_metadata
+    )
     { 'intent' => 'create_event' }
   end
 
@@ -303,6 +359,8 @@ class SlackMessageHandler
   end
 
   def log_action(message, calendar_event:, status:, metadata: {})
+    metadata = metadata.dup
+    metadata[:correlation_id] = @correlation_id unless metadata.key?(:correlation_id) || metadata.key?('correlation_id')
     ChatAction.create!(
       chat_message: message,
       calendar_event_id: calendar_event&.id,

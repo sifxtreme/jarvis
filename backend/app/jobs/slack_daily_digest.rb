@@ -1,4 +1,8 @@
 class SlackDailyDigest
+  def self.perform
+    new.perform
+  end
+
   def perform
     User.where(active: true).find_each do |user|
       slack_id = slack_user_id_for(user)
