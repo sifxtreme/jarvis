@@ -2,6 +2,7 @@ class SyncCalendarEvents
   @queue = :calendar
 
   WINDOW_DAYS = 30
+  PAST_DAYS = 7
 
   def self.perform
     sync_connections(CalendarConnection.where(sync_enabled: true).includes(:user))
@@ -19,7 +20,7 @@ class SyncCalendarEvents
       next if user.nil? || user.google_refresh_token.to_s.empty?
 
       client = GoogleCalendarClient.new(user)
-      time_min = Time.current.beginning_of_day
+      time_min = Time.current.beginning_of_day - PAST_DAYS.days
       time_max = time_min + WINDOW_DAYS.days
 
       if connection.busy_only

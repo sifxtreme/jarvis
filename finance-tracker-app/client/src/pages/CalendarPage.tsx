@@ -639,6 +639,16 @@ export default function CalendarPage() {
     return `${startLabel} – ${endLabel}`;
   }, [anchorDate, view, viewDays]);
 
+  const monthLabel = useMemo(() => {
+    const start = viewDays[0] || anchorDate;
+    const end = viewDays[viewDays.length - 1] || anchorDate;
+    if (view === "month") return format(anchorDate, "MMMM yyyy");
+    const startMonth = format(start, "MMM");
+    const endMonth = format(end, "MMM");
+    const year = format(end, "yyyy");
+    return startMonth === endMonth ? `${startMonth} ${year}` : `${startMonth}/${endMonth} ${year}`;
+  }, [anchorDate, view, viewDays]);
+
   const layoutDayEntries = (day: Date, dayEntries: CalendarEntry[]) => {
     const dayStart = startOfDay(day);
     const dayEnd = addDays(dayStart, 1);
@@ -694,6 +704,7 @@ export default function CalendarPage() {
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-6">
             <div className="flex items-baseline gap-2">
               <h1 className="text-2xl font-bold">Calendar</h1>
+              <span className="text-sm font-semibold text-muted-foreground">{monthLabel}</span>
               {isMobile && <span className="text-sm text-muted-foreground">{headerRange}</span>}
             </div>
             <div className="flex flex-wrap items-center gap-2 md:flex-nowrap">

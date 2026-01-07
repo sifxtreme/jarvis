@@ -49,7 +49,7 @@ class SlackMessageHandler
 
     case intent['intent']
     when 'list_events'
-      "I can list upcoming events soon. (Calendar querying comes next.)"
+      handle_list_events(message)
     when 'digest'
       "I can send daily/weekly digests soon. (Calendar querying comes next.)"
     when 'help'
@@ -199,6 +199,44 @@ class SlackMessageHandler
   rescue GoogleCalendarClient::CalendarError => e
     log_action(message, calendar_event: nil, status: 'error', metadata: { error: e.message })
     "Calendar error: #{e.message}"
+  end
+
+  def handle_list_events(message)
+    user = resolve_user(message)
+    unless user
+      return "I couldn't match your Slack user to a Jarvis account. Please sign in on the web app first."
+    end
+
+    query = gemini.extract_event_query_from_text(cleaned_text, context: nil)
+    log_ai_request(
+      message,
+      query[:usage],
+      request_kind: 'event_query',
+      model: gemini_intent_model,
+      status: query[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: query[:event])
+    )
+    data = query[:event] || {}
+    title = data['title'].to_s.strip
+    date = data['date'].to_s.strip
+
+    scope = CalendarEvent.where(user: user).where.not(status: 'cancelled')
+    scope = scope.where(start_at: Time.zone.now..(Time.zone.now + 90.days))
+    if date.present?
+      day = Date.parse(date) rescue nil
+      scope = scope.where(start_at: day.beginning_of_day..day.end_of_day) if day
+    end
+    scope = scope.where("title ILIKE ?", "%#{title}%") if title.present?
+    events = scope.order(:start_at).limit(5).to_a
+
+    if events.empty?
+      return "I couldn't find any upcoming events that match."
+    end
+
+    lines = events.map { |event| format_event_brief(event) }
+    title.present? ? "Here are the next matches:\n#{lines.join("\n")}" : "Here are the next events:\n#{lines.join("\n")}"
+  rescue StandardError => e
+    "List error: #{e.message}"
   end
 
   def primary_calendar_id_for(user)
@@ -380,6 +418,16 @@ class SlackMessageHandler
     return nil if result.start&.date
 
     result.start&.date_time&.strftime('%H:%M')
+  end
+
+  def format_event_brief(event)
+    return event.title.to_s if event.start_at.nil?
+
+    date_label = event.start_at.strftime('%b %d')
+    time_label = event.start_at.strftime('%H:%M')
+    end_label = event.end_at ? event.end_at.strftime('%H:%M') : nil
+    time_range = end_label ? "#{time_label}-#{end_label}" : time_label
+    "#{date_label} #{time_range} - #{event.title}"
   end
 
   def build_recurrence_rules(recurrence, start_date: nil)

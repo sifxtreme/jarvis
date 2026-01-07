@@ -7,7 +7,7 @@ Date: 2026-01-02
 
 ## Status (Current vs Future)
 
-- Implemented: Slack + web chat flows using Gemini for intent + extraction.
+- Implemented: Slack + web chat flows using Gemini for intent + extraction, including upcoming event queries.
 - Future/UX vision: Full chat UI with rich previews and edit/confirm flows (mockups below).
 
 ## Reliability + Observability (Current)
@@ -79,6 +79,13 @@ With Jarvis:
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+## What Chat Can Answer (Current)
+
+- Create events from text or images (Slack + web).
+- Update or delete events with confirm flows (supports recurring scope: this event vs series).
+- List upcoming events and answer “when is the next ___?” style queries.
+- Add transactions and save/search memories.
 
 ### After Sending a Screenshot
 

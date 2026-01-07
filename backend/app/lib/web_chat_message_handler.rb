@@ -49,7 +49,7 @@ class WebChatMessageHandler
     when 'search_memory'
       handle_search_memory
     when 'list_events'
-      build_response("I can list upcoming events soon. (Calendar querying comes next.)")
+      handle_list_events
     when 'digest'
       build_response("I can send daily/weekly digests soon. (Calendar querying comes next.)")
     when 'help'
@@ -598,6 +598,66 @@ class WebChatMessageHandler
     confirm_or_delete_event(candidates.first[:event])
   rescue StandardError => e
     build_response("Delete error: #{e.message}")
+  end
+
+  def handle_list_events
+    query = gemini.extract_event_query_from_text(@text, context: recent_context_text)
+    log_ai_request(
+      @message,
+      query[:usage],
+      request_kind: 'event_query',
+      model: gemini_intent_model,
+      status: query[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: query[:event])
+    )
+    data = query[:event] || {}
+
+    title = data['title'].to_s.strip
+    date = data['date'].to_s.strip
+    scope = CalendarEvent.where(user: @user).where.not(status: 'cancelled')
+    start_at = Time.zone.now
+    end_at = start_at + CALENDAR_WINDOW_FUTURE_DAYS.days
+    scope = scope.where(start_at: start_at..end_at)
+
+    if date.present?
+      day = Date.parse(date) rescue nil
+      scope = scope.where(start_at: day.beginning_of_day..day.end_of_day) if day
+    end
+
+    if title.present?
+      scope = scope.where("title ILIKE ?", "%#{title}%")
+    end
+
+    events = scope.order(:start_at).limit(5).to_a
+    if events.empty? && title.present?
+      events = fuzzy_event_candidates(title).map { |entry| entry[:event] }
+    end
+
+    if events.empty?
+      log_action(
+        @message,
+        calendar_event_id: nil,
+        calendar_id: nil,
+        status: 'success',
+        action_type: 'list_events',
+        metadata: { query: data, result_count: 0 }
+      )
+      return build_response("I couldn't find any upcoming events that match.")
+    end
+
+    lines = events.map { |event| format_event_brief(event) }
+    response = title.present? ? "Here are the next matches:\n#{lines.join("\n")}" : "Here are the next events:\n#{lines.join("\n")}"
+    log_action(
+      @message,
+      calendar_event_id: nil,
+      calendar_id: nil,
+      status: 'success',
+      action_type: 'list_events',
+      metadata: { query: data, result_count: events.length }
+    )
+    build_response(response)
+  rescue StandardError => e
+    build_response("List error: #{e.message}")
   end
 
   def handle_delete_target_clarification(_payload)
@@ -1273,6 +1333,16 @@ class WebChatMessageHandler
       (event.start_at ? "Date: #{event.start_at.to_date}" : nil),
       (event.start_at ? "Time: #{event.start_at.strftime('%H:%M')}" : nil)
     ].compact.join("\n")
+  end
+
+  def format_event_brief(event)
+    return event.title.to_s if event.start_at.nil?
+
+    date_label = event.start_at.strftime('%b %d')
+    time_label = event.start_at.strftime('%H:%M')
+    end_label = event.end_at ? event.end_at.strftime('%H:%M') : nil
+    time_range = end_label ? "#{time_label}-#{end_label}" : time_label
+    "#{date_label} #{time_range} - #{event.title}"
   end
 
   def format_event_changes(event_record, changes)
