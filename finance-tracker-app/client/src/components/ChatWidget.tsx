@@ -35,7 +35,7 @@ export function ChatWidget() {
   return (
     <div
       className={cn(
-        "fixed inset-0 z-50 flex flex-col items-end gap-3 sm:bottom-5 sm:right-5 sm:inset-auto",
+        "fixed inset-0 z-50 flex flex-col items-end gap-3 sm:bottom-5 sm:right-5 sm:top-auto sm:left-auto",
         isOpen ? "pointer-events-auto" : "pointer-events-none"
       )}
     >
