@@ -108,7 +108,7 @@ export function Navbar() {
       {/* Mobile Nav */}
       {mobileMenuOpen && (
         <div className="md:hidden border-t px-4 py-2 space-y-1">
-          {navItems.map((item) => {
+          {navItems.filter((item) => item.path !== "/trends").map((item) => {
             const isActive = location.pathname === item.path;
             return (
               <Link
@@ -127,21 +127,6 @@ export function Navbar() {
               </Link>
             );
           })}
-          <Link
-            to="/teller-repair"
-            onClick={() => setMobileMenuOpen(false)}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
-          >
-            <Settings className="h-4 w-4" />
-            Teller Repair
-          </Link>
-          <button
-            onClick={connectCalendar}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted w-full"
-            disabled={calendarConnecting}
-          >
-            {calendarConnecting ? "Connecting..." : "Connect Calendar"}
-          </button>
           <button
             onClick={toggleTheme}
             className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted w-full"
