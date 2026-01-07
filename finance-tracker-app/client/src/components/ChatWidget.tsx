@@ -25,7 +25,12 @@ export function ChatWidget() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-end gap-3 sm:bottom-5 sm:right-5 sm:inset-auto">
+    <div
+      className={cn(
+        "fixed inset-0 z-50 flex flex-col items-end gap-3 sm:bottom-5 sm:right-5 sm:inset-auto",
+        isOpen ? "pointer-events-auto" : "pointer-events-none"
+      )}
+    >
       <div
         className={cn(
           "w-full transition-all duration-200 sm:w-[380px]",
@@ -58,7 +63,7 @@ export function ChatWidget() {
       <Button
         type="button"
         size="lg"
-        className={cn("h-12 rounded-full px-5 shadow-lg sm:flex", isOpen ? "hidden" : "flex")}
+        className={cn("h-12 rounded-full px-5 shadow-lg sm:flex pointer-events-auto", isOpen ? "hidden" : "flex")}
         onClick={() => setIsOpen((prev) => !prev)}
         aria-label={isOpen ? "Hide chat" : "Open chat"}
       >
