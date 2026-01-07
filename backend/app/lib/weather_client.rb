@@ -36,6 +36,7 @@ class WeatherClient
       latitude: latitude,
       longitude: longitude,
       hourly: 'temperature_2m,precipitation_probability,weathercode',
+      temperature_unit: 'fahrenheit',
       timezone: time_zone
     )
 
@@ -88,13 +89,13 @@ class WeatherClient
     summary.map do |hour, data|
       next unless data
       label = format_hour(hour)
-      temp = data[:temp] ? "#{data[:temp]}°" : "—"
+      temp = data[:temp] ? "#{data[:temp].round}°F" : "—"
       emoji = weather_emoji(data[:code])
       precip = data[:precip] ? "#{data[:precip]}%" : nil
       pieces = [label, "#{temp}#{emoji}"]
-      pieces << "☔️#{precip}" if precip
+      pieces << "☔️#{precip}" if data[:precip].to_f >= 10
       pieces.join(' ')
-    end.compact.join(' • ')
+    end.compact.join("\n")
   end
 
   def format_hour(hour)
