@@ -143,6 +143,13 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
         setMessages((response.messages || []).map(mapMessage));
         setHasMore(Boolean(response.has_more));
         setBeforeId(response.next_before_id ?? null);
+        requestAnimationFrame(() => {
+          const container = scrollRef.current;
+          if (!container) return;
+          container.scrollTop = container.scrollHeight;
+          shouldAutoScrollRef.current = true;
+          setShowJumpToLatest(false);
+        });
       } catch (error) {
         console.error("Failed to load chat messages", error);
       } finally {

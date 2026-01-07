@@ -151,6 +151,28 @@ class GoogleCalendarClient
     raise CalendarError, e.message
   end
 
+  def detach_instance(calendar_id:, instance_id:, event: nil)
+    instance = event || @service.get_event(calendar_id, instance_id)
+    detached = Google::Apis::CalendarV3::Event.new(
+      summary: instance.summary,
+      location: instance.location,
+      description: instance.description,
+      start: instance.start,
+      end: instance.end,
+      attendees: instance.attendees,
+      reminders: instance.reminders,
+      guests_can_modify: instance.guests_can_modify,
+      guests_can_invite_others: instance.guests_can_invite_others,
+      guests_can_see_other_guests: instance.guests_can_see_other_guests,
+      extended_properties: instance.extended_properties
+    )
+    created = @service.insert_event(calendar_id, detached)
+    @service.delete_event(calendar_id, instance_id)
+    created
+  rescue Google::Apis::Error => e
+    raise CalendarError, e.message
+  end
+
   private
 
   def build_oauth_client

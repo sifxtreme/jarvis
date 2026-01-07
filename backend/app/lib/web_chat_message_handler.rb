@@ -1186,8 +1186,17 @@ class WebChatMessageHandler
       verification = { verified: false, error: e.message }
     end
 
-    event_source = verified_event || result
-    event_record.update!(
+    detached_instance = nil
+    if scope == 'instance' && updates['recurrence_clear']
+      detached_instance = client.detach_instance(
+        calendar_id: event_record.calendar_id,
+        instance_id: target_event_id,
+        event: verified_event || result
+      )
+    end
+
+    event_source = detached_instance || verified_event || result
+    update_payload = {
       title: event_source.summary,
       description: event_source.description,
       location: event_source.location,
@@ -1195,7 +1204,9 @@ class WebChatMessageHandler
       end_at: event_source.end&.date_time || event_source.end&.date,
       raw_event: event_source.to_h,
       status: 'active'
-    )
+    }
+    update_payload[:event_id] = event_source.id if detached_instance
+    event_record.update!(update_payload)
 
     log_action(
       @message,
@@ -1210,6 +1221,8 @@ class WebChatMessageHandler
         updates: updates,
         snapshot: snapshot,
         calendar_response: event_source.to_h,
+        detached_instance_id: detached_instance ? target_event_id : nil,
+        detached_event_id: detached_instance&.id,
         verification: verification,
         scope: scope,
         correlation_id: @correlation_id
@@ -1225,6 +1238,10 @@ class WebChatMessageHandler
         action: 'calendar_event_updated',
         error_code: 'calendar_update_partial'
       )
+    end
+
+    if detached_instance
+      return build_response("Updated the event and detached this instance from the series. ✅", event_created: true, action: 'calendar_event_updated')
     end
 
     build_response("Updated the event. ✅", event_created: true, action: 'calendar_event_updated')

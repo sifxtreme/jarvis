@@ -59,7 +59,7 @@ class SlackDailyDigest
           error: e.message,
           response: {
             type: e.class.name,
-            slack_error: e.respond_to?(:response) ? e.response&.data : nil
+            slack_error: slack_error_payload(e)
           }
         )
         Rails.logger.error "[SlackDigest] Failed to post digest user_id=#{user.id}: #{e.message}"
@@ -137,9 +137,22 @@ class SlackDailyDigest
       error: {
         type: e.class.name,
         message: e.message,
-        slack_error: e.respond_to?(:response) ? e.response&.data : nil
+        slack_error: slack_error_payload(e)
       }
     }
+  end
+
+  def slack_error_payload(error)
+    return nil unless error.respond_to?(:response)
+
+    response = error.response
+    {
+      status: response&.status,
+      headers: response&.headers,
+      body: response&.body
+    }
+  rescue StandardError
+    nil
   end
 
   def client
