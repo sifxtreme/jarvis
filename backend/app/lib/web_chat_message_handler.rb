@@ -309,7 +309,7 @@ class WebChatMessageHandler
       clear_thread_state
       return build_response(event['message'] || "I couldn't find event details.")
     end
-    event['recurrence'] = normalize_recurrence(event['recurrence']) || recurrence_from_text(@text)
+    event['recurrence'] = normalize_recurrence(event['recurrence'])
     missing = missing_event_fields(event)
     confidence = normalize_confidence(event['confidence'])
 
@@ -349,7 +349,7 @@ class WebChatMessageHandler
     end
     missing = missing_event_fields(updated)
     confidence = normalize_confidence(updated['confidence'])
-    updated['recurrence'] = normalize_recurrence(updated['recurrence']) || recurrence_from_text(@text)
+    updated['recurrence'] = normalize_recurrence(updated['recurrence'])
 
     if missing.any?
       set_pending_action('clarify_event_fields', { 'event' => updated, 'missing_fields' => missing })
@@ -395,9 +395,7 @@ class WebChatMessageHandler
     duration_minutes = parse_duration_minutes(@text)
     changes['duration_minutes'] = duration_minutes if duration_minutes
     changes['recurrence'] = normalize_recurrence(changes['recurrence'])
-    changes['recurrence_clear'] = true if recurrence_clear_requested?(@text)
-    changes['recurrence'] = normalize_recurrence(changes['recurrence'])
-    changes['recurrence_clear'] = true if recurrence_clear_requested?(@text)
+    changes['recurrence_clear'] = true if changes['recurrence_clear']
     if changes.empty?
       set_pending_action('clarify_update_changes', { 'target' => (data['target'] || {}).compact })
       return build_response("What should I change about the event?")
@@ -484,6 +482,8 @@ class WebChatMessageHandler
     changes['confidence'] = data['confidence'] if data['confidence']
     duration_minutes = parse_duration_minutes(@text)
     changes['duration_minutes'] = duration_minutes if duration_minutes
+    changes['recurrence'] = normalize_recurrence(changes['recurrence'])
+    changes['recurrence_clear'] = true if changes['recurrence_clear']
 
     if changes.empty?
       return build_response("I still need what to change (time, date, title, etc.).")
@@ -536,7 +536,30 @@ class WebChatMessageHandler
 
     if affirmative?
       clear_thread_state
-      return apply_event_update(event_record, changes, snapshot: snapshot)
+      updated_changes = changes.dup
+      updated_changes['recurrence'] = normalize_recurrence(updated_changes['recurrence'])
+
+      directive = resolve_recurring_scope(@text)
+      updated_changes['recurrence_clear'] = true if updated_changes['recurrence_clear'] || directive[:recurrence_clear]
+
+      scope = updated_changes['recurring_scope'] || directive[:scope]
+      if recurring_event?(event_record) && scope.nil?
+        set_pending_action(
+          'clarify_recurring_scope',
+          { 'event_id' => event_record.id, 'changes' => updated_changes, 'snapshot' => snapshot, 'action' => 'update' }
+        )
+        return build_response("This event repeats. Update just this event or the whole series? Reply \"this\" or \"all\".")
+      end
+      if scope == 'instance' && (updated_changes['recurrence'] || updated_changes['recurrence_clear'])
+        set_pending_action(
+          'clarify_recurring_scope',
+          { 'event_id' => event_record.id, 'changes' => updated_changes, 'snapshot' => snapshot, 'action' => 'update' }
+        )
+        return build_response("Recurrence changes apply to the whole series. Update the series instead? Reply \"all\" or \"this\" to pick.")
+      end
+      updated_changes['recurring_scope'] = scope if scope
+
+      return apply_event_update(event_record, updated_changes, snapshot: snapshot)
     end
 
     clear_thread_state
@@ -545,7 +568,7 @@ class WebChatMessageHandler
 
   def confirm_or_update_event(event_record, changes)
     confidence = normalize_confidence(changes['confidence'])
-    scope = changes['recurring_scope'] || recurring_scope_from_text(@text)
+    scope = changes['recurring_scope'] || resolve_recurring_scope(@text)[:scope]
     if recurring_event?(event_record) && scope.nil?
       set_pending_action(
         'clarify_recurring_scope',
@@ -754,7 +777,7 @@ class WebChatMessageHandler
   end
 
   def confirm_or_delete_event(event_record)
-    scope = recurring_scope_from_text(@text)
+    scope = resolve_recurring_scope(@text)[:scope]
     if recurring_event?(event_record) && scope.nil?
       set_pending_action(
         'clarify_recurring_scope',
@@ -772,7 +795,7 @@ class WebChatMessageHandler
   def handle_delete_confirmation(payload)
     event_id = payload['event_id']
     snapshot = payload['snapshot']
-    scope = payload['recurring_scope'] || recurring_scope_from_text(@text)
+    scope = payload['recurring_scope'] || resolve_recurring_scope(@text)[:scope]
     event_record = CalendarEvent.find_by(id: event_id)
     unless event_record
       calendar_id = snapshot.is_a?(Hash) ? (snapshot['calendar_id'] || snapshot[:calendar_id]) : nil
@@ -797,7 +820,7 @@ class WebChatMessageHandler
   end
 
   def handle_recurring_scope_clarification(payload)
-    scope = recurring_scope_from_text(@text)
+    scope = resolve_recurring_scope(@text)[:scope]
     return build_response("Reply \"this\" to change only this event or \"all\" for the whole series.") unless scope
 
     event_record = CalendarEvent.find_by(id: payload['event_id'])
@@ -1853,11 +1876,6 @@ class WebChatMessageHandler
     nil
   end
 
-  def recurrence_clear_requested?(text)
-    normalized = text.to_s.downcase
-    normalized.match?(/\b(one[- ]?time|not recurring|stop repeating|stop recurring|remove recurrence|no longer recurring)\b/)
-  end
-
   def normalize_recurrence(recurrence)
     return nil if recurrence.nil?
 
@@ -1880,54 +1898,6 @@ class WebChatMessageHandler
     data
   end
 
-  def recurrence_from_text(text)
-    normalized = text.to_s.downcase
-    return nil if normalized.empty?
-
-    return { 'frequency' => 'daily' } if normalized.match?(/\b(daily|every day)\b/)
-    return { 'frequency' => 'weekly', 'interval' => 2 } if normalized.match?(/\bevery other week\b/)
-    return { 'frequency' => 'weekly' } if normalized.match?(/\b(weekly|every week)\b/)
-    return { 'frequency' => 'monthly' } if normalized.match?(/\b(monthly|every month)\b/)
-    return { 'frequency' => 'yearly' } if normalized.match?(/\b(yearly|annually|every year)\b/)
-
-    if normalized.match?(/\b(weekdays|weekday)\b/)
-      return { 'frequency' => 'weekly', 'by_day' => %w[MO TU WE TH FR] }
-    end
-
-    if normalized.match?(/\b(weekends|weekend)\b/)
-      return { 'frequency' => 'weekly', 'by_day' => %w[SA SU] }
-    end
-
-    days = parse_day_list(normalized)
-    return { 'frequency' => 'weekly', 'by_day' => days } if days.any?
-
-    nil
-  end
-
-  def parse_day_list(text)
-    day_map = {
-      'monday' => 'MO',
-      'mon' => 'MO',
-      'tuesday' => 'TU',
-      'tue' => 'TU',
-      'tues' => 'TU',
-      'wednesday' => 'WE',
-      'wed' => 'WE',
-      'thursday' => 'TH',
-      'thu' => 'TH',
-      'thurs' => 'TH',
-      'friday' => 'FR',
-      'fri' => 'FR',
-      'saturday' => 'SA',
-      'sat' => 'SA',
-      'sunday' => 'SU',
-      'sun' => 'SU'
-    }
-
-    day_map.each_with_object([]) do |(name, code), days|
-      days << code if text.match?(/\b#{Regexp.escape(name)}\b/)
-    end.uniq
-  end
 
   def build_recurrence_rules(recurrence, start_date: nil)
     return nil if recurrence.nil?
@@ -1972,15 +1942,6 @@ class WebChatMessageHandler
     ["RRULE:#{parts.join(';')}"]
   end
 
-  def recurring_scope_from_text(text)
-    normalized = text.to_s.downcase
-    return nil if normalized.empty?
-
-    return 'instance' if normalized.match?(/\b(this|just this|only this|this one|this event)\b/)
-    return 'series' if normalized.match?(/\b(entire series|whole series|series|recurring|all future|all events|every occurrence)\b/)
-
-    nil
-  end
 
   def recurring_event?(event_record)
     raw = event_record.raw_event || {}
@@ -2154,6 +2115,27 @@ class WebChatMessageHandler
   def ai_metadata(response: nil, request: nil, extra: {})
     base_request = request || { text: @text, has_image: image_attached? }
     { request: base_request, response: response, correlation_id: @correlation_id }.merge(extra).compact
+  end
+
+  def resolve_recurring_scope(text)
+    result = gemini.extract_recurring_scope_from_text(text, context: recent_context_text)
+    log_ai_request(
+      @message,
+      result[:usage],
+      request_kind: 'recurring_scope',
+      model: gemini_intent_model,
+      status: result[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: result[:event])
+    )
+    data = result[:event] || {}
+    scope = data['recurring_scope'].to_s
+    scope = nil if scope.empty? || scope == 'unspecified'
+    {
+      scope: scope,
+      recurrence_clear: data['recurrence_clear'] == true
+    }
+  rescue StandardError
+    { scope: nil, recurrence_clear: false }
   end
 
   def log_ai_request(message, usage, request_kind:, model:, status:, error_message: nil, metadata: {})

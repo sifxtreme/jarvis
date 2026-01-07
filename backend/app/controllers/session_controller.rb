@@ -1,28 +1,34 @@
 class SessionController < ActionController::API
   include ActionController::Cookies
   include GoogleAuth
+  include JwtAuth
 
   def create
     token = params[:id_token].to_s
     authenticate_google_token!(token)
     return if performed?
 
-    session[:user_email] = @current_user_email
-    render json: { success: true }
+    jwt = issue_jwt(@current_user_email)
+    render json: {
+      token: jwt[:token],
+      expires_at: Time.at(jwt[:exp]).iso8601
+    }
   end
 
   def show
-    email = session[:user_email].to_s
-    if email.present? && allowed_emails.include?(email)
-      render json: { authenticated: true, email: email }
-    else
-      reset_session
-      render json: { authenticated: false }, status: :unauthorized
+    token = bearer_token
+    payload = token.present? ? decode_jwt(token) : nil
+    if payload && allowed_emails.include?(payload['sub'])
+      render json: { authenticated: true, email: payload['sub'] }
+      return
     end
+
+    render json: { authenticated: false }, status: :unauthorized
   end
 
   def destroy
-    reset_session
+    token = bearer_token
+    revoke_jwt(token) if token.present?
     render json: { success: true }
   end
 end

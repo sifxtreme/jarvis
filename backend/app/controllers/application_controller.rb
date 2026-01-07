@@ -1,6 +1,7 @@
 class ApplicationController < ActionController::API
   include ActionController::Cookies
   include GoogleAuth
+  include JwtAuth
   include PaperTrail::Rails::Controller
 
   before_action :validate_header
@@ -11,12 +12,14 @@ class ApplicationController < ActionController::API
 
     Rails.logger.tagged("AUTH") { Rails.logger.warn "Validating authorization header: #{request.headers['Authorization']}" }
 
-    if session[:user_email].present?
-      @current_user_email = session[:user_email]
-      return
-    end
+    token = bearer_token
+    if token.present?
+      payload = decode_jwt(token)
+      if payload
+        @current_user_email = payload['sub']
+        return
+      end
 
-    if allow_google_auth?
       authenticate_google!
       return
     end

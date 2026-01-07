@@ -22,6 +22,7 @@ gem 'omniauth-rails_csrf_protection', '~> 1.0'
 gem 'aws-sdk-s3', '~> 1.48'
 gem 'image_processing', '~> 1.12'
 gem 'mini_magick', '~> 4.12'
+gem 'jwt', '~> 2.7'
 
 gem 'rack-cors', '~> 1.0.5', require: 'rack/cors' # allow cors requests (good for local development against production server)
 

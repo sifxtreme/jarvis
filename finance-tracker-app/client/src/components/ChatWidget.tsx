@@ -41,7 +41,7 @@ export function ChatWidget() {
     >
       <div
         className={cn(
-          "w-full transition-all duration-200 sm:w-[380px]",
+          "w-full transition-all duration-200 sm:w-[420px]",
           isOpen ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-4 opacity-0"
         )}
       >

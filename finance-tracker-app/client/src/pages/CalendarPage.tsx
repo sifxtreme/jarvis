@@ -192,6 +192,7 @@ export default function CalendarPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const isMobile = useIsMobile();
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollRestoreRef = useRef<number | null>(null);
   const [scrollbarWidth, setScrollbarWidth] = useState(0);
   const pendingDayRef = useRef<Date | null>(null);
   const [deletingEventId, setDeletingEventId] = useState<number | null>(null);
@@ -219,7 +220,12 @@ export default function CalendarPage() {
   }, []);
 
   useEffect(() => {
-    const handleCreated = () => setRefreshKey((current) => current + 1);
+    const handleCreated = () => {
+      if (scrollRef.current) {
+        scrollRestoreRef.current = scrollRef.current.scrollTop;
+      }
+      setRefreshKey((current) => current + 1);
+    };
     window.addEventListener("jarvis:calendar-event-created", handleCreated);
     window.addEventListener("jarvis:calendar-changed", handleCreated);
     return () => {
@@ -227,6 +233,16 @@ export default function CalendarPage() {
       window.removeEventListener("jarvis:calendar-changed", handleCreated);
     };
   }, []);
+
+  useEffect(() => {
+    if (loading || !scrollRef.current) return;
+    if (scrollRestoreRef.current === null) return;
+    const top = scrollRestoreRef.current;
+    scrollRestoreRef.current = null;
+    requestAnimationFrame(() => {
+      if (scrollRef.current) scrollRef.current.scrollTop = top;
+    });
+  }, [loading, data, view]);
 
   useEffect(() => {
     const cached = localStorage.getItem(GEO_CACHE_KEY);

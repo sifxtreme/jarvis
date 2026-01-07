@@ -83,6 +83,13 @@ class GeminiVision
     parse_json_response(response)
   end
 
+  def extract_recurring_scope_from_text(text, context: nil)
+    parts = [{ text: recurring_scope_prompt(text, context: context) }]
+
+    response = make_request(parts: parts, model: DEFAULT_INTENT_MODEL)
+    parse_json_response(response)
+  end
+
   private
 
   def make_request(parts:, model:)
@@ -436,6 +443,8 @@ class GeminiVision
             "count": 10,
             "until": "YYYY-MM-DD"
           },
+          "recurrence_clear": true,
+          "recurring_scope": "instance|series|unspecified",
           "location": "New location",
           "description": "New description"
         }
@@ -446,6 +455,26 @@ class GeminiVision
         "error": "no_changes",
         "message": "Missing update details."
       }
+
+      Text:
+      "#{text}"
+    PROMPT
+  end
+
+  def recurring_scope_prompt(text, context: nil)
+    context_block = format_context_block(context)
+    <<~PROMPT
+      #{context_block}Determine whether the user wants to change just this event or the whole recurring series. Return JSON:
+      {
+        "recurring_scope": "instance|series|unspecified",
+        "recurrence_clear": true|false
+      }
+
+      Rules:
+      - "this", "just this", "only this", "this one" => instance
+      - "all", "every", "whole series", "all future", "series" => series
+      - If unclear, use "unspecified".
+      - If the user says "not recurring", "stop repeating", "remove recurrence", set recurrence_clear to true.
 
       Text:
       "#{text}"

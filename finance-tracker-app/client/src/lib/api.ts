@@ -4,6 +4,7 @@ import { create } from 'zustand';
 
 // Define constants first
 export const API_BASE_URL = 'https://sifxtre.me/api';
+const AUTH_TOKEN_KEY = 'jarvis_auth_token';
 
 interface AuthStore {
   showAuthModal: boolean;
@@ -19,6 +20,22 @@ export const useAuthStore = create<AuthStore>((set) => ({
   setIsAuthenticated: (authenticated) => set({ isAuthenticated: authenticated }),
 }));
 
+export const getAuthToken = (): string | null => {
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+};
+
+export const setAuthToken = (token: string): void => {
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
+};
+
+export const clearAuthToken = (): void => {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+};
+
 // Create an axios instance
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -31,6 +48,7 @@ axiosInstance.interceptors.response.use(
   error => {
     if (error.response?.status === 401) {
       // If we get a 401, we know we're unauthenticated
+      clearAuthToken();
       useAuthStore.getState().setIsAuthenticated(false);
       useAuthStore.getState().setShowAuthModal(true);
     } else {
@@ -69,12 +87,17 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 
 // Add request interceptor to update auth header
 axiosInstance.interceptors.request.use(config => {
-  config.headers.Authorization = undefined;
+  const token = getAuthToken();
+  config.headers.Authorization = token ? `Bearer ${token}` : undefined;
   return config;
 });
 
 // Function to verify if the current API key is valid
 export const verifyAuthentication = async (): Promise<boolean> => {
+  const token = getAuthToken();
+  if (!token) {
+    return false;
+  }
   try {
     // Verify session cookie
     await axiosInstance.get('/auth/session', {
@@ -99,6 +122,7 @@ export const setAuthentication = (): void => {
 
 // Function to clear authentication
 export const clearAuthentication = (): void => {
+  clearAuthToken();
   useAuthStore.getState().setIsAuthenticated(false);
 };
 
@@ -107,11 +131,15 @@ export const getGoogleCalendarAuthUrl = async (): Promise<string> => {
 };
 
 export const createSession = async (idToken: string): Promise<void> => {
-  await axiosInstance.post('/auth/session', { id_token: idToken });
+  const response = await axiosInstance.post<{ token: string }>('/auth/session', { id_token: idToken });
+  if (response.data?.token) {
+    setAuthToken(response.data.token);
+  }
 };
 
 export const destroySession = async (): Promise<void> => {
   await axiosInstance.delete('/auth/session');
+  clearAuthToken();
 };
 
 export type CalendarItem = {

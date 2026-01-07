@@ -73,6 +73,52 @@ const dispatchDataRefresh = (action?: string | null) => {
   }
 };
 
+const linkifyText = (text: string) => {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  return parts.map((part, index) => {
+    if (!part.match(urlRegex)) {
+      return <span key={index}>{part}</span>;
+    }
+    return (
+      <a
+        key={index}
+        href={part}
+        target="_blank"
+        rel="noreferrer"
+        className="text-blue-600 underline underline-offset-2 break-words dark:text-blue-300"
+      >
+        {part}
+      </a>
+    );
+  });
+};
+
+const renderMessageText = (text: string) => {
+  const lines = text.split("\n");
+  const header = lines[0]?.trim() || "";
+  const isListHeader =
+    header.startsWith("Here are the next matches:") || header.startsWith("Here are the next events:");
+
+  if (isListHeader) {
+    return (
+      <div className="space-y-2">
+        <div className="font-medium">{linkifyText(header)}</div>
+        <ul className="space-y-1">
+          {lines.slice(1).filter(Boolean).map((line, index) => (
+            <li key={index} className="flex gap-2">
+              <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400/80 dark:bg-slate-500" />
+              <span className="flex-1">{linkifyText(line.trim())}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
+  return <div className="whitespace-pre-wrap">{linkifyText(text)}</div>;
+};
+
 export function ChatPanel({ onEventCreated }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
@@ -358,7 +404,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
                               className="max-h-64 w-full rounded-lg object-cover"
                             />
                           )}
-                          {message.text && <div className="whitespace-pre-wrap">{message.text}</div>}
+                          {message.text && renderMessageText(message.text)}
                         </div>
                       )}
                     </div>
