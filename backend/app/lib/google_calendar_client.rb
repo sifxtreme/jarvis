@@ -53,8 +53,8 @@ class GoogleCalendarClient
       description: event['description'],
       start: start_field,
       end: end_field,
-      recurrence: recurrence_rules,
-      attendees: attendees.map { |email| Google::Apis::CalendarV3::EventAttendee.new(email: email) },
+      recurrence: Array(recurrence_rules),
+      attendees: Array(attendees).map { |email| Google::Apis::CalendarV3::EventAttendee.new(email: email) },
       guests_can_modify: guests_can_modify,
       guests_can_invite_others: true,
       guests_can_see_other_guests: true
