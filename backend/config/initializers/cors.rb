@@ -9,8 +9,9 @@ Rails.application.config.middleware.insert_before 0, Rack::Cors do
   allow do
     origins 'https://finances.sifxtre.me', 'http://localhost:3001'
     resource '*',
-    headers: :any,
+    headers: %w[Authorization Content-Type],
+    expose: %w[Authorization],
     methods: [:get, :post, :put, :patch, :delete, :options, :head],
-    credentials: true
+    credentials: false
   end
 end

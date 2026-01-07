@@ -14,13 +14,21 @@ module JwtAuth
       exp: exp
     }
     token = JWT.encode(payload, jwt_secret, 'HS256')
+    JwtSession.create!(jti: jti, email: email, expires_at: Time.at(exp))
     jwt_store.write(jti, exp - now)
     { token: token, exp: exp, jti: jti }
   end
 
   def decode_jwt(token)
     payload, = JWT.decode(token, jwt_secret, true, { algorithm: 'HS256' })
-    return nil unless jwt_store.valid?(payload['jti'])
+    session = JwtSession.find_by(jti: payload['jti'])
+    return nil unless session
+    return nil if session.revoked_at.present? || session.expires_at <= Time.current
+
+    begin
+      jwt_store.write(session.jti, (session.expires_at.to_i - Time.current.to_i)) unless jwt_store.valid?(session.jti)
+    rescue StandardError
+    end
 
     payload
   rescue JWT::DecodeError
@@ -38,6 +46,7 @@ module JwtAuth
     payload = decode_jwt_for_revoke(token)
     return false unless payload && payload['jti']
 
+    JwtSession.where(jti: payload['jti']).update_all(revoked_at: Time.current)
     jwt_store.revoke(payload['jti'])
     true
   end
