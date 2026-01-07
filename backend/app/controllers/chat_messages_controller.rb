@@ -75,6 +75,12 @@ class ChatMessagesController < ApplicationController
     }
   rescue StandardError => e
     Rails.logger.error "[Chat] Failed to process message: #{e.message}"
+    thread_state = defined?(thread) && thread ? thread.state || {} : {}
+    action_context = {
+      pending_action: thread_state['pending_action'],
+      payload: thread_state['payload'],
+      last_action: thread_state['last_action']
+    }.compact
     if defined?(user_message) && user_message
       ChatAction.create!(
         chat_message: user_message,
@@ -87,11 +93,18 @@ class ChatMessagesController < ApplicationController
           error: e.message,
           error_code: 'chat_processing_failed',
           request_id: request.request_id,
-          backtrace: e.backtrace&.first(10)
+          backtrace: e.backtrace&.first(10),
+          action_context: action_context,
+          message_text: user_message.text
         }
       )
     end
-    render json: { error: e.message }, status: :internal_server_error
+    render json: {
+      error: e.message,
+      error_code: 'chat_processing_failed',
+      request_id: request.request_id,
+      action_context: action_context
+    }, status: :internal_server_error
   end
 
   private

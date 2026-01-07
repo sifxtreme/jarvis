@@ -77,8 +77,9 @@ class SlackDailyDigest
                           .order(:start_at)
 
     weather_lines = weather_for(user)
+    busy_lines = busy_blocks_for(user, today)
 
-    return nil if events.empty? && (weather_lines.nil? || weather_lines.empty?)
+    return nil if events.empty? && busy_lines.empty? && (weather_lines.nil? || weather_lines.empty?)
 
     lines = []
     lines << "*Daily Digest — #{today.strftime('%b %d, %Y')}*"
@@ -92,12 +93,22 @@ class SlackDailyDigest
       end
     end
 
+    if busy_lines.any?
+      lines << "\n*Busy Blocks*"
+      lines.concat(busy_lines)
+    end
+
     lines.join("\n")
   end
 
   def weather_for(user)
     locations = user.user_locations.where(label: ['home', 'school']).order(:label)
-    return nil if locations.empty?
+    if locations.empty?
+      return [
+        "*Weather*",
+        "• Add a home/school location to enable weather."
+      ]
+    end
 
     lines = ["*Weather*"]
     locations.each do |location|
@@ -116,7 +127,40 @@ class SlackDailyDigest
       lines << "• #{label}: #{description}"
     end
 
-    lines.length > 1 ? lines : nil
+    return lines if lines.length > 1
+
+    [
+      "*Weather*",
+      "• Add coordinates to home/school locations to enable weather."
+    ]
+  end
+
+  def busy_blocks_for(user, day)
+    users = [user] + User.where(active: true).where.not(id: user.id).to_a
+    blocks = BusyBlock.where(user: users)
+                      .where(start_at: day.beginning_of_day..day.end_of_day)
+                      .order(:start_at)
+    return [] if blocks.empty?
+
+    grouped = blocks.group_by(&:user_id)
+    lines = []
+    users.each do |target|
+      next unless grouped[target.id]
+
+      label = target == user ? 'You' : user_label(target)
+      grouped[target.id].each do |block|
+        start_time = block.start_at.strftime('%H:%M')
+        end_time = block.end_at.strftime('%H:%M')
+        lines << "• #{start_time}-#{end_time} — #{label}"
+      end
+    end
+    lines
+  end
+
+  def user_label(user)
+    email = user.email.to_s
+    name = email.split('@').first.to_s.tr('.', ' ')
+    name.empty? ? email : name.split.map(&:capitalize).join(' ')
   end
 
   def slack_user_id_for(user)

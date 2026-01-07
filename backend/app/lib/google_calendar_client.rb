@@ -159,7 +159,7 @@ class GoogleCalendarClient
       description: instance.description,
       start: instance.start,
       end: instance.end,
-      attendees: instance.attendees,
+      attendees: Array(instance.attendees),
       reminders: instance.reminders,
       guests_can_modify: instance.guests_can_modify,
       guests_can_invite_others: instance.guests_can_invite_others,
