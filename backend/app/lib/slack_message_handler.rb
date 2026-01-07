@@ -152,7 +152,15 @@ class SlackMessageHandler
     calendar_id = primary_calendar_id_for(user)
     calendar = GoogleCalendarClient.new(user)
     attendees = (spouse_emails(user) + [user.email]).uniq
-    result = calendar.create_event(event, calendar_id: calendar_id, attendees: attendees, guests_can_modify: true)
+    event['recurrence'] = normalize_recurrence(event['recurrence'])
+    recurrence_rules = build_recurrence_rules(event['recurrence'], start_date: event['date'])
+    result = calendar.create_event(
+      event,
+      calendar_id: calendar_id,
+      attendees: attendees,
+      guests_can_modify: true,
+      recurrence_rules: recurrence_rules
+    )
 
     calendar_event = CalendarEvent.create!(
       user: user,
@@ -175,7 +183,7 @@ class SlackMessageHandler
       metadata: {
         event_id: calendar_event.event_id,
         title: calendar_event.title,
-        calendar_request: { event: event, attendees: attendees, calendar_id: calendar_id },
+        calendar_request: { event: event, attendees: attendees, calendar_id: calendar_id, recurrence_rules: recurrence_rules },
         calendar_response: result.to_h,
         correlation_id: @correlation_id
       }
@@ -372,6 +380,71 @@ class SlackMessageHandler
     return nil if result.start&.date
 
     result.start&.date_time&.strftime('%H:%M')
+  end
+
+  def build_recurrence_rules(recurrence, start_date: nil)
+    return nil if recurrence.nil?
+
+    if recurrence.is_a?(String)
+      rule = recurrence.strip
+      return nil if rule.empty?
+      rule = "RRULE:#{rule}" unless rule.start_with?('RRULE:')
+      return [rule]
+    end
+
+    return nil unless recurrence.is_a?(Hash)
+
+    freq = recurrence['frequency'].to_s.upcase
+    return nil if freq.empty?
+
+    parts = ["FREQ=#{freq}"]
+    interval = recurrence['interval'].to_i
+    parts << "INTERVAL=#{interval}" if interval.positive?
+
+    by_day = Array(recurrence['by_day']).map(&:to_s).map(&:upcase).uniq
+    if by_day.empty? && freq == 'WEEKLY' && start_date.present?
+      begin
+        day_code = start_date.is_a?(Date) ? start_date.strftime('%a').upcase[0, 2] : Date.parse(start_date.to_s).strftime('%a').upcase[0, 2]
+        by_day = [day_code]
+      rescue ArgumentError
+      end
+    end
+    parts << "BYDAY=#{by_day.join(',')}" if by_day.any?
+
+    count = recurrence['count'].to_i
+    parts << "COUNT=#{count}" if count.positive?
+
+    if recurrence['until'].present?
+      begin
+        until_date = Date.parse(recurrence['until'].to_s)
+        parts << "UNTIL=#{until_date.strftime('%Y%m%d')}"
+      rescue ArgumentError
+      end
+    end
+
+    ["RRULE:#{parts.join(';')}"]
+  end
+
+  def normalize_recurrence(recurrence)
+    return nil if recurrence.nil?
+
+    if recurrence.is_a?(String)
+      cleaned = recurrence.strip
+      return nil if cleaned.empty?
+      return cleaned
+    end
+
+    return nil unless recurrence.is_a?(Hash)
+
+    data = recurrence.transform_keys(&:to_s)
+    freq = data['frequency'].to_s.downcase
+    return nil if freq.empty?
+
+    data['frequency'] = freq
+    data['by_day'] = Array(data['by_day']).map(&:to_s).map(&:upcase).uniq
+    data['interval'] = data['interval'].to_i if data['interval']
+    data['count'] = data['count'].to_i if data['count']
+    data
   end
 
   def log_action(message, calendar_event:, status:, metadata: {})

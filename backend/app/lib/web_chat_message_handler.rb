@@ -7,6 +7,7 @@ require 'stringio'
 class WebChatMessageHandler
   CONFIDENCE_ORDER = { 'low' => 0, 'medium' => 1, 'high' => 2 }.freeze
   CALENDAR_WINDOW_FUTURE_DAYS = 90
+  CALENDAR_WINDOW_PAST_DAYS = 30
   MAX_GEMINI_DIMENSION = 1568
   IDEMPOTENCY_WINDOW_SECONDS = 120
 
@@ -124,6 +125,8 @@ class WebChatMessageHandler
       return handle_event_selection(payload, action_type: 'delete')
     when 'confirm_delete'
       return handle_delete_confirmation(payload)
+    when 'clarify_delete_target'
+      return handle_delete_target_clarification(payload)
     when 'select_event_for_update'
       return handle_event_selection(payload, action_type: 'update')
     when 'confirm_update'
@@ -132,6 +135,8 @@ class WebChatMessageHandler
       return handle_update_changes_clarification(payload)
     when 'clarify_update_target'
       return handle_update_target_clarification(payload)
+    when 'clarify_recurring_scope'
+      return handle_recurring_scope_clarification(payload)
     when 'clarify_memory_fields'
       return handle_memory_correction(payload)
     when 'confirm_memory'
@@ -302,6 +307,7 @@ class WebChatMessageHandler
       clear_thread_state
       return build_response(event['message'] || "I couldn't find event details.")
     end
+    event['recurrence'] = normalize_recurrence(event['recurrence']) || recurrence_from_text(@text)
     missing = missing_event_fields(event)
     confidence = normalize_confidence(event['confidence'])
 
@@ -341,6 +347,7 @@ class WebChatMessageHandler
     end
     missing = missing_event_fields(updated)
     confidence = normalize_confidence(updated['confidence'])
+    updated['recurrence'] = normalize_recurrence(updated['recurrence']) || recurrence_from_text(@text)
 
     if missing.any?
       set_pending_action('clarify_event_fields', { 'event' => updated, 'missing_fields' => missing })
@@ -385,6 +392,10 @@ class WebChatMessageHandler
     changes['confidence'] = data['confidence'] if data['confidence']
     duration_minutes = parse_duration_minutes(@text)
     changes['duration_minutes'] = duration_minutes if duration_minutes
+    changes['recurrence'] = normalize_recurrence(changes['recurrence'])
+    changes['recurrence_clear'] = true if recurrence_clear_requested?(@text)
+    changes['recurrence'] = normalize_recurrence(changes['recurrence'])
+    changes['recurrence_clear'] = true if recurrence_clear_requested?(@text)
     if changes.empty?
       set_pending_action('clarify_update_changes', { 'target' => (data['target'] || {}).compact })
       return build_response("What should I change about the event?")
@@ -399,8 +410,11 @@ class WebChatMessageHandler
       return build_response("Which event should I update? Please share the title and date.")
     end
 
-    candidates = find_event_candidates(target)
-    return build_response("I couldn't find that event. Can you share the title and date?") if candidates.empty?
+    candidates = find_event_candidates_with_fallback(target)
+    if candidates.empty?
+      set_pending_action('clarify_update_target', { 'changes' => changes })
+      return build_response("I couldn't find that event. Can you share the title and date?")
+    end
 
     if candidates.length > 1
       set_pending_action('select_event_for_update', { 'candidates' => serialize_candidates(candidates), 'changes' => changes })
@@ -434,8 +448,11 @@ class WebChatMessageHandler
       return build_response("I still need the event title or date.")
     end
 
-    candidates = find_event_candidates(data)
-    return build_response("I couldn't find that event. Can you share the title and date?") if candidates.empty?
+    candidates = find_event_candidates_with_fallback(data)
+    if candidates.empty?
+      set_pending_action('clarify_update_target', { 'changes' => changes })
+      return build_response("I couldn't find that event. Can you share the title and date?")
+    end
 
     if candidates.length > 1
       set_pending_action('select_event_for_update', { 'candidates' => serialize_candidates(candidates), 'changes' => changes })
@@ -526,6 +543,22 @@ class WebChatMessageHandler
 
   def confirm_or_update_event(event_record, changes)
     confidence = normalize_confidence(changes['confidence'])
+    scope = changes['recurring_scope'] || recurring_scope_from_text(@text)
+    if recurring_event?(event_record) && scope.nil?
+      set_pending_action(
+        'clarify_recurring_scope',
+        { 'event_id' => event_record.id, 'changes' => changes, 'snapshot' => event_snapshot(event_record), 'action' => 'update' }
+      )
+      return build_response("This event repeats. Update just this event or the whole series? Reply \"this\" or \"all\".")
+    end
+    if scope == 'instance' && (changes['recurrence'] || changes['recurrence_clear'])
+      set_pending_action(
+        'clarify_recurring_scope',
+        { 'event_id' => event_record.id, 'changes' => changes, 'snapshot' => event_snapshot(event_record), 'action' => 'update' }
+      )
+      return build_response("Recurrence changes apply to the whole series. Update the series instead? Reply \"all\" or \"this\" to pick.")
+    end
+    changes['recurring_scope'] = scope if scope
     snapshot = event_snapshot(event_record)
     if confidence != 'high'
       set_pending_action('confirm_update', { 'event_id' => event_record.id, 'changes' => changes, 'snapshot' => snapshot })
@@ -551,7 +584,39 @@ class WebChatMessageHandler
       return build_response("Which event should I delete? Please share the title and date.")
     end
 
-    candidates = find_event_candidates(data)
+    candidates = find_event_candidates_with_fallback(data)
+    if candidates.empty?
+      set_pending_action('clarify_delete_target')
+      return build_response("I couldn't find that event. Can you share the title and date?")
+    end
+
+    if candidates.length > 1
+      set_pending_action('select_event_for_delete', { 'candidates' => serialize_candidates(candidates) })
+      return build_response("Which event should I delete?\n#{format_candidates(candidates)}")
+    end
+
+    confirm_or_delete_event(candidates.first[:event])
+  rescue StandardError => e
+    build_response("Delete error: #{e.message}")
+  end
+
+  def handle_delete_target_clarification(_payload)
+    query = gemini.extract_event_query_from_text(@text, context: recent_context_text)
+    log_ai_request(
+      @message,
+      query[:usage],
+      request_kind: 'event_query',
+      model: gemini_intent_model,
+      status: query[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: query[:event])
+    )
+    data = query[:event]
+
+    if data['error']
+      return build_response("I still need the event title or date.")
+    end
+
+    candidates = find_event_candidates_with_fallback(data)
     return build_response("I couldn't find that event. Can you share the title and date?") if candidates.empty?
 
     if candidates.length > 1
@@ -559,6 +624,7 @@ class WebChatMessageHandler
       return build_response("Which event should I delete?\n#{format_candidates(candidates)}")
     end
 
+    clear_thread_state
     confirm_or_delete_event(candidates.first[:event])
   rescue StandardError => e
     build_response("Delete error: #{e.message}")
@@ -600,13 +666,25 @@ class WebChatMessageHandler
   end
 
   def confirm_or_delete_event(event_record)
-    set_pending_action('confirm_delete', { 'event_id' => event_record.id, 'snapshot' => event_snapshot(event_record) })
+    scope = recurring_scope_from_text(@text)
+    if recurring_event?(event_record) && scope.nil?
+      set_pending_action(
+        'clarify_recurring_scope',
+        { 'event_id' => event_record.id, 'snapshot' => event_snapshot(event_record), 'action' => 'delete' }
+      )
+      return build_response("This event repeats. Delete just this event or the whole series? Reply \"this\" or \"all\".")
+    end
+    set_pending_action(
+      'confirm_delete',
+      { 'event_id' => event_record.id, 'snapshot' => event_snapshot(event_record), 'recurring_scope' => scope }
+    )
     build_response("Delete this event?\n#{format_event_record(event_record)}")
   end
 
   def handle_delete_confirmation(payload)
     event_id = payload['event_id']
     snapshot = payload['snapshot']
+    scope = payload['recurring_scope'] || recurring_scope_from_text(@text)
     event_record = CalendarEvent.find_by(id: event_id)
     unless event_record
       calendar_id = snapshot.is_a?(Hash) ? (snapshot['calendar_id'] || snapshot[:calendar_id]) : nil
@@ -623,11 +701,31 @@ class WebChatMessageHandler
 
     if affirmative?
       clear_thread_state
-      return delete_event(event_record)
+      return delete_event(event_record, scope: scope)
     end
 
     clear_thread_state
     build_response("Okay, I won’t delete it.")
+  end
+
+  def handle_recurring_scope_clarification(payload)
+    scope = recurring_scope_from_text(@text)
+    return build_response("Reply \"this\" to change only this event or \"all\" for the whole series.") unless scope
+
+    event_record = CalendarEvent.find_by(id: payload['event_id'])
+    unless event_record
+      clear_thread_state
+      return build_response("I couldn't find that event anymore.", error_code: 'event_not_found')
+    end
+
+    clear_thread_state
+    if payload['action'] == 'delete'
+      return delete_event(event_record, scope: scope)
+    end
+
+    changes = payload['changes'] || {}
+    changes['recurring_scope'] = scope
+    apply_event_update(event_record, changes, snapshot: payload['snapshot'])
   end
 
   def handle_create_transaction(image_message_id: nil)
@@ -855,6 +953,7 @@ class WebChatMessageHandler
     calendar_id = primary_calendar_id
     calendar = GoogleCalendarClient.new(@user)
     attendees = (spouse_emails(@user) + [@user.email]).uniq
+    recurrence_rules = build_recurrence_rules(event['recurrence'], start_date: event['date'])
 
     idempotency_payload = { event: event, attendees: attendees, calendar_id: calendar_id }
     signature = idempotency_signature('create_calendar_event', idempotency_payload)
@@ -870,7 +969,13 @@ class WebChatMessageHandler
       return build_response("I already added that event. ✅", action: 'calendar_event_created')
     end
 
-    result = calendar.create_event(event, calendar_id: calendar_id, attendees: attendees, guests_can_modify: true)
+    result = calendar.create_event(
+      event,
+      calendar_id: calendar_id,
+      attendees: attendees,
+      guests_can_modify: true,
+      recurrence_rules: recurrence_rules
+    )
 
     calendar_event = CalendarEvent.create!(
       user: @user,
@@ -896,7 +1001,7 @@ class WebChatMessageHandler
         event_id: calendar_event.event_id,
         title: calendar_event.title,
         confidence: event['confidence'],
-        calendar_request: { event: event, attendees: attendees, calendar_id: calendar_id },
+        calendar_request: { event: event, attendees: attendees, calendar_id: calendar_id, recurrence_rules: recurrence_rules },
         calendar_response: result.to_h,
         correlation_id: @correlation_id
       }.compact
@@ -941,7 +1046,10 @@ class WebChatMessageHandler
       return build_response("I need a new date or time to update the event.", error_code: 'missing_event_update_fields')
     end
 
-    idempotency_payload = { event_id: event_record.event_id, changes: changes }
+    scope = changes['recurring_scope'] || 'instance'
+    target_event_id = scope == 'series' ? recurring_master_event_id(event_record) : event_record.event_id
+
+    idempotency_payload = { event_id: target_event_id, changes: changes, scope: scope }
     signature = idempotency_signature('update_calendar_event', idempotency_payload)
     if duplicate_action?('update_calendar_event', signature)
       log_action(
@@ -950,18 +1058,18 @@ class WebChatMessageHandler
         calendar_id: event_record.calendar_id,
         status: 'duplicate',
         action_type: 'update_calendar_event',
-        metadata: { error_code: 'duplicate_request', event_id: event_record.event_id, changes: changes, correlation_id: @correlation_id }
+        metadata: { error_code: 'duplicate_request', event_id: target_event_id, changes: changes, scope: scope, correlation_id: @correlation_id }
       )
       return build_response("I already applied that update. ✅", action: 'calendar_event_updated')
     end
 
     client = GoogleCalendarClient.new(@user)
-    result = client.update_event(calendar_id: event_record.calendar_id, event_id: event_record.event_id, updates: updates)
+    result = client.update_event(calendar_id: event_record.calendar_id, event_id: target_event_id, updates: updates)
 
     verified_event = nil
     verification = { verified: false }
     begin
-      verified_event = client.get_event(calendar_id: event_record.calendar_id, event_id: event_record.event_id)
+      verified_event = client.get_event(calendar_id: event_record.calendar_id, event_id: target_event_id)
       verification = verify_event_updates(verified_event, updates)
     rescue GoogleCalendarClient::CalendarError => e
       verification = { verified: false, error: e.message }
@@ -985,18 +1093,20 @@ class WebChatMessageHandler
       status: 'success',
       action_type: 'update_calendar_event',
       metadata: {
-        event_id: event_record.event_id,
+        event_id: target_event_id,
         title: event_record.title,
         changes: changes,
         updates: updates,
         snapshot: snapshot,
         calendar_response: event_source.to_h,
         verification: verification,
+        scope: scope,
         correlation_id: @correlation_id
       }.compact
     )
     remember_last_event(event_record.id)
     remember_idempotency!('update_calendar_event', signature)
+    refresh_household_calendar_data
 
     if verification[:mismatches].to_a.any?
       return build_response(
@@ -1017,15 +1127,16 @@ class WebChatMessageHandler
       metadata: {
         error_code: 'calendar_update_failed',
         error: e.message,
-        event_id: event_record.event_id,
+        event_id: target_event_id,
         changes: changes,
+        scope: scope,
         correlation_id: @correlation_id
       }
     )
     build_response("Calendar update error: #{e.message}", error_code: 'calendar_update_failed')
   end
 
-  def delete_event(event_record)
+  def delete_event(event_record, scope: nil)
     if @user.google_refresh_token.to_s.empty?
       log_action(
         @message,
@@ -1038,7 +1149,10 @@ class WebChatMessageHandler
       return build_response("Please connect your calendar at https://finances.sifxtre.me first.", error_code: 'insufficient_permissions')
     end
 
-    signature = idempotency_signature('delete_calendar_event', { event_id: event_record.event_id })
+    scope ||= 'instance'
+    target_event_id = scope == 'series' ? recurring_master_event_id(event_record) : event_record.event_id
+
+    signature = idempotency_signature('delete_calendar_event', { event_id: target_event_id, scope: scope })
     if duplicate_action?('delete_calendar_event', signature)
       log_action(
         @message,
@@ -1046,13 +1160,13 @@ class WebChatMessageHandler
         calendar_id: event_record.calendar_id,
         status: 'duplicate',
         action_type: 'delete_calendar_event',
-        metadata: { error_code: 'duplicate_request', event_id: event_record.event_id, correlation_id: @correlation_id }
+        metadata: { error_code: 'duplicate_request', event_id: target_event_id, scope: scope, correlation_id: @correlation_id }
       )
       return build_response("I already deleted that event. ✅", action: 'calendar_event_deleted')
     end
 
     client = GoogleCalendarClient.new(@user)
-    client.delete_event(calendar_id: event_record.calendar_id, event_id: event_record.event_id)
+    client.delete_event(calendar_id: event_record.calendar_id, event_id: target_event_id)
     event_record.update!(status: 'cancelled')
 
     log_action(
@@ -1062,9 +1176,10 @@ class WebChatMessageHandler
       status: 'success',
       action_type: 'delete_calendar_event',
       metadata: {
-        event_id: event_record.event_id,
+        event_id: target_event_id,
         title: event_record.title,
-        calendar_request: { calendar_id: event_record.calendar_id, event_id: event_record.event_id },
+        calendar_request: { calendar_id: event_record.calendar_id, event_id: target_event_id },
+        scope: scope,
         correlation_id: @correlation_id
       }
     )
@@ -1077,7 +1192,7 @@ class WebChatMessageHandler
       calendar_id: event_record.calendar_id,
       status: 'error',
       action_type: 'delete_calendar_event',
-      metadata: { error_code: 'calendar_delete_failed', error: e.message, event_id: event_record.event_id, correlation_id: @correlation_id }
+      metadata: { error_code: 'calendar_delete_failed', error: e.message, event_id: target_event_id, scope: scope, correlation_id: @correlation_id }
     )
     build_response("Calendar delete error: #{e.message}", error_code: 'calendar_delete_failed')
   end
@@ -1126,9 +1241,30 @@ class WebChatMessageHandler
     lines << "Date: #{event['date']}" if event['date'].present?
     time_range = [event['start_time'], event['end_time']].compact.join(' - ')
     lines << "Time: #{time_range}" if time_range.present?
+    recurrence_label = format_recurrence(event['recurrence'])
+    lines << "Repeats: #{recurrence_label}" if recurrence_label
     lines << "Location: #{event['location']}" if event['location'].present?
     lines << "Details: #{event['description']}" if event['description'].present?
     lines.join("\n")
+  end
+
+  def format_recurrence(recurrence)
+    return nil if recurrence.nil?
+
+    if recurrence.is_a?(String)
+      return recurrence if recurrence.strip != ''
+      return nil
+    end
+
+    return nil unless recurrence.is_a?(Hash)
+
+    freq = recurrence['frequency'].to_s
+    return nil if freq.empty?
+
+    label = freq
+    days = Array(recurrence['by_day']).map(&:to_s)
+    label = "#{label} on #{days.join(', ')}" if days.any?
+    label
   end
 
   def format_event_record(event)
@@ -1153,6 +1289,12 @@ class WebChatMessageHandler
     end_time = event_record.end_at&.strftime('%H:%M') if end_time.to_s.empty?
     time_range = [time, end_time].compact.join(' - ')
     lines << "Time: #{time_range}" if time_range.present?
+    if changes['recurrence_clear']
+      lines << "Repeats: none"
+    else
+      recurrence_label = format_recurrence(changes['recurrence'])
+      lines << "Repeats: #{recurrence_label}" if recurrence_label
+    end
     if changes['location'] || event_record.location
       lines << "Location: #{changes['location'] || event_record.location}"
     end
@@ -1325,7 +1467,7 @@ class WebChatMessageHandler
         scope = scope.where(start_at: day.beginning_of_day..day.end_of_day)
       end
     else
-      start_at = Time.zone.today
+      start_at = Time.zone.today - CALENDAR_WINDOW_PAST_DAYS.days
       end_at = Time.zone.today + CALENDAR_WINDOW_FUTURE_DAYS.days
       scope = scope.where(start_at: start_at.beginning_of_day..end_at.end_of_day)
     end
@@ -1367,6 +1509,46 @@ class WebChatMessageHandler
 
     scored.select { |entry| entry[:score] > 0 }
       .sort_by { |entry| [-entry[:score], entry[:distance]] }
+  end
+
+  def find_event_candidates_with_fallback(query)
+    candidates = find_event_candidates(query)
+    return candidates if candidates.any?
+
+    title = query['title'].to_s.strip
+    return [] if title.empty?
+
+    relaxed = query.dup
+    relaxed.delete('date')
+    relaxed.delete('start_time')
+    candidates = find_event_candidates(relaxed)
+    return candidates if candidates.any?
+
+    fuzzy_event_candidates(title)
+  end
+
+  def fuzzy_event_candidates(title)
+    return [] if title.to_s.strip.empty?
+
+    start_at = Time.zone.today - CALENDAR_WINDOW_PAST_DAYS.days
+    end_at = Time.zone.today + CALENDAR_WINDOW_FUTURE_DAYS.days
+    quoted_title = ActiveRecord::Base.connection.quote(title)
+
+    scope = CalendarEvent.where(user: @user)
+                         .where.not(status: 'cancelled')
+                         .where(start_at: start_at.beginning_of_day..end_at.end_of_day)
+    results = scope
+              .select("calendar_events.*, similarity(title, #{quoted_title}) AS similarity_score")
+              .where("similarity(title, #{quoted_title}) > 0.2")
+              .order(Arel.sql("similarity(title, #{quoted_title}) DESC"))
+              .limit(10)
+              .to_a
+
+    results.map do |event|
+      similarity = event.respond_to?(:similarity_score) ? event.similarity_score.to_f : 0
+      distance = event.start_at ? (event.start_at - Time.zone.now).abs : 10.years
+      { event: event, score: (similarity * 10).round(2), distance: distance }
+    end
   end
 
   def serialize_candidates(candidates)
@@ -1451,6 +1633,10 @@ class WebChatMessageHandler
     mismatches << 'date' if updates['date'] && actual_date.to_s != updates['date'].to_s
     mismatches << 'start_time' if updates['start_time'] && actual_start_time.to_s != updates['start_time'].to_s
     mismatches << 'end_time' if updates['end_time'] && actual_end_time.to_s != updates['end_time'].to_s
+    if updates['recurrence_rules']
+      actual_recurrence = Array(event.recurrence).map(&:to_s)
+      mismatches << 'recurrence' if actual_recurrence != Array(updates['recurrence_rules']).map(&:to_s)
+    end
 
     {
       verified: true,
@@ -1540,6 +1726,145 @@ class WebChatMessageHandler
     nil
   end
 
+  def recurrence_clear_requested?(text)
+    normalized = text.to_s.downcase
+    normalized.match?(/\b(one[- ]?time|not recurring|stop repeating|stop recurring|remove recurrence|no longer recurring)\b/)
+  end
+
+  def normalize_recurrence(recurrence)
+    return nil if recurrence.nil?
+
+    if recurrence.is_a?(String)
+      cleaned = recurrence.strip
+      return nil if cleaned.empty?
+      return cleaned
+    end
+
+    return nil unless recurrence.is_a?(Hash)
+
+    data = recurrence.transform_keys(&:to_s)
+    freq = data['frequency'].to_s.downcase
+    return nil if freq.empty?
+
+    data['frequency'] = freq
+    data['by_day'] = Array(data['by_day']).map(&:to_s).map(&:upcase).uniq
+    data['interval'] = data['interval'].to_i if data['interval']
+    data['count'] = data['count'].to_i if data['count']
+    data
+  end
+
+  def recurrence_from_text(text)
+    normalized = text.to_s.downcase
+    return nil if normalized.empty?
+
+    return { 'frequency' => 'daily' } if normalized.match?(/\b(daily|every day)\b/)
+    return { 'frequency' => 'weekly', 'interval' => 2 } if normalized.match?(/\bevery other week\b/)
+    return { 'frequency' => 'weekly' } if normalized.match?(/\b(weekly|every week)\b/)
+    return { 'frequency' => 'monthly' } if normalized.match?(/\b(monthly|every month)\b/)
+    return { 'frequency' => 'yearly' } if normalized.match?(/\b(yearly|annually|every year)\b/)
+
+    if normalized.match?(/\b(weekdays|weekday)\b/)
+      return { 'frequency' => 'weekly', 'by_day' => %w[MO TU WE TH FR] }
+    end
+
+    if normalized.match?(/\b(weekends|weekend)\b/)
+      return { 'frequency' => 'weekly', 'by_day' => %w[SA SU] }
+    end
+
+    days = parse_day_list(normalized)
+    return { 'frequency' => 'weekly', 'by_day' => days } if days.any?
+
+    nil
+  end
+
+  def parse_day_list(text)
+    day_map = {
+      'monday' => 'MO',
+      'mon' => 'MO',
+      'tuesday' => 'TU',
+      'tue' => 'TU',
+      'tues' => 'TU',
+      'wednesday' => 'WE',
+      'wed' => 'WE',
+      'thursday' => 'TH',
+      'thu' => 'TH',
+      'thurs' => 'TH',
+      'friday' => 'FR',
+      'fri' => 'FR',
+      'saturday' => 'SA',
+      'sat' => 'SA',
+      'sunday' => 'SU',
+      'sun' => 'SU'
+    }
+
+    day_map.each_with_object([]) do |(name, code), days|
+      days << code if text.match?(/\b#{Regexp.escape(name)}\b/)
+    end.uniq
+  end
+
+  def build_recurrence_rules(recurrence, start_date: nil)
+    return nil if recurrence.nil?
+
+    if recurrence.is_a?(String)
+      rule = recurrence.strip
+      return nil if rule.empty?
+      rule = "RRULE:#{rule}" unless rule.start_with?('RRULE:')
+      return [rule]
+    end
+
+    return nil unless recurrence.is_a?(Hash)
+
+    freq = recurrence['frequency'].to_s.upcase
+    return nil if freq.empty?
+
+    parts = ["FREQ=#{freq}"]
+    interval = recurrence['interval'].to_i
+    parts << "INTERVAL=#{interval}" if interval.positive?
+
+    by_day = Array(recurrence['by_day']).map(&:to_s).map(&:upcase).uniq
+    if by_day.empty? && freq == 'WEEKLY' && start_date.present?
+      begin
+        day_code = start_date.is_a?(Date) ? start_date.strftime('%a').upcase[0, 2] : Date.parse(start_date.to_s).strftime('%a').upcase[0, 2]
+        by_day = [day_code]
+      rescue ArgumentError
+      end
+    end
+    parts << "BYDAY=#{by_day.join(',')}" if by_day.any?
+
+    count = recurrence['count'].to_i
+    parts << "COUNT=#{count}" if count.positive?
+
+    if recurrence['until'].present?
+      begin
+        until_date = Date.parse(recurrence['until'].to_s)
+        parts << "UNTIL=#{until_date.strftime('%Y%m%d')}"
+      rescue ArgumentError
+      end
+    end
+
+    ["RRULE:#{parts.join(';')}"]
+  end
+
+  def recurring_scope_from_text(text)
+    normalized = text.to_s.downcase
+    return nil if normalized.empty?
+
+    return 'instance' if normalized.match?(/\b(this|just this|only this|this one|this event)\b/)
+    return 'series' if normalized.match?(/\b(entire series|whole series|series|recurring|all future|all events|every occurrence)\b/)
+
+    nil
+  end
+
+  def recurring_event?(event_record)
+    raw = event_record.raw_event || {}
+    raw['recurringEventId'].present? || raw['recurrence'].present? || raw['originalStartTime'].present?
+  end
+
+  def recurring_master_event_id(event_record)
+    raw = event_record.raw_event || {}
+    raw['recurringEventId'].presence || event_record.event_id
+  end
+
   def build_event_updates(event_record, changes)
     date = changes['date'].presence || event_record.start_at&.to_date&.iso8601
     start_time = changes['start_time'].presence || event_record.start_at&.strftime('%H:%M')
@@ -1560,14 +1885,23 @@ class WebChatMessageHandler
     end
     end_time = event_record.end_at&.strftime('%H:%M') if end_time.to_s.empty?
 
+    recurrence_rules = nil
+    if changes['recurrence_clear']
+      recurrence_rules = []
+    elsif changes['recurrence']
+      recurrence_rules = build_recurrence_rules(changes['recurrence'], start_date: date)
+    end
+
     {
       'title' => changes['title'].presence || event_record.title,
       'date' => date,
       'start_time' => start_time,
       'end_time' => end_time,
       'location' => changes['location'].presence || event_record.location,
-      'description' => changes['description'].presence || event_record.description
-    }
+      'description' => changes['description'].presence || event_record.description,
+      'recurrence_rules' => recurrence_rules,
+      'recurrence_clear' => changes['recurrence_clear']
+    }.compact
   end
 
   def parse_transaction_date(date_str)
@@ -1626,6 +1960,40 @@ class WebChatMessageHandler
 
   def spouse_emails(user)
     User.where(active: true).where.not(id: user.id).pluck(:email)
+  end
+
+  def refresh_household_calendar_data
+    users = household_users
+    users.each do |user|
+      next if user.google_refresh_token.to_s.empty?
+
+      begin
+        sync_calendar_list_for(user)
+      rescue GoogleCalendarClient::CalendarError => e
+        Rails.logger.warn("[CalendarUpdate] Calendar list sync failed user_id=#{user.id} error=#{e.message}")
+      end
+    end
+
+    SyncCalendarEvents.perform_for_users(users)
+  end
+
+  def household_users
+    emails = (spouse_emails(@user) + [@user.email]).uniq
+    User.where(email: emails)
+  end
+
+  def sync_calendar_list_for(user)
+    client = GoogleCalendarClient.new(user)
+    calendars = client.list_calendars
+
+    calendars.each do |cal|
+      CalendarConnection.find_or_initialize_by(user: user, calendar_id: cal[:id]).update(
+        summary: cal[:summary],
+        access_role: cal[:access_role],
+        primary: cal[:primary] || false,
+        time_zone: cal[:time_zone]
+      )
+    end
   end
 
   def event_date(result)

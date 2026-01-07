@@ -4,7 +4,17 @@ class SyncCalendarEvents
   WINDOW_DAYS = 30
 
   def self.perform
-    CalendarConnection.where(sync_enabled: true).includes(:user).find_each do |connection|
+    sync_connections(CalendarConnection.where(sync_enabled: true).includes(:user))
+  end
+
+  def self.perform_for_users(users)
+    return if users.blank?
+
+    sync_connections(CalendarConnection.where(sync_enabled: true, user: users).includes(:user))
+  end
+
+  def self.sync_connections(connections)
+    connections.find_each do |connection|
       user = connection.user
       next if user.nil? || user.google_refresh_token.to_s.empty?
 

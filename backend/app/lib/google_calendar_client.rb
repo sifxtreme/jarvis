@@ -26,7 +26,7 @@ class GoogleCalendarClient
     raise CalendarError, e.message
   end
 
-  def create_event(event, calendar_id: 'primary', attendees: [], guests_can_modify: true)
+  def create_event(event, calendar_id: 'primary', attendees: [], guests_can_modify: true, recurrence_rules: nil)
     start_time = parse_datetime(event['date'], event['start_time'])
     end_time = parse_datetime(event['date'], event['end_time'])
 
@@ -53,6 +53,7 @@ class GoogleCalendarClient
       description: event['description'],
       start: start_field,
       end: end_field,
+      recurrence: recurrence_rules,
       attendees: attendees.map { |email| Google::Apis::CalendarV3::EventAttendee.new(email: email) },
       guests_can_modify: guests_can_modify,
       guests_can_invite_others: true,
@@ -116,6 +117,12 @@ class GoogleCalendarClient
     event.summary = updates['title'] if updates['title']
     event.location = updates['location'] if updates['location']
     event.description = updates['description'] if updates['description']
+
+    if updates['recurrence_clear']
+      event.recurrence = []
+    elsif updates['recurrence_rules']
+      event.recurrence = updates['recurrence_rules']
+    end
 
     if updates['date']
       start_time = parse_datetime(updates['date'], updates['start_time'])

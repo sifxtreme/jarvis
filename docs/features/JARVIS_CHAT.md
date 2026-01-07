@@ -17,6 +17,7 @@ Date: 2026-01-02
 - Post-update verification re-fetches the event and flags partial updates.
 - Structured error codes are returned and logged for calendar actions.
 - Gemini + Google Calendar requests/responses are logged with correlation IDs for traceability.
+- Recurring events are supported for create/update/delete with scope choice (this event vs whole series).
 
 ## Product Vision
 

@@ -171,6 +171,13 @@ class GeminiVision
         "date": "YYYY-MM-DD" (if year missing, infer closest future date),
         "start_time": "HH:MM" (24-hour format, or null if not found),
         "end_time": "HH:MM" (24-hour format, or null if not found),
+        "recurrence": {
+          "frequency": "daily|weekly|monthly|yearly",
+          "interval": 1,
+          "by_day": ["MO", "TU"],
+          "count": 10,
+          "until": "YYYY-MM-DD"
+        },
         "location": "Venue name and/or address, or null if not found",
         "description": "Any additional relevant details",
         "confidence": "high" if date and time are clearly visible, "medium" if some guessing required, "low" if very uncertain
@@ -194,6 +201,13 @@ class GeminiVision
         "date": "YYYY-MM-DD" (if year missing, infer closest future date),
         "start_time": "HH:MM" (24-hour format, or null if not found),
         "end_time": "HH:MM" (24-hour format, or null if not found),
+        "recurrence": {
+          "frequency": "daily|weekly|monthly|yearly",
+          "interval": 1,
+          "by_day": ["MO", "TU"],
+          "count": 10,
+          "until": "YYYY-MM-DD"
+        },
         "location": "Venue name and/or address, or null if not found",
         "description": "Any additional relevant details",
         "confidence": "high" if date and time are clearly visible, "medium" if some guessing required, "low" if very uncertain
@@ -411,6 +425,13 @@ class GeminiVision
           "start_time": "HH:MM",
           "end_time": "HH:MM",
           "duration_minutes": 120,
+          "recurrence": {
+            "frequency": "daily|weekly|monthly|yearly",
+            "interval": 1,
+            "by_day": ["MO", "TU"],
+            "count": 10,
+            "until": "YYYY-MM-DD"
+          },
           "location": "New location",
           "description": "New description"
         }
