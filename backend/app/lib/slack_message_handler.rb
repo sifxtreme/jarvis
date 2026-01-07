@@ -11,11 +11,19 @@ class SlackMessageHandler
   def process!
     message = create_chat_message
     text = response_text(message)
-    client.chat_postMessage(
+    response = client.chat_postMessage(
       channel: channel,
       thread_ts: thread_ts,
       text: text,
       mrkdwn: true
+    )
+    SlackMessageLog.create!(
+      chat_message: message,
+      user_id: resolve_user(message)&.id,
+      channel: channel,
+      thread_ts: thread_ts,
+      status: 'success',
+      response: response.to_h
     )
   rescue StandardError => e
     Rails.logger.error "[Slack] Failed to process message: #{e.message}"
@@ -35,6 +43,15 @@ class SlackMessageHandler
         }
       )
     end
+    SlackMessageLog.create!(
+      chat_message: (defined?(message) && message ? message : nil),
+      user_id: (defined?(message) && message ? resolve_user(message)&.id : nil),
+      channel: channel,
+      thread_ts: thread_ts,
+      status: 'error',
+      error: e.message,
+      response: {}
+    )
     client.chat_postMessage(
       channel: channel,
       thread_ts: thread_ts,

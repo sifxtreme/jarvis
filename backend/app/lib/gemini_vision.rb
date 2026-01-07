@@ -13,7 +13,7 @@ class GeminiVision
   def extract_event_from_image(image_base64, mime_type: 'image/png')
     parts = [
       { inlineData: { mimeType: mime_type, data: image_base64 } },
-      { text: extraction_prompt(today: Date.current) }
+      { text: extraction_prompt(today: Time.zone.today) }
     ]
 
     response = make_request(parts: parts, model: DEFAULT_EXTRACT_MODEL)
@@ -28,7 +28,7 @@ class GeminiVision
   end
 
   def classify_intent(text:, has_image:)
-    parts = [{ text: intent_prompt(text, has_image: has_image, today: Date.current) }]
+    parts = [{ text: intent_prompt(text, has_image: has_image, today: Time.zone.today) }]
 
     response = make_request(parts: parts, model: DEFAULT_INTENT_MODEL)
     parse_json_response(response)
@@ -44,7 +44,7 @@ class GeminiVision
   def extract_transaction_from_image(image_base64, mime_type: 'image/png')
     parts = [
       { inlineData: { mimeType: mime_type, data: image_base64 } },
-      { text: transaction_image_prompt(today: Date.current) }
+      { text: transaction_image_prompt(today: Time.zone.today) }
     ]
 
     response = make_request(parts: parts, model: DEFAULT_EXTRACT_MODEL)
@@ -163,7 +163,7 @@ class GeminiVision
 
   def extraction_prompt(today:)
     <<~PROMPT
-      Today is #{today}.
+      Today is #{today} (Timezone: #{timezone_label}).
 
       Extract calendar event details from this image. Return JSON:
       {
@@ -193,7 +193,7 @@ class GeminiVision
 
   def text_prompt(text)
     <<~PROMPT
-      Today is #{Date.current}.
+      Today is #{Time.zone.today} (Timezone: #{timezone_label}).
 
       Extract calendar event details from the text below. Return JSON:
       {
@@ -226,7 +226,7 @@ class GeminiVision
 
   def intent_prompt(text, has_image:, today:)
     <<~PROMPT
-      Today is #{today}.
+      Today is #{today} (Timezone: #{timezone_label}).
 
       You are classifying the user's intent for a chat assistant that manages calendars and finances.
       Return JSON only:
@@ -281,7 +281,7 @@ class GeminiVision
 
   def transaction_image_prompt(today:)
     <<~PROMPT
-      Today is #{today}.
+      Today is #{today} (Timezone: #{timezone_label}).
 
       Extract a financial transaction from this image (receipt, invoice, or payment confirmation). Return JSON:
       {
@@ -328,6 +328,10 @@ class GeminiVision
         "confidence": "low|medium|high"
       }
     PROMPT
+  end
+
+  def timezone_label
+    Time.zone.tzinfo&.name || 'America/Los_Angeles'
   end
 
   def memory_prompt(text)

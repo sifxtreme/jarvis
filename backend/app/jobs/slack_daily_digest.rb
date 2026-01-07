@@ -5,19 +5,35 @@ class SlackDailyDigest
 
   def perform
     User.where(active: true).find_each do |user|
-      slack_id = slack_user_id_for(user)
-      next if slack_id.to_s.empty?
+      begin
+        channel = nil
+        slack_id = slack_user_id_for(user)
+        next if slack_id.to_s.empty?
 
-      channel = open_dm(slack_id)
-      next if channel.to_s.empty?
+        channel = open_dm(slack_id)
+        next if channel.to_s.empty?
 
-      message = build_digest_message(user)
-      next if message.to_s.strip.empty?
+        message = build_digest_message(user)
+        next if message.to_s.strip.empty?
 
-      client.chat_postMessage(channel: channel, text: message, mrkdwn: true)
+        response = client.chat_postMessage(channel: channel, text: message, mrkdwn: true)
+        SlackMessageLog.create!(
+          user_id: user.id,
+          channel: channel,
+          status: 'success',
+          response: response.to_h
+        )
+      rescue StandardError => e
+        SlackMessageLog.create!(
+          user_id: user.id,
+          channel: channel,
+          status: 'error',
+          error: e.message,
+          response: {}
+        )
+        Rails.logger.error "[SlackDigest] Failed to post digest user_id=#{user.id}: #{e.message}"
+      end
     end
-  rescue StandardError => e
-    Rails.logger.error "[SlackDigest] Failed to post digest: #{e.message}"
   end
 
   private
