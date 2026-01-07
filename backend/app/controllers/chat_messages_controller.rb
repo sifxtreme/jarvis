@@ -5,12 +5,26 @@ class ChatMessagesController < ApplicationController
     user = current_user
     return render json: { error: 'Unauthorized' }, status: :unauthorized unless user
 
-    messages = ChatMessage
-      .where(transport: 'web', external_id: user.id.to_s)
-      .order(:created_at)
-      .limit(200)
+    limit = params[:limit].to_i
+    limit = 10 if limit <= 0
+    limit = [limit, 50].min
+    before_id = params[:before_id].to_i
 
-    render json: { messages: messages.map { |message| serialize(message) } }
+    scope = ChatMessage
+      .where(transport: 'web', external_id: user.id.to_s)
+      .order(created_at: :desc)
+
+    scope = scope.where("id < ?", before_id) if before_id.positive?
+
+    batch = scope.limit(limit + 1).to_a
+    has_more = batch.length > limit
+    messages = batch.first(limit).reverse
+
+    render json: {
+      messages: messages.map { |message| serialize(message) },
+      has_more: has_more,
+      next_before_id: messages.first&.id
+    }
   end
 
   def create

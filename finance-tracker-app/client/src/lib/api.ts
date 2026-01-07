@@ -227,9 +227,21 @@ export const api = {
   }
 };
 
-export const getChatMessages = async (): Promise<ChatMessage[]> => {
-  const response = await axiosInstance.get<{ messages: ChatMessage[] }>('/chat/messages');
-  return response.data.messages || [];
+export const getChatMessages = async (params?: {
+  limit?: number;
+  beforeId?: number;
+}): Promise<{ messages: ChatMessage[]; has_more?: boolean; next_before_id?: number | null }> => {
+  const response = await axiosInstance.get<{
+    messages: ChatMessage[];
+    has_more?: boolean;
+    next_before_id?: number | null;
+  }>('/chat/messages', {
+    params: {
+      limit: params?.limit,
+      before_id: params?.beforeId,
+    },
+  });
+  return response.data || { messages: [] };
 };
 
 export const createChatMessage = async (

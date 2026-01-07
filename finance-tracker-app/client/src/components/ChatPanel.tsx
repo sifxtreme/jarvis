@@ -77,8 +77,11 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [beforeId, setBeforeId] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const shouldAutoScrollRef = useRef(true);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -89,9 +92,11 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
     let mounted = true;
     const loadMessages = async () => {
       try {
-        const response = await getChatMessages();
+        const response = await getChatMessages({ limit: 10 });
         if (!mounted) return;
-        setMessages(response.map(mapMessage));
+        setMessages((response.messages || []).map(mapMessage));
+        setHasMore(Boolean(response.has_more));
+        setBeforeId(response.next_before_id ?? null);
       } catch (error) {
         console.error("Failed to load chat messages", error);
       } finally {
@@ -148,9 +153,36 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
   const handleScroll = () => {
     const container = scrollRef.current;
     if (!container) return;
+    if (container.scrollTop < 80 && hasMore && !isLoadingMore && !isLoading) {
+      void loadOlderMessages();
+    }
     const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
     shouldAutoScrollRef.current = distanceFromBottom < 80;
     setShowJumpToLatest(distanceFromBottom > 140);
+  };
+
+  const loadOlderMessages = async () => {
+    if (!beforeId) return;
+    const container = scrollRef.current;
+    if (!container) return;
+    setIsLoadingMore(true);
+    const prevScrollHeight = container.scrollHeight;
+    const prevScrollTop = container.scrollTop;
+    try {
+      const response = await getChatMessages({ limit: 10, beforeId });
+      const older = (response.messages || []).map(mapMessage);
+      setMessages((prev) => [...older, ...prev]);
+      setHasMore(Boolean(response.has_more));
+      setBeforeId(response.next_before_id ?? null);
+      requestAnimationFrame(() => {
+        const nextScrollHeight = container.scrollHeight;
+        container.scrollTop = nextScrollHeight - prevScrollHeight + prevScrollTop;
+      });
+    } catch (error) {
+      console.error("Failed to load older chat messages", error);
+    } finally {
+      setIsLoadingMore(false);
+    }
   };
 
   const handleSend = async (event?: FormEvent) => {
@@ -268,6 +300,20 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
           </div>
         ) : (
           <div>
+            {isLoadingMore && (
+              <div className="mb-3 flex items-center gap-2 text-[11px] text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  {["0ms", "150ms", "300ms"].map((delay) => (
+                    <span
+                      key={delay}
+                      className="h-1.5 w-1.5 rounded-full bg-slate-400/80 animate-bounce dark:bg-slate-200"
+                      style={{ animationDelay: delay }}
+                    />
+                  ))}
+                </div>
+                <span>Loading older messages…</span>
+              </div>
+            )}
             {groupedMessages.map(({ message, groupedWithPrev, groupedWithNext }) => {
               const isUser = message.role === "user";
               const timeLabel = new Date(message.createdAt).toLocaleTimeString([], {
@@ -298,7 +344,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
                           {["0ms", "150ms", "300ms"].map((delay) => (
                             <span
                               key={delay}
-                              className="h-2 w-2 rounded-full bg-current/70 animate-pulse"
+                              className="h-2.5 w-2.5 rounded-full bg-slate-400/90 animate-bounce dark:bg-slate-200"
                               style={{ animationDelay: delay }}
                             />
                           ))}
@@ -349,7 +395,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
               {["0ms", "150ms", "300ms"].map((delay) => (
                 <span
                   key={delay}
-                  className="h-2 w-2 rounded-full bg-current/70 animate-pulse"
+                  className="h-2 w-2 rounded-full bg-slate-400/90 animate-bounce dark:bg-slate-200"
                   style={{ animationDelay: delay }}
                 />
               ))}
