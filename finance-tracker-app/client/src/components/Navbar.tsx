@@ -85,6 +85,11 @@ export function Navbar() {
               <DropdownMenuItem className="text-xs font-medium" asChild>
                 <Link to="/teller-repair">Teller Repair</Link>
               </DropdownMenuItem>
+              <DropdownMenuItem className="text-xs font-medium" asChild>
+                <a href="https://sifxtre.me/resque/schedule" target="_blank" rel="noreferrer">
+                  Resque Schedule
+                </a>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <button

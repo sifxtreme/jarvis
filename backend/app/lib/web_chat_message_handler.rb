@@ -1120,13 +1120,18 @@ class WebChatMessageHandler
     remember_last_event(calendar_event.id)
     remember_idempotency!('create_calendar_event', signature)
 
-    build_response([
+    response_lines = [
       "Added to your calendar! ✅",
       "Title: #{result.summary}",
       "Date: #{event_date(result)}",
-      "Time: #{event_time(result)}",
+      "Time: #{event_time_range(result)}",
+      "Guests: #{attendees.join(', ')}",
       "Link: #{result.html_link}"
-    ].compact.join("\n"), event_created: true, action: 'calendar_event_created')
+    ]
+    if recurrence_rules.present?
+      response_lines << "Recurrence: #{recurrence_rules.join(', ')}"
+    end
+    build_response(response_lines.compact.join("\n"), event_created: true, action: 'calendar_event_created')
   rescue GoogleCalendarClient::CalendarError => e
     log_action(
       @message,
@@ -1240,11 +1245,22 @@ class WebChatMessageHandler
       )
     end
 
-    if detached_instance
-      return build_response("Updated the event and detached this instance from the series. ✅", event_created: true, action: 'calendar_event_updated')
+    response_lines = [
+      "Updated the event. ✅",
+      "Title: #{event_source.summary}",
+      "Date: #{event_date(event_source)}",
+      "Time: #{event_time_range(event_source)}",
+      "Scope: #{scope_label(scope, detached_instance: detached_instance)}"
+    ]
+    if updates['recurrence_clear']
+      response_lines << "Recurrence: cleared"
+    elsif updates['recurrence_rules']
+      response_lines << "Recurrence: #{updates['recurrence_rules'].join(', ')}"
     end
-
-    build_response("Updated the event. ✅", event_created: true, action: 'calendar_event_updated')
+    if detached_instance
+      response_lines << "Detached: this instance is now standalone"
+    end
+    build_response(response_lines.compact.join("\n"), event_created: true, action: 'calendar_event_updated')
   rescue GoogleCalendarClient::CalendarError => e
     log_action(
       @message,
@@ -1312,7 +1328,14 @@ class WebChatMessageHandler
       }
     )
     remember_idempotency!('delete_calendar_event', signature)
-    build_response("Deleted the event. ✅", event_created: true, action: 'calendar_event_deleted')
+    response_lines = [
+      "Deleted the event. ✅",
+      "Title: #{event_record.title}",
+      "Date: #{event_record_date(event_record)}",
+      "Time: #{event_record_time_range(event_record)}",
+      "Scope: #{scope_label(scope, detached_instance: false)}"
+    ]
+    build_response(response_lines.compact.join("\n"), event_created: true, action: 'calendar_event_deleted')
   rescue GoogleCalendarClient::CalendarError => e
     log_action(
       @message,
@@ -2113,6 +2136,36 @@ class WebChatMessageHandler
     return nil if result.start&.date
 
     result.start&.date_time&.strftime('%H:%M')
+  end
+
+  def event_time_range(result)
+    return 'All day' if result.start&.date
+
+    start_time = result.start&.date_time&.strftime('%H:%M')
+    end_time = result.end&.date_time&.strftime('%H:%M')
+    return start_time if start_time && end_time.to_s.empty?
+
+    [start_time, end_time].compact.join(' - ')
+  end
+
+  def event_record_date(record)
+    record.start_at&.to_date
+  end
+
+  def event_record_time_range(record)
+    return 'All day' if record.start_at&.to_time&.hour == 0 && record.end_at&.to_time&.hour == 0
+
+    start_time = record.start_at&.strftime('%H:%M')
+    end_time = record.end_at&.strftime('%H:%M')
+    return start_time if start_time && end_time.to_s.empty?
+
+    [start_time, end_time].compact.join(' - ')
+  end
+
+  def scope_label(scope, detached_instance:)
+    return 'this event only (detached)' if detached_instance
+
+    scope == 'series' ? 'entire series' : 'this event only'
   end
 
   def log_action(message, calendar_event_id:, calendar_id:, status:, action_type:, metadata: {})

@@ -209,14 +209,14 @@ export default function TellerRepairPage() {
         <p className="text-muted-foreground mb-6">Fix disconnected bank connections (MFA required)</p>
 
         {/* Instructions */}
-        <Card className="mb-6 border-l-4 border-l-yellow-500 bg-yellow-50/50">
+        <Card className="mb-6 border-l-4 border-l-yellow-500 bg-yellow-50/50 dark:border-l-yellow-400 dark:bg-slate-900/60 dark:border-slate-700">
           <CardContent className="pt-4">
-            <h3 className="font-semibold text-yellow-800 mb-2">How to find your credentials:</h3>
-            <ol className="list-decimal list-inside space-y-1 text-sm text-yellow-900">
-              <li>Go to <a href="https://teller.io/dashboard" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">teller.io/dashboard</a></li>
-              <li>Your <strong>Application ID</strong> is shown at the top (starts with <code className="bg-yellow-200 px-1 rounded">app_</code>)</li>
+            <h3 className="font-semibold text-yellow-800 mb-2 dark:text-yellow-200">How to find your credentials:</h3>
+            <ol className="list-decimal list-inside space-y-1 text-sm text-yellow-900 dark:text-yellow-100">
+              <li>Go to <a href="https://teller.io/dashboard" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline dark:text-blue-300">teller.io/dashboard</a></li>
+              <li>Your <strong>Application ID</strong> is shown at the top (starts with <code className="bg-yellow-200 px-1 rounded dark:bg-yellow-400/20 dark:text-yellow-100">app_</code>)</li>
               <li>Click on <strong>Enrollments</strong> in the sidebar</li>
-              <li>Find your enrollment and copy the <strong>Enrollment ID</strong> (starts with <code className="bg-yellow-200 px-1 rounded">enr_</code>)</li>
+              <li>Find your enrollment and copy the <strong>Enrollment ID</strong> (starts with <code className="bg-yellow-200 px-1 rounded dark:bg-yellow-400/20 dark:text-yellow-100">enr_</code>)</li>
             </ol>
           </CardContent>
         </Card>
@@ -266,9 +266,9 @@ export default function TellerRepairPage() {
             {status.type && (
               <div className={cn(
                 "flex items-center gap-2 p-3 rounded-lg text-sm",
-                status.type === "success" && "bg-green-100 text-green-800",
-                status.type === "error" && "bg-red-100 text-red-800",
-                status.type === "info" && "bg-blue-100 text-blue-800"
+                status.type === "success" && "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200",
+                status.type === "error" && "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200",
+                status.type === "info" && "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
               )}>
                 <StatusIcon type={status.type} />
                 {status.message}
@@ -294,7 +294,7 @@ export default function TellerRepairPage() {
               readOnly
             />
             <p className="text-xs text-muted-foreground mt-2">
-              Update this token in: <code className="bg-muted px-1 rounded">backend/app/lib/teller/api.rb</code>
+              Update this token in: <code className="bg-muted px-1 rounded dark:bg-slate-800 dark:text-slate-200">backend/app/lib/teller/api.rb</code>
             </p>
           </CardContent>
         </Card>
@@ -331,9 +331,9 @@ export default function TellerRepairPage() {
             {lookupStatus.type && (
               <div className={cn(
                 "flex items-center gap-2 p-3 rounded-lg text-sm",
-                lookupStatus.type === "success" && "bg-green-100 text-green-800",
-                lookupStatus.type === "error" && "bg-red-100 text-red-800",
-                lookupStatus.type === "info" && "bg-blue-100 text-blue-800"
+                lookupStatus.type === "success" && "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200",
+                lookupStatus.type === "error" && "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200",
+                lookupStatus.type === "info" && "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
               )}>
                 <StatusIcon type={lookupStatus.type} />
                 {lookupStatus.message}
@@ -344,7 +344,7 @@ export default function TellerRepairPage() {
               <div className="space-y-2">
                 <h4 className="font-medium">Accounts Found:</h4>
                 {accounts.map((acc) => (
-                  <div key={acc.id} className="bg-muted p-3 rounded-lg">
+                  <div key={acc.id} className="bg-muted p-3 rounded-lg dark:bg-slate-900/60 dark:border dark:border-slate-800">
                     <div className="font-medium">{acc.name || "Unknown"} ({acc.subtype || acc.type || "account"})</div>
                     <div className="font-mono text-xs text-muted-foreground">Account ID: {acc.id}</div>
                     <div className="text-xs text-muted-foreground">Institution: {acc.institution?.name || "N/A"}</div>
