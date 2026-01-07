@@ -17,7 +17,6 @@ class CreateBankSyncLogs < ActiveRecord::Migration[5.2]
 
     add_index :bank_sync_logs, :provider
     add_index :bank_sync_logs, :status
-    add_index :bank_sync_logs, :bank_connection_id
     add_index :bank_sync_logs, :latest_transaction_date
   end
 end
