@@ -39,7 +39,7 @@ export const clearAuthToken = (): void => {
 // Create an axios instance
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  withCredentials: true
+  withCredentials: false
 });
 
 // Add response interceptor
