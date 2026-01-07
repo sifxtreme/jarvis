@@ -49,8 +49,18 @@ class Teller::API
   def sync_transactions_for_bank(bank)
     Rails.logger.info "[Teller] Syncing transactions for #{bank.name}"
 
+    started_at = Time.current
+    status = 'success'
+    error = nil
+    fetched_count = 0
+    filtered_count = 0
+    inserted_count = 0
+    updated_count = 0
+    latest_transaction_date = nil
+
     begin
       raw_transactions = fetch_transactions(bank)
+      fetched_count = raw_transactions.size
 
       filtered_transactions = raw_transactions.filter do |trx|
         is_complete = trx['status'] == 'posted'
@@ -62,12 +72,20 @@ class Teller::API
         date_ok && is_complete
       end
 
+      filtered_count = filtered_transactions.count
       Rails.logger.info "[Teller] Found #{filtered_transactions.count} transactions for #{bank.name}"
 
       filtered_transactions.each do |trx|
         f = FinancialTransaction.find_or_initialize_by(plaid_id: trx['id'])
 
         next if f.reviewed?
+
+        latest_transaction_date = [latest_transaction_date, Date.parse(trx['date'])].compact.max
+        if f.new_record?
+          inserted_count += 1
+        else
+          updated_count += 1
+        end
 
         f.transacted_at = trx['date']
         f.plaid_name = trx.dig('description') || trx.dig('details', 'counterparty', 'name')
@@ -80,7 +98,27 @@ class Teller::API
 
       Rails.logger.info "[Teller] Finished syncing #{bank.name}"
     rescue TellerError => e
+      status = 'error'
+      error = e.message
       Rails.logger.error "[Teller] Error syncing #{bank.name}: #{e.message}"
+    rescue StandardError => e
+      status = 'error'
+      error = e.message
+      Rails.logger.error "[Teller] Error syncing #{bank.name}: #{e.message}"
+    ensure
+      BankSyncLog.create!(
+        bank_connection: bank,
+        provider: bank.provider || 'teller',
+        status: status,
+        error: error,
+        fetched_count: fetched_count,
+        filtered_count: filtered_count,
+        inserted_count: inserted_count,
+        updated_count: updated_count,
+        latest_transaction_date: latest_transaction_date,
+        started_at: started_at,
+        finished_at: Time.current
+      )
       # Continue with other banks even if one fails
     end
   end
