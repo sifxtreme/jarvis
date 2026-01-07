@@ -5,6 +5,7 @@ import YearlyBudgetPage from './pages/YearlyBudgetPage';
 import TrendsPage from './pages/TrendsPage';
 import TellerRepairPage from './pages/TellerRepairPage';
 import CalendarPage from './pages/CalendarPage';
+import ChatPage from './pages/ChatPage';
 import { AuthModal } from '@/components/AuthModal';
 import { ChatWidget } from '@/components/ChatWidget';
 import { Navbar } from '@/components/Navbar';
@@ -75,6 +76,7 @@ function App() {
             <Routes>
               <Route path="/" element={<TransactionsPage />} />
               <Route path="/calendar" element={<CalendarPage />} />
+              <Route path="/chat" element={<ChatPage />} />
               <Route path="/yearly-budget" element={<YearlyBudgetPage />} />
               <Route path="/trends" element={<TrendsPage />} />
               <Route path="/teller-repair" element={<TellerRepairPage />} />

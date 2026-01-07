@@ -240,7 +240,7 @@ class SlackMessageHandler
   end
 
   def primary_calendar_id_for(user)
-    CalendarConnection.where(user: user, primary: true).pick(:calendar_id) || user.email || 'primary'
+    user.calendar_connections.find_by(primary: true)&.calendar_id || user.email || 'primary'
   end
 
   def format_event(event)

@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { TrendingUp, DollarSign, Calendar, Menu, Sun, Moon, PiggyBank, Settings } from "lucide-react";
+import { TrendingUp, DollarSign, Calendar, Menu, Sun, Moon, PiggyBank, Settings, MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "@/hooks/useTheme";
 import { getGoogleCalendarAuthUrl } from "@/lib/api";
@@ -14,6 +14,7 @@ import {
 const navItems = [
   { path: "/", label: "Transactions", icon: DollarSign },
   { path: "/calendar", label: "Calendar", icon: Calendar },
+  { path: "/chat", label: "Chat", icon: MessageCircle },
   { path: "/trends", label: "Trends", icon: TrendingUp },
   { path: "/yearly-budget", label: "Budget", icon: PiggyBank },
 ];

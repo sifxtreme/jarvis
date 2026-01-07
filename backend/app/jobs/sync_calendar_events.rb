@@ -2,7 +2,7 @@ class SyncCalendarEvents
   @queue = :calendar
 
   WINDOW_DAYS = 30
-  PAST_DAYS = 7
+  PAST_DAYS = 3
 
   def self.perform
     sync_connections(CalendarConnection.where(sync_enabled: true).includes(:user))

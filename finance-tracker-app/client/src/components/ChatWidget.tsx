@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { MessageCircle, X } from "lucide-react";
 import { ChatPanel } from "@/components/ChatPanel";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const STORAGE_KEY = "jarvis_chat_widget_open";
 
 export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
+  const isMobile = useIsMobile();
+  const location = useLocation();
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -23,6 +27,10 @@ export function ChatWidget() {
     window.dispatchEvent(new CustomEvent("jarvis:calendar-event-created"));
     window.dispatchEvent(new CustomEvent("jarvis:calendar-changed"));
   };
+
+  if (isMobile || location.pathname === "/chat") {
+    return null;
+  }
 
   return (
     <div

@@ -137,6 +137,8 @@ class WebChatMessageHandler
       return handle_update_target_clarification(payload)
     when 'clarify_recurring_scope'
       return handle_recurring_scope_clarification(payload)
+    when 'clarify_list_query'
+      return handle_list_query_clarification(payload)
     when 'clarify_memory_fields'
       return handle_memory_correction(payload)
     when 'confirm_memory'
@@ -614,6 +616,7 @@ class WebChatMessageHandler
 
     title = data['title'].to_s.strip
     date = data['date'].to_s.strip
+    title = fallback_list_title(title)
     scope = CalendarEvent.where(user: @user).where.not(status: 'cancelled')
     start_at = Time.zone.now
     end_at = start_at + CALENDAR_WINDOW_FUTURE_DAYS.days
@@ -625,7 +628,7 @@ class WebChatMessageHandler
     end
 
     if title.present?
-      scope = scope.where("title ILIKE ?", "%#{title}%")
+      scope = apply_title_filters(scope, title)
     end
 
     events = scope.order(:start_at).limit(5).to_a
@@ -634,6 +637,7 @@ class WebChatMessageHandler
     end
 
     if events.empty?
+      set_pending_action('clarify_list_query', { 'query' => data })
       log_action(
         @message,
         calendar_event_id: nil,
@@ -642,7 +646,7 @@ class WebChatMessageHandler
         action_type: 'list_events',
         metadata: { query: data, result_count: 0 }
       )
-      return build_response("I couldn't find any upcoming events that match.")
+      return build_response("I couldn't find any upcoming events that match. Want me to search a different title?")
     end
 
     lines = events.map { |event| format_event_brief(event) }
@@ -656,6 +660,30 @@ class WebChatMessageHandler
       metadata: { query: data, result_count: events.length }
     )
     build_response(response)
+  rescue StandardError => e
+    build_response("List error: #{e.message}")
+  end
+
+  def handle_list_query_clarification(payload)
+    data = payload['query'] || {}
+    title = data['title'].to_s.strip
+    title = fallback_list_title(title)
+    title = fallback_list_title(@text) if title.empty?
+
+    scope = CalendarEvent.where(user: @user).where.not(status: 'cancelled')
+    scope = scope.where(start_at: Time.zone.now..(Time.zone.now + CALENDAR_WINDOW_FUTURE_DAYS.days))
+    scope = apply_title_filters(scope, title) if title.present?
+
+    events = scope.order(:start_at).limit(5).to_a
+    events = fuzzy_event_candidates(title).map { |entry| entry[:event] } if events.empty? && title.present?
+
+    if events.empty?
+      return build_response("Still nothing. Try a specific title or date.")
+    end
+
+    clear_thread_state
+    lines = events.map { |event| format_event_brief(event) }
+    build_response("Here are the next matches:\n#{lines.join("\n")}")
   rescue StandardError => e
     build_response("List error: #{e.message}")
   end
@@ -1343,6 +1371,35 @@ class WebChatMessageHandler
     end_label = event.end_at ? event.end_at.strftime('%H:%M') : nil
     time_range = end_label ? "#{time_label}-#{end_label}" : time_label
     "#{date_label} #{time_range} - #{event.title}"
+  end
+
+  def fallback_list_title(title)
+    return title unless title.to_s.strip.empty?
+
+    tokens = extract_query_tokens(@text)
+    tokens.join(' ')
+  end
+
+  def extract_query_tokens(text)
+    cleaned = text.to_s.downcase
+    cleaned = cleaned.gsub(/[^a-z0-9\s]/, ' ')
+    cleaned = cleaned.gsub(/\b(when|what|next|upcoming|event|events|find|show|list|the|a|an|is|are|me|please|for)\b/, ' ')
+    tokens = cleaned.split(/\s+/).reject(&:empty?)
+    tokens.map { |token| normalize_token(token) }.uniq
+  end
+
+  def normalize_token(token)
+    return 'swim' if token == 'swimming'
+    return 'swim' if token == 'swim'
+    return token.sub(/ing$/, '') if token.length > 4 && token.end_with?('ing')
+    token
+  end
+
+  def apply_title_filters(scope, title)
+    tokens = extract_query_tokens(title)
+    tokens.reduce(scope) do |rel, token|
+      rel.where("title ILIKE ?", "%#{token}%")
+    end
   end
 
   def format_event_changes(event_record, changes)
