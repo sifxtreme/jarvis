@@ -19,14 +19,15 @@ class SlackDailyDigest
           next
         end
 
-        channel = open_dm(slack_id)
+        dm_result = open_dm(slack_id)
+        channel = dm_result[:channel]
         if channel.to_s.empty?
           SlackMessageLog.create!(
             user_id: user.id,
             channel: nil,
             status: 'skipped',
             error: 'missing_dm_channel',
-            response: {}
+            response: dm_result[:error] || {}
           )
           next
         end
@@ -56,7 +57,10 @@ class SlackDailyDigest
           channel: channel,
           status: 'error',
           error: e.message,
-          response: {}
+          response: {
+            type: e.class.name,
+            slack_error: e.respond_to?(:response) ? e.response&.data : nil
+          }
         )
         Rails.logger.error "[SlackDigest] Failed to post digest user_id=#{user.id}: #{e.message}"
       end
@@ -126,9 +130,16 @@ class SlackDailyDigest
 
   def open_dm(user_id)
     response = client.conversations_open(users: user_id)
-    response&.channel&.id
-  rescue StandardError
-    nil
+    { channel: response&.channel&.id }
+  rescue StandardError => e
+    {
+      channel: nil,
+      error: {
+        type: e.class.name,
+        message: e.message,
+        slack_error: e.respond_to?(:response) ? e.response&.data : nil
+      }
+    }
   end
 
   def client

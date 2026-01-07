@@ -30,10 +30,12 @@ export const getAuthToken = (): string | null => {
 
 export const setAuthToken = (token: string): void => {
   localStorage.setItem(AUTH_TOKEN_KEY, token);
+  console.info('[AUTH] Stored JWT in localStorage.');
 };
 
 export const clearAuthToken = (): void => {
   localStorage.removeItem(AUTH_TOKEN_KEY);
+  console.info('[AUTH] Cleared JWT from localStorage.');
 };
 
 // Create an axios instance
@@ -47,9 +49,12 @@ axiosInstance.interceptors.response.use(
   response => response,
   error => {
     if (error.response?.status === 401) {
-      // If we get a 401, we know we're unauthenticated
-      clearAuthToken();
-      useAuthStore.getState().setIsAuthenticated(false);
+      const authHeader = error.config?.headers?.Authorization;
+      const usedAuth = typeof authHeader === 'string' && authHeader.startsWith('Bearer ');
+      if (usedAuth) {
+        clearAuthToken();
+        useAuthStore.getState().setIsAuthenticated(false);
+      }
       useAuthStore.getState().setShowAuthModal(true);
     } else {
       const status = error.response?.status;
@@ -88,7 +93,11 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 // Add request interceptor to update auth header
 axiosInstance.interceptors.request.use(config => {
   const token = getAuthToken();
-  config.headers.Authorization = token ? `Bearer ${token}` : undefined;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  } else {
+    delete config.headers.Authorization;
+  }
   return config;
 });
 
@@ -131,9 +140,12 @@ export const getGoogleCalendarAuthUrl = async (): Promise<string> => {
 };
 
 export const createSession = async (idToken: string): Promise<void> => {
+  console.info('[AUTH] Creating session via Google token.');
   const response = await axiosInstance.post<{ token: string }>('/auth/session', { id_token: idToken });
   if (response.data?.token) {
     setAuthToken(response.data.token);
+  } else {
+    console.warn('[AUTH] Session response missing token.');
   }
 };
 
