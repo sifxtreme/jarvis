@@ -8,13 +8,40 @@ class SlackDailyDigest
       begin
         channel = nil
         slack_id = slack_user_id_for(user)
-        next if slack_id.to_s.empty?
+        if slack_id.to_s.empty?
+          SlackMessageLog.create!(
+            user_id: user.id,
+            channel: nil,
+            status: 'skipped',
+            error: 'missing_slack_user_id',
+            response: {}
+          )
+          next
+        end
 
         channel = open_dm(slack_id)
-        next if channel.to_s.empty?
+        if channel.to_s.empty?
+          SlackMessageLog.create!(
+            user_id: user.id,
+            channel: nil,
+            status: 'skipped',
+            error: 'missing_dm_channel',
+            response: {}
+          )
+          next
+        end
 
         message = build_digest_message(user)
-        next if message.to_s.strip.empty?
+        if message.to_s.strip.empty?
+          SlackMessageLog.create!(
+            user_id: user.id,
+            channel: channel,
+            status: 'skipped',
+            error: 'empty_digest',
+            response: {}
+          )
+          next
+        end
 
         response = client.chat_postMessage(channel: channel, text: message, mrkdwn: true)
         SlackMessageLog.create!(
