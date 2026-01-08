@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { AlertCircle, CheckCircle, Info, Wrench, Plus, Search } from "lucide-react";
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL, getTellerEnrollment, saveTellerEnrollment, getTellerHealth, type TellerHealthStatus } from "@/lib/api";
 
 declare global {
   interface Window {
@@ -43,6 +43,7 @@ export default function TellerRepairPage() {
   const [lookupStatus, setLookupStatus] = useState<{ message: string; type: StatusType }>({ message: "", type: null });
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [scriptLoaded, setScriptLoaded] = useState(false);
+  const [unhealthyConnections, setUnhealthyConnections] = useState<TellerHealthStatus[]>([]);
 
   // Load Teller Connect script
   useEffect(() => {
@@ -69,6 +70,33 @@ export default function TellerRepairPage() {
       setLookupToken(accessToken);
     }
   }, [accessToken]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadEnrollment = async () => {
+      const saved = await getTellerEnrollment();
+      if (!mounted || !saved) return;
+      setAppId(saved.application_id || "");
+      setEnrollmentId(saved.enrollment_id || "");
+    };
+    loadEnrollment();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadHealth = async () => {
+      const unhealthy = await getTellerHealth();
+      if (!mounted) return;
+      setUnhealthyConnections(unhealthy);
+    };
+    loadHealth();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const showStatus = (message: string, type: StatusType) => {
     setStatus({ message, type });
@@ -104,6 +132,9 @@ export default function TellerRepairPage() {
         environment: "development",
         onSuccess: (enrollment) => {
           setAccessToken(enrollment.accessToken);
+          saveTellerEnrollment(appId, enrollmentId).catch((e) => {
+            console.error("Failed to save Teller enrollment:", e);
+          });
           showStatus("Enrollment repaired! Copy the access token above.", "success");
         },
         onExit: () => {
@@ -144,8 +175,12 @@ export default function TellerRepairPage() {
         environment: "development",
         onSuccess: (enrollment) => {
           setAccessToken(enrollment.accessToken);
-          if (enrollment.enrollment?.id) {
-            setEnrollmentId(enrollment.enrollment.id);
+          const newEnrollmentId = enrollment.enrollment?.id;
+          if (newEnrollmentId) {
+            setEnrollmentId(newEnrollmentId);
+            saveTellerEnrollment(appId, newEnrollmentId).catch((e) => {
+              console.error("Failed to save Teller enrollment:", e);
+            });
           }
           showStatus("New enrollment created! Copy the access token.", "success");
         },
@@ -207,6 +242,29 @@ export default function TellerRepairPage() {
       <div className="max-w-2xl mx-auto">
         <h1 className="text-2xl font-bold mb-2">Teller Enrollment Repair</h1>
         <p className="text-muted-foreground mb-6">Fix disconnected bank connections (MFA required)</p>
+
+        {unhealthyConnections.length > 0 && (
+          <Card className="mb-6 border-l-4 border-l-red-500 bg-red-50/60 dark:border-l-red-400 dark:bg-red-900/20 dark:border-slate-700">
+            <CardContent className="pt-4">
+              <h3 className="font-semibold text-red-800 mb-2 dark:text-red-200">Teller connection needs attention</h3>
+              <p className="text-sm text-red-900/80 dark:text-red-100/80 mb-3">
+                Recent syncs look unhealthy. Repair the enrollment below to restore updates.
+              </p>
+              <ul className="space-y-2 text-sm text-red-900 dark:text-red-100">
+                {unhealthyConnections.map((connection) => (
+                  <li key={connection.bank_connection_id} className="rounded-md border border-red-200/70 px-3 py-2 dark:border-red-800/50">
+                    <div className="font-medium">{connection.name}</div>
+                    <div className="text-xs text-red-900/70 dark:text-red-100/70">
+                      Status: {connection.status}
+                      {connection.latest_transaction_date ? ` · Last txn: ${connection.latest_transaction_date}` : " · No recent transactions"}
+                      {connection.error ? ` · Error: ${connection.error}` : ""}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Instructions */}
         <Card className="mb-6 border-l-4 border-l-yellow-500 bg-yellow-50/50 dark:border-l-yellow-400 dark:bg-slate-900/60 dark:border-slate-700">

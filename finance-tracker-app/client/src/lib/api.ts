@@ -139,6 +139,49 @@ export const getGoogleCalendarAuthUrl = async (): Promise<string> => {
   return `${API_BASE_URL}/auth/google_oauth2`;
 };
 
+export type TellerEnrollment = {
+  application_id: string;
+  enrollment_id: string;
+  updated_at?: string;
+};
+
+export type TellerHealthStatus = {
+  bank_connection_id: number;
+  name: string;
+  status: string;
+  latest_transaction_date?: string;
+  fetched_count: number;
+  filtered_count: number;
+  inserted_count: number;
+  updated_count: number;
+  last_synced_at?: string;
+  error?: string;
+  reason: 'error' | 'stale' | 'missing';
+};
+
+export const getTellerEnrollment = async (): Promise<TellerEnrollment | null> => {
+  try {
+    const response = await axiosInstance.get('/teller/enrollment');
+    return response.data?.enrollment || null;
+  } catch (error) {
+    console.error('Failed to load Teller enrollment:', error);
+    return null;
+  }
+};
+
+export const saveTellerEnrollment = async (applicationId: string, enrollmentId: string): Promise<TellerEnrollment | null> => {
+  const response = await axiosInstance.post('/teller/enrollment', {
+    application_id: applicationId,
+    enrollment_id: enrollmentId
+  });
+  return response.data?.enrollment || null;
+};
+
+export const getTellerHealth = async (): Promise<TellerHealthStatus[]> => {
+  const response = await axiosInstance.get('/teller/health');
+  return response.data?.unhealthy || [];
+};
+
 export const createSession = async (idToken: string): Promise<void> => {
   console.info('[AUTH] Creating session via Google token.');
   const response = await axiosInstance.post<{ token: string }>('/auth/session', { id_token: idToken });

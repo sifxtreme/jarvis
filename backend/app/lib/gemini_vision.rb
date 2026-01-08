@@ -265,6 +265,8 @@ class GeminiVision
 
   def transaction_text_prompt(text)
     <<~PROMPT
+      Today is #{Time.zone.today} (Timezone: #{timezone_label}).
+
       Extract a financial transaction from the text. Return JSON:
       {
         "amount": 12.34,
@@ -310,6 +312,8 @@ class GeminiVision
 
   def event_correction_prompt(event, correction_text)
     <<~PROMPT
+      Today is #{Time.zone.today} (Timezone: #{timezone_label}).
+
       Current event details:
       #{event.to_json}
 
@@ -324,6 +328,8 @@ class GeminiVision
 
   def transaction_correction_prompt(transaction, correction_text)
     <<~PROMPT
+      Today is #{Time.zone.today} (Timezone: #{timezone_label}).
+
       Current transaction details:
       #{transaction.to_json}
 
@@ -343,6 +349,8 @@ class GeminiVision
 
   def memory_prompt(text)
     <<~PROMPT
+      Today is #{Time.zone.today} (Timezone: #{timezone_label}).
+
       Extract a memory to store. Return JSON:
       {
         "content": "Normalized memory content",
@@ -363,6 +371,8 @@ class GeminiVision
 
   def memory_query_prompt(text)
     <<~PROMPT
+      Today is #{Time.zone.today} (Timezone: #{timezone_label}).
+
       Extract what memories to search for. Return JSON:
       {
         "query": "keywords to search",
@@ -388,6 +398,8 @@ class GeminiVision
     end.join("\n")
 
     <<~PROMPT
+      Today is #{Time.zone.today} (Timezone: #{timezone_label}).
+
       Answer the user's question using only the memories below. If the memories don't help, say you don't know.
 
       Question: "#{question}"
@@ -400,6 +412,8 @@ class GeminiVision
   def event_query_prompt(text, context: nil)
     context_block = format_context_block(context)
     <<~PROMPT
+      Today is #{Time.zone.today} (Timezone: #{timezone_label}).
+
       #{context_block}Extract the calendar event the user is referring to. Return JSON:
       {
         "title": "Event title or keywords",
@@ -422,6 +436,8 @@ class GeminiVision
   def event_update_prompt(text, context: nil)
     context_block = format_context_block(context)
     <<~PROMPT
+      Today is #{Time.zone.today} (Timezone: #{timezone_label}).
+
       #{context_block}Extract which event to update and the requested changes. Return JSON:
       {
         "confidence": "low|medium|high",
@@ -464,6 +480,8 @@ class GeminiVision
   def recurring_scope_prompt(text, context: nil)
     context_block = format_context_block(context)
     <<~PROMPT
+      Today is #{Time.zone.today} (Timezone: #{timezone_label}).
+
       #{context_block}Determine whether the user wants to change just this event or the whole recurring series. Return JSON:
       {
         "recurring_scope": "instance|series|unspecified",

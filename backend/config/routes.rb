@@ -12,6 +12,9 @@ Rails.application.routes.draw do
 
   # Teller API utilities
   get 'teller/accounts', to: 'teller#accounts'
+  get 'teller/health', to: 'teller#health'
+  get 'teller/enrollment', to: 'teller_enrollments#show'
+  post 'teller/enrollment', to: 'teller_enrollments#create'
 
   get 'chat/messages', to: 'chat_messages#index'
   post 'chat/messages', to: 'chat_messages#create'
