@@ -1,5 +1,7 @@
 # Progress Log — 2026-01-02
 
+Note: Historical snapshot. Not actively maintained.
+
 ## Calendar UI
 - Built week/day grid layout with sticky header + time gutter.
 - Added all-day lane (top of grid) and mobile agenda list.

@@ -9,6 +9,35 @@ Jarvis evolves from a finance tracker into a true personal AI assistant — your
 
 ---
 
+## High-Level Roadmap (Planned)
+
+- **Calendar intelligence** — richer recurring handling, conflict resolution, and better summaries.
+- **Daily briefings** — personalized digests across calendar, weather, and tasks.
+- **Email triage** — extract tasks, events, and follow‑ups from forwarded emails.
+- **Memory & preferences** — better long‑term recall with more structured tagging.
+- **Household + family hub** — shared schedules, routines, and coordination views.
+- **Grocery + meal planning** — list capture, reminders, and weekly planning.
+- **Chores + tasks (Apple Reminders)** — household chore charts and task lists backed by iCloud Reminders.
+- **Shopping lists** — auto-generate lists and sync/export to shopping services.
+- **Photo display mode** — optional idle “photo frame” mode for shared displays.
+
+## High-Level Roadmap (Confirmed Choices)
+
+### Building
+- **AI meal planning + grocery lists + recipes** — connect to calendar context and ingredients.
+- **Chores + tasks (Apple Reminders)** — task assignments per household member.
+- **Shopping list auto-generation + sync** — export to services or shared lists.
+
+### Maybe
+- **Photo display mode** — only if it fits the household hub setup.
+
+### Not Building (Already Covered or Not Needed)
+- **Unified family calendar aggregation** — already supported.
+- **Color-coded calendars** — already supported.
+- **AI event import from flyers/emails** — already supported.
+
+---
+
 ## Robust Product Spec (Phase 1)
 
 This section reflects current desired behavior and priorities for the first robust iteration.
