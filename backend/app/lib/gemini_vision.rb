@@ -90,6 +90,27 @@ class GeminiVision
     parse_json_response(response)
   end
 
+  def extract_memory_from_text(text)
+    parts = [{ text: memory_prompt(text) }]
+
+    response = make_request(parts: parts, model: DEFAULT_EXTRACT_MODEL)
+    parse_json_response(response)
+  end
+
+  def extract_memory_query_from_text(text)
+    parts = [{ text: memory_query_prompt(text) }]
+
+    response = make_request(parts: parts, model: DEFAULT_INTENT_MODEL)
+    parse_json_response(response)
+  end
+
+  def answer_with_memories(question, memories)
+    parts = [{ text: memory_answer_prompt(question, memories) }]
+
+    response = make_request(parts: parts, model: DEFAULT_EXTRACT_MODEL)
+    { text: parse_text_response(response), usage: response['usageMetadata'] || {} }
+  end
+
   private
 
   def make_request(parts:, model:)
@@ -504,27 +525,6 @@ class GeminiVision
     return "" if context_text.empty?
 
     "Recent conversation context:\n#{context_text}\n\n"
-  end
-
-  def extract_memory_from_text(text)
-    parts = [{ text: memory_prompt(text) }]
-
-    response = make_request(parts: parts, model: DEFAULT_EXTRACT_MODEL)
-    parse_json_response(response)
-  end
-
-  def extract_memory_query_from_text(text)
-    parts = [{ text: memory_query_prompt(text) }]
-
-    response = make_request(parts: parts, model: DEFAULT_INTENT_MODEL)
-    parse_json_response(response)
-  end
-
-  def answer_with_memories(question, memories)
-    parts = [{ text: memory_answer_prompt(question, memories) }]
-
-    response = make_request(parts: parts, model: DEFAULT_EXTRACT_MODEL)
-    { text: parse_text_response(response), usage: response['usageMetadata'] || {} }
   end
 
 end
