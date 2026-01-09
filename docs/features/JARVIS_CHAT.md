@@ -1106,12 +1106,10 @@ JARVIS_TIMEZONE=America/New_York
 
 ### Near-Term
 - **Multiple calendars** — Let user choose which calendar to add to
-- **Recurring events** — "Make this weekly"
-- **Time zone handling** — Detect from image or ask user
+- **Recurring series stop** — Support “stop future events” + optional recreate of the latest instance
 - **Edit before confirm** — Inline editing of extracted fields
 
 ### Medium-Term
-- **Message history** — Persist chat history (localStorage or database)
 - **Email forwarding** — Forward emails to Jarvis, extract events
 - **SMS/iMessage integration** — Via Shortcuts app on iOS
 

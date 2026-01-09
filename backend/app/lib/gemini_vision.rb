@@ -505,7 +505,7 @@ class GeminiVision
 
     "Recent conversation context:\n#{context_text}\n\n"
   end
-end
+
   def extract_memory_from_text(text)
     parts = [{ text: memory_prompt(text) }]
 
@@ -526,3 +526,5 @@ end
     response = make_request(parts: parts, model: DEFAULT_EXTRACT_MODEL)
     { text: parse_text_response(response), usage: response['usageMetadata'] || {} }
   end
+
+end
