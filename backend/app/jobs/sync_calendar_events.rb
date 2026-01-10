@@ -117,16 +117,13 @@ class SyncCalendarEvents
         status: 'active'
       }
 
-      if existing_event = existing[event.id]
-        existing_event.update(attrs.merge(calendar_id: connection.calendar_id))
-      else
-        CalendarEvent.create!(
-          attrs.merge(
-            user_id: connection.user_id,
-            calendar_id: connection.calendar_id,
-            event_id: event.id
-          )
-        )
+      record = existing[event.id] || CalendarEvent.find_or_initialize_by(user_id: connection.user_id, event_id: event.id)
+      record.assign_attributes(attrs.merge(calendar_id: connection.calendar_id))
+      begin
+        record.save!
+      rescue ActiveRecord::RecordNotUnique
+        CalendarEvent.where(user_id: connection.user_id, event_id: event.id)
+                     .update_all(attrs.merge(calendar_id: connection.calendar_id))
       end
     end
 

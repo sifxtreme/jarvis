@@ -2190,7 +2190,11 @@ class WebChatMessageHandler
       end
     end
 
-    SyncCalendarEvents.perform_for_users(users)
+    begin
+      SyncCalendarEvents.perform_for_users(users)
+    rescue StandardError => e
+      Rails.logger.warn("[CalendarSync] Failed during chat refresh user_id=#{@user&.id} error=#{e.message}")
+    end
   end
 
   def household_users
