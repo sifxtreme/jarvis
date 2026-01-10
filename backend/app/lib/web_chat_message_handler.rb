@@ -193,14 +193,29 @@ class WebChatMessageHandler
     data['urls'] = urls if urls.any?
 
     if data['error']
-      return build_response(data['message'] || "I couldn't find a memory to save.")
+      set_pending_action('clarify_memory_fields', { 'memory' => {} })
+      return build_response(
+        clarify_missing_details(
+          intent: 'create_memory',
+          missing_fields: ['content'],
+          extracted: {},
+          fallback: data['message'] || "What should I remember?"
+        )
+      )
     end
 
     content = data['content'].to_s.strip
     confidence = normalize_confidence(data['confidence'])
     if content.empty?
       set_pending_action('clarify_memory_fields', { 'memory' => data })
-      return build_response("What should I remember?")
+      return build_response(
+        clarify_missing_details(
+          intent: 'create_memory',
+          missing_fields: ['content'],
+          extracted: data,
+          fallback: "What should I remember?"
+        )
+      )
     end
 
     if confidence != 'high'
@@ -226,7 +241,15 @@ class WebChatMessageHandler
     updated = result[:event] || {}
 
     if updated['error']
-      return build_response(updated['message'] || "I couldn't update that memory.")
+      set_pending_action('clarify_memory_fields', { 'memory' => {} })
+      return build_response(
+        clarify_missing_details(
+          intent: 'create_memory',
+          missing_fields: ['content'],
+          extracted: {},
+          fallback: updated['message'] || "What should I remember?"
+        )
+      )
     end
 
     urls = extract_urls(@text)
@@ -236,7 +259,14 @@ class WebChatMessageHandler
     confidence = normalize_confidence(updated['confidence'])
     if content.empty?
       set_pending_action('clarify_memory_fields', { 'memory' => updated })
-      return build_response("What should I remember?")
+      return build_response(
+        clarify_missing_details(
+          intent: 'create_memory',
+          missing_fields: ['content'],
+          extracted: updated,
+          fallback: "What should I remember?"
+        )
+      )
     end
 
     if confidence != 'high'
@@ -273,7 +303,14 @@ class WebChatMessageHandler
     query = result[:event] || {}
 
     if query['error'] || query['query'].to_s.strip.empty?
-      return build_response("What should I search for in your memories?")
+      return build_response(
+        clarify_missing_details(
+          intent: 'search_memory',
+          missing_fields: ['query'],
+          extracted: {},
+          fallback: "What should I search for in your memories?"
+        )
+      )
     end
 
     memories = search_memories(query['query'])
@@ -306,8 +343,15 @@ class WebChatMessageHandler
 
     event = result[:event] || {}
     if event['error']
-      clear_thread_state
-      return build_response(event['message'] || "I couldn't find event details.")
+      set_pending_action('clarify_event_fields', { 'event' => {} })
+      return build_response(
+        clarify_missing_details(
+          intent: 'create_event',
+          missing_fields: ['title', 'date', 'time'],
+          extracted: {},
+          fallback: event['message'].presence || "What is the title, date, and time?"
+        )
+      )
     end
     event['recurrence'] = normalize_recurrence(event['recurrence'])
     missing = missing_event_fields(event)
@@ -315,7 +359,14 @@ class WebChatMessageHandler
 
     if missing.any?
       set_pending_action('clarify_event_fields', { 'event' => event, 'missing_fields' => missing })
-      return build_response("I need #{missing.join(', ')} to add this event.")
+      return build_response(
+        clarify_missing_details(
+          intent: 'create_event',
+          missing_fields: missing,
+          extracted: event,
+          fallback: "I need #{missing.join(', ')} to add this event."
+        )
+      )
     end
 
     if confidence != 'high'
@@ -353,7 +404,14 @@ class WebChatMessageHandler
 
     if missing.any?
       set_pending_action('clarify_event_fields', { 'event' => updated, 'missing_fields' => missing })
-      return build_response("I still need #{missing.join(', ')}.")
+      return build_response(
+        clarify_missing_details(
+          intent: 'create_event',
+          missing_fields: missing,
+          extracted: updated,
+          fallback: "I still need #{missing.join(', ')}."
+        )
+      )
     end
 
     if confidence != 'high'
@@ -398,7 +456,14 @@ class WebChatMessageHandler
     changes['recurrence_clear'] = true if changes['recurrence_clear']
     if changes.empty?
       set_pending_action('clarify_update_changes', { 'target' => (data['target'] || {}).compact })
-      return build_response("What should I change about the event?")
+      return build_response(
+        clarify_missing_details(
+          intent: 'update_event_changes',
+          missing_fields: ['changes'],
+          extracted: data,
+          fallback: "What should I change about the event?"
+        )
+      )
     end
 
     target = (data['target'] || {}).compact
@@ -407,13 +472,27 @@ class WebChatMessageHandler
         return confirm_or_update_event(recent_event, changes)
       end
       set_pending_action('clarify_update_target', { 'changes' => changes })
-      return build_response("Which event should I update? Please share the title and date.")
+      return build_response(
+        clarify_missing_details(
+          intent: 'update_event_target',
+          missing_fields: ['title', 'date'],
+          extracted: changes,
+          fallback: "Which event should I update? Please share the title and date."
+        )
+      )
     end
 
     candidates = find_event_candidates_with_fallback(target)
     if candidates.empty?
       set_pending_action('clarify_update_target', { 'changes' => changes })
-      return build_response("I couldn't find that event. Can you share the title and date?")
+      return build_response(
+        clarify_missing_details(
+          intent: 'update_event_target',
+          missing_fields: ['title', 'date'],
+          extracted: changes,
+          fallback: "I couldn't find that event. Can you share the title and date?"
+        )
+      )
     end
 
     if candidates.length > 1
@@ -448,13 +527,27 @@ class WebChatMessageHandler
         clear_thread_state
         return confirm_or_update_event(recent_event, changes)
       end
-      return build_response("I still need the event title or date.")
+      return build_response(
+        clarify_missing_details(
+          intent: 'update_event_target',
+          missing_fields: ['title', 'date'],
+          extracted: changes,
+          fallback: "I still need the event title or date."
+        )
+      )
     end
 
     candidates = find_event_candidates_with_fallback(data)
     if candidates.empty?
       set_pending_action('clarify_update_target', { 'changes' => changes })
-      return build_response("I couldn't find that event. Can you share the title and date?")
+      return build_response(
+        clarify_missing_details(
+          intent: 'update_event_target',
+          missing_fields: ['title', 'date'],
+          extracted: changes,
+          fallback: "I couldn't find that event. Can you share the title and date?"
+        )
+      )
     end
 
     if candidates.length > 1
@@ -493,7 +586,14 @@ class WebChatMessageHandler
     changes['recurrence_clear'] = true if changes['recurrence_clear']
 
     if changes.empty?
-      return build_response("I still need what to change (time, date, title, etc.).")
+      return build_response(
+        clarify_missing_details(
+          intent: 'update_event_changes',
+          missing_fields: ['changes'],
+          extracted: target,
+          fallback: "I still need what to change (time, date, title, etc.)."
+        )
+      )
     end
 
     target = (data['target'] || {}).compact if target.empty?
@@ -509,7 +609,14 @@ class WebChatMessageHandler
     candidates = find_event_candidates(target)
     if candidates.empty?
       set_pending_action('clarify_update_target', { 'changes' => changes })
-      return build_response("I couldn't find that event. Can you share the title and date?")
+      return build_response(
+        clarify_missing_details(
+          intent: 'update_event_target',
+          missing_fields: ['title', 'date'],
+          extracted: changes,
+          fallback: "I couldn't find that event. Can you share the title and date?"
+        )
+      )
     end
 
     if candidates.length > 1
@@ -617,13 +724,27 @@ class WebChatMessageHandler
     data = query[:event]
 
     if data['error']
-      return build_response("Which event should I delete? Please share the title and date.")
+      return build_response(
+        clarify_missing_details(
+          intent: 'delete_event_target',
+          missing_fields: ['title', 'date'],
+          extracted: {},
+          fallback: "Which event should I delete? Please share the title and date."
+        )
+      )
     end
 
     candidates = find_event_candidates_with_fallback(data)
     if candidates.empty?
       set_pending_action('clarify_delete_target')
-      return build_response("I couldn't find that event. Can you share the title and date?")
+      return build_response(
+        clarify_missing_details(
+          intent: 'delete_event_target',
+          missing_fields: ['title', 'date'],
+          extracted: {},
+          fallback: "I couldn't find that event. Can you share the title and date?"
+        )
+      )
     end
 
     if candidates.length > 1
@@ -650,6 +771,17 @@ class WebChatMessageHandler
       metadata: ai_metadata(response: query[:event])
     )
     data = query[:event] || {}
+    if data['error']
+      set_pending_action('clarify_list_query', { 'query' => {} })
+      return build_response(
+        clarify_missing_details(
+          intent: 'list_events',
+          missing_fields: ['date', 'title'],
+          extracted: {},
+          fallback: data['message'] || "What date or title should I look for?"
+        )
+      )
+    end
 
     title = data['title'].to_s.strip
     date = data['date'].to_s.strip
@@ -657,12 +789,16 @@ class WebChatMessageHandler
     scope = CalendarEvent.where(user: @user).where.not(status: 'cancelled')
     if date.present?
       day = Date.parse(date) rescue nil
-      scope = scope.where(start_at: day.beginning_of_day..day.end_of_day) if day
+      if day
+        zone = la_now.time_zone
+        scope = scope.where(start_at: day.in_time_zone(zone).beginning_of_day..day.in_time_zone(zone).end_of_day)
+      end
     elsif title.empty?
-      today = Time.zone.today
-      scope = scope.where(start_at: today.beginning_of_day..today.end_of_day)
+      today = la_today
+      zone = la_now.time_zone
+      scope = scope.where(start_at: today.in_time_zone(zone).beginning_of_day..today.in_time_zone(zone).end_of_day)
     else
-      start_at = Time.zone.now
+      start_at = la_now
       end_at = start_at + CALENDAR_WINDOW_FUTURE_DAYS.days
       scope = scope.where(start_at: start_at..end_at)
     end
@@ -686,6 +822,9 @@ class WebChatMessageHandler
         action_type: 'list_events',
         metadata: { query: data, result_count: 0 }
       )
+      if title.empty? && date.empty?
+        return build_response("No events today. Want me to check what's next on your calendar?")
+      end
       return build_response("I couldn't find any upcoming events that match. Want me to search a different title?")
     end
 
@@ -712,18 +851,22 @@ class WebChatMessageHandler
 
     scope = CalendarEvent.where(user: @user).where.not(status: 'cancelled')
     if title.present?
-      scope = scope.where(start_at: Time.zone.now..(Time.zone.now + CALENDAR_WINDOW_FUTURE_DAYS.days))
+      scope = scope.where(start_at: la_now..(la_now + CALENDAR_WINDOW_FUTURE_DAYS.days))
       scope = apply_title_filters(scope, title)
     else
-      today = Time.zone.today
-      scope = scope.where(start_at: today.beginning_of_day..today.end_of_day)
+      today = la_today
+      zone = la_now.time_zone
+      scope = scope.where(start_at: today.in_time_zone(zone).beginning_of_day..today.in_time_zone(zone).end_of_day)
     end
 
     events = scope.order(:start_at).limit(5).to_a
     events = fuzzy_event_candidates(title).map { |entry| entry[:event] } if events.empty? && title.present?
 
     if events.empty?
-      return build_response("Still nothing. Try a specific title or date.")
+      if title.present?
+        return build_response("Still nothing. Try a more specific title or date.")
+      end
+      return build_response("No events today. Want me to check what's next on your calendar?")
     end
 
     clear_thread_state
@@ -746,11 +889,27 @@ class WebChatMessageHandler
     data = query[:event]
 
     if data['error']
-      return build_response("I still need the event title or date.")
+      return build_response(
+        clarify_missing_details(
+          intent: 'delete_event_target',
+          missing_fields: ['title', 'date'],
+          extracted: {},
+          fallback: "I still need the event title or date."
+        )
+      )
     end
 
     candidates = find_event_candidates_with_fallback(data)
-    return build_response("I couldn't find that event. Can you share the title and date?") if candidates.empty?
+    if candidates.empty?
+      return build_response(
+        clarify_missing_details(
+          intent: 'delete_event_target',
+          missing_fields: ['title', 'date'],
+          extracted: {},
+          fallback: "I couldn't find that event. Can you share the title and date?"
+        )
+      )
+    end
 
     if candidates.length > 1
       if (auto_pick = auto_pick_candidate(candidates))
@@ -878,20 +1037,31 @@ class WebChatMessageHandler
     transaction = result[:event] || {}
     if transaction['error']
       clear_thread_state
-      return build_response(transaction['message'] || "I couldn't find a transaction.")
+      set_pending_action('clarify_transaction_fields', { 'transaction' => {} })
+      return build_response(
+        clarify_missing_details(
+          intent: 'create_transaction',
+          missing_fields: ['merchant', 'amount', 'date', 'source'],
+          extracted: {},
+          extra: "Valid sources: #{TransactionSources.prompt_list}",
+          fallback: transaction['message'] || "What is the merchant, amount, date, and source?"
+        )
+      )
     end
     missing = missing_transaction_fields(transaction)
     confidence = normalize_confidence(transaction['confidence'])
 
     if missing.any?
       set_pending_action('clarify_transaction_fields', { 'transaction' => transaction, 'missing_fields' => missing })
-      if missing.include?('a source') && image_attached?
-        return build_response("Which source should I use? Most screenshots are `bofa` — is that correct?")
-      end
-      if missing.include?('a valid source')
-        return build_response("Which source should I use? Options: #{TransactionSources.prompt_list}.")
-      end
-      return build_response("I need #{missing.join(', ')} to add this transaction.")
+      return build_response(
+        clarify_missing_details(
+          intent: 'create_transaction',
+          missing_fields: missing,
+          extracted: transaction,
+          extra: "Valid sources: #{TransactionSources.prompt_list}",
+          fallback: "I need #{missing.join(', ')} to add this transaction."
+        )
+      )
     end
 
     if confidence != 'high'
@@ -920,13 +1090,15 @@ class WebChatMessageHandler
 
     if missing.any?
       set_pending_action('clarify_transaction_fields', { 'transaction' => updated, 'missing_fields' => missing })
-      if missing.include?('a source') && image_attached?
-        return build_response("Which source should I use? Most screenshots are `bofa` — is that correct?")
-      end
-      if missing.include?('a valid source')
-        return build_response("Which source should I use? Options: #{TransactionSources.prompt_list}.")
-      end
-      return build_response("I still need #{missing.join(', ')}.")
+      return build_response(
+        clarify_missing_details(
+          intent: 'create_transaction',
+          missing_fields: missing,
+          extracted: updated,
+          extra: "Valid sources: #{TransactionSources.prompt_list}",
+          fallback: "I still need #{missing.join(', ')}."
+        )
+      )
     end
 
     if confidence != 'high'
@@ -1481,7 +1653,7 @@ class WebChatMessageHandler
 
   def render_extraction_result(event)
     if event['error']
-      event['message'] || "I couldn't find event details in that message."
+      "What is the title, date, and time?"
     else
       [
         "I found an event:",
@@ -1759,11 +1931,12 @@ class WebChatMessageHandler
     if date.present?
       day = Date.parse(date) rescue nil
       if day
-        scope = scope.where(start_at: day.beginning_of_day..day.end_of_day)
+        zone = la_now.time_zone
+        scope = scope.where(start_at: day.in_time_zone(zone).beginning_of_day..day.in_time_zone(zone).end_of_day)
       end
     else
-      start_at = Time.zone.today - CALENDAR_WINDOW_PAST_DAYS.days
-      end_at = Time.zone.today + CALENDAR_WINDOW_FUTURE_DAYS.days
+      start_at = la_today - CALENDAR_WINDOW_PAST_DAYS.days
+      end_at = la_today + CALENDAR_WINDOW_FUTURE_DAYS.days
       scope = scope.where(start_at: start_at.beginning_of_day..end_at.end_of_day)
     end
 
@@ -1791,14 +1964,15 @@ class WebChatMessageHandler
         end
       end
       if time.present? && event.start_at
-        target_time = Time.zone.parse("#{event.start_at.to_date} #{time}") rescue nil
+        zone = la_now.time_zone
+        target_time = zone.parse("#{event.start_at.to_date} #{time}") rescue nil
         if target_time
           diff = (event.start_at - target_time).abs
           score += 2 if diff <= 60.minutes
           score += 1 if diff <= 15.minutes
         end
       end
-      distance = event.start_at ? (event.start_at - Time.zone.now).abs : 10.years
+      distance = event.start_at ? (event.start_at - la_now).abs : 10.years
       { event: event, score: score, distance: distance }
     end
 
@@ -1825,8 +1999,8 @@ class WebChatMessageHandler
   def fuzzy_event_candidates(title)
     return [] if title.to_s.strip.empty?
 
-    start_at = Time.zone.today - CALENDAR_WINDOW_PAST_DAYS.days
-    end_at = Time.zone.today + CALENDAR_WINDOW_FUTURE_DAYS.days
+    start_at = la_today - CALENDAR_WINDOW_PAST_DAYS.days
+    end_at = la_today + CALENDAR_WINDOW_FUTURE_DAYS.days
     quoted_title = ActiveRecord::Base.connection.quote(title)
 
     scope = CalendarEvent.where(user: @user)
@@ -1841,7 +2015,7 @@ class WebChatMessageHandler
 
     results.map do |event|
       similarity = event.respond_to?(:similarity_score) ? event.similarity_score.to_f : 0
-      distance = event.start_at ? (event.start_at - Time.zone.now).abs : 10.years
+      distance = event.start_at ? (event.start_at - la_now).abs : 10.years
       { event: event, score: (similarity * 10).round(2), distance: distance }
     end
   end
@@ -2204,6 +2378,14 @@ class WebChatMessageHandler
     @gemini ||= GeminiVision.new
   end
 
+  def la_now
+    Time.now.in_time_zone('America/Los_Angeles')
+  end
+
+  def la_today
+    la_now.to_date
+  end
+
   def spouse_emails(user)
     User.where(active: true).where.not(id: user.id).pluck(:email)
   end
@@ -2343,6 +2525,28 @@ class WebChatMessageHandler
   def ai_metadata(response: nil, request: nil, extra: {})
     base_request = request || { text: @text, has_image: image_attached? }
     { request: base_request, response: response, correlation_id: @correlation_id }.merge(extra).compact
+  end
+
+  def clarify_missing_details(intent:, missing_fields:, extracted:, fallback:, extra: nil)
+    response = gemini.clarify_missing_details(
+      intent: intent,
+      missing_fields: missing_fields,
+      extracted: extracted,
+      context: recent_context_text,
+      extra: extra
+    )
+    log_ai_request(
+      @message,
+      response[:usage],
+      request_kind: 'clarify_missing_details',
+      model: gemini_intent_model,
+      status: response[:text].to_s.strip.empty? ? 'error' : 'success',
+      metadata: ai_metadata(response: { text: response[:text], intent: intent, missing_fields: missing_fields, extracted: extracted, extra: extra })
+    )
+    response[:text].presence || fallback
+  rescue StandardError => e
+    Rails.logger.warn("[ChatClarify] Failed to generate question intent=#{intent} error=#{e.message}")
+    fallback
   end
 
   def resolve_recurring_scope(text)

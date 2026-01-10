@@ -4,6 +4,7 @@ class SyncCalendarBusyBlocks
   @queue = :calendar
 
   WINDOW_DAYS = 30
+  PAST_DAYS = 7
 
   def self.perform
     CalendarConnection.where(busy_only: true, sync_enabled: true).includes(:user).find_each do |connection|
@@ -12,7 +13,7 @@ class SyncCalendarBusyBlocks
 
       begin
         client = GoogleCalendarClient.new(user)
-        time_min = Time.current.beginning_of_day
+        time_min = Time.current.beginning_of_day - PAST_DAYS.days
         time_max = time_min + WINDOW_DAYS.days
 
         response = client.freebusy(calendar_ids: [connection.calendar_id], time_min: time_min, time_max: time_max)

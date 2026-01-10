@@ -13,7 +13,7 @@ class GeminiVision
   def extract_event_from_image(image_base64, mime_type: 'image/png')
     parts = [
       { inlineData: { mimeType: mime_type, data: image_base64 } },
-      { text: extraction_prompt(today: Time.zone.today) }
+      { text: extraction_prompt(today: today_in_timezone) }
     ]
 
     response = make_request(parts: parts, model: DEFAULT_EXTRACT_MODEL)
@@ -28,7 +28,7 @@ class GeminiVision
   end
 
   def classify_intent(text:, has_image:)
-    parts = [{ text: intent_prompt(text, has_image: has_image, today: Time.zone.today) }]
+    parts = [{ text: intent_prompt(text, has_image: has_image, today: today_in_timezone) }]
 
     response = make_request(parts: parts, model: DEFAULT_INTENT_MODEL)
     parse_json_response(response)
@@ -44,7 +44,7 @@ class GeminiVision
   def extract_transaction_from_image(image_base64, mime_type: 'image/png')
     parts = [
       { inlineData: { mimeType: mime_type, data: image_base64 } },
-      { text: transaction_image_prompt(today: Time.zone.today) }
+      { text: transaction_image_prompt(today: today_in_timezone) }
     ]
 
     response = make_request(parts: parts, model: DEFAULT_EXTRACT_MODEL)
@@ -88,6 +88,13 @@ class GeminiVision
 
     response = make_request(parts: parts, model: DEFAULT_INTENT_MODEL)
     parse_json_response(response)
+  end
+
+  def clarify_missing_details(intent:, missing_fields:, extracted: {}, context: nil, extra: nil)
+    parts = [{ text: clarify_missing_details_prompt(intent: intent, missing_fields: missing_fields, extracted: extracted, context: context, extra: extra) }]
+
+    response = make_request(parts: parts, model: DEFAULT_INTENT_MODEL)
+    { text: parse_text_response(response), usage: response['usageMetadata'] || {} }
   end
 
   def extract_memory_from_text(text)
@@ -214,14 +221,14 @@ class GeminiVision
       If this image does not contain event information, return:
       {
         "error": "no_event_found",
-        "message": "I couldn't find event details in this image. Try sending a clearer image of an event flyer, invitation, or text message."
+        "message": "What’s the title, date, and time? (You can say “all‑day”.)"
       }
     PROMPT
   end
 
   def text_prompt(text)
     <<~PROMPT
-      Today is #{Time.zone.today} (Timezone: #{timezone_label}).
+      Today is #{today_in_timezone} (Timezone: #{timezone_label}).
 
       Extract calendar event details from the text below. Return JSON:
       {
@@ -244,7 +251,7 @@ class GeminiVision
       If the text does not contain event information, return:
       {
         "error": "no_event_found",
-        "message": "I couldn't find event details in that message. Try including a title, date, and time."
+        "message": "What’s the title, date, and time? (You can say “all‑day”.)"
       }
 
       Text:
@@ -286,7 +293,7 @@ class GeminiVision
 
   def transaction_text_prompt(text)
     <<~PROMPT
-      Today is #{Time.zone.today} (Timezone: #{timezone_label}).
+      Today is #{today_in_timezone} (Timezone: #{timezone_label}).
 
       Extract a financial transaction from the text. Return JSON:
       {
@@ -333,7 +340,7 @@ class GeminiVision
 
   def event_correction_prompt(event, correction_text)
     <<~PROMPT
-      Today is #{Time.zone.today} (Timezone: #{timezone_label}).
+      Today is #{today_in_timezone} (Timezone: #{timezone_label}).
 
       Current event details:
       #{event.to_json}
@@ -349,7 +356,7 @@ class GeminiVision
 
   def transaction_correction_prompt(transaction, correction_text)
     <<~PROMPT
-      Today is #{Time.zone.today} (Timezone: #{timezone_label}).
+      Today is #{today_in_timezone} (Timezone: #{timezone_label}).
 
       Current transaction details:
       #{transaction.to_json}
@@ -368,9 +375,13 @@ class GeminiVision
     'America/Los_Angeles'
   end
 
+  def today_in_timezone
+    Time.now.in_time_zone(timezone_label).to_date
+  end
+
   def memory_prompt(text)
     <<~PROMPT
-      Today is #{Time.zone.today} (Timezone: #{timezone_label}).
+      Today is #{today_in_timezone} (Timezone: #{timezone_label}).
 
       Extract a memory to store. Return JSON:
       {
@@ -392,7 +403,7 @@ class GeminiVision
 
   def memory_query_prompt(text)
     <<~PROMPT
-      Today is #{Time.zone.today} (Timezone: #{timezone_label}).
+      Today is #{today_in_timezone} (Timezone: #{timezone_label}).
 
       Extract what memories to search for. Return JSON:
       {
@@ -419,7 +430,7 @@ class GeminiVision
     end.join("\n")
 
     <<~PROMPT
-      Today is #{Time.zone.today} (Timezone: #{timezone_label}).
+      Today is #{today_in_timezone} (Timezone: #{timezone_label}).
 
       Answer the user's question using only the memories below. If the memories don't help, say you don't know.
 
@@ -433,7 +444,7 @@ class GeminiVision
   def event_query_prompt(text, context: nil)
     context_block = format_context_block(context)
     <<~PROMPT
-      Today is #{Time.zone.today} (Timezone: #{timezone_label}).
+      Today is #{today_in_timezone} (Timezone: #{timezone_label}).
 
       #{context_block}Extract the calendar event the user is referring to. Return JSON:
       {
@@ -442,6 +453,11 @@ class GeminiVision
         "start_time": "HH:MM",
         "confidence": "low|medium|high"
       }
+
+      Rules:
+      - If the user says "today", "tonight", "this morning", "this afternoon", or "this evening", set "date" to today.
+      - If the user says "tomorrow", set "date" to tomorrow.
+      - If the user gives only a weekday ("Friday"), choose the next occurrence of that weekday.
 
       If you cannot determine any details, return:
       {
@@ -457,7 +473,7 @@ class GeminiVision
   def event_update_prompt(text, context: nil)
     context_block = format_context_block(context)
     <<~PROMPT
-      Today is #{Time.zone.today} (Timezone: #{timezone_label}).
+      Today is #{today_in_timezone} (Timezone: #{timezone_label}).
 
       #{context_block}Extract which event to update and the requested changes. Return JSON:
       {
@@ -501,7 +517,7 @@ class GeminiVision
   def recurring_scope_prompt(text, context: nil)
     context_block = format_context_block(context)
     <<~PROMPT
-      Today is #{Time.zone.today} (Timezone: #{timezone_label}).
+      Today is #{today_in_timezone} (Timezone: #{timezone_label}).
 
       #{context_block}Determine whether the user wants to change just this event or the whole recurring series. Return JSON:
       {
@@ -525,6 +541,23 @@ class GeminiVision
     return "" if context_text.empty?
 
     "Recent conversation context:\n#{context_text}\n\n"
+  end
+
+  def clarify_missing_details_prompt(intent:, missing_fields:, extracted:, context: nil, extra: nil)
+    context_block = format_context_block(context)
+    missing_list = Array(missing_fields).map(&:to_s).join(', ')
+    extracted_json = extracted.to_json
+    extra_block = extra.to_s.strip
+    extra_block = extra_block.empty? ? "" : "Extra context:\n#{extra_block}\n\n"
+
+    <<~PROMPT
+      Today is #{today_in_timezone} (Timezone: #{timezone_label}).
+
+      #{context_block}You are helping a user complete a #{intent} request. Ask one concise question to get the missing details.
+      Missing fields: #{missing_list}
+      Known details: #{extracted_json}
+      #{extra_block}Return only the question text. Do not include JSON.
+    PROMPT
   end
 
 end
