@@ -457,8 +457,8 @@ class SlackMessageHandler
     return event.title.to_s if event.start_at.nil?
 
     date_label = event.start_at.strftime('%b %d')
-    time_label = event.start_at.strftime('%H:%M')
-    end_label = event.end_at ? event.end_at.strftime('%H:%M') : nil
+    time_label = event.start_at.strftime('%-I:%M %p')
+    end_label = event.end_at ? event.end_at.strftime('%-I:%M %p') : nil
     time_range = end_label ? "#{time_label}-#{end_label}" : time_label
     "#{date_label} #{time_range} - #{event.title}"
   end

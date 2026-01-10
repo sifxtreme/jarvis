@@ -1707,8 +1707,8 @@ class WebChatMessageHandler
     return event.title.to_s if event.start_at.nil?
 
     date_label = event.start_at.strftime('%b %d')
-    time_label = event.start_at.strftime('%H:%M')
-    end_label = event.end_at ? event.end_at.strftime('%H:%M') : nil
+    time_label = event.start_at.strftime('%-I:%M %p')
+    end_label = event.end_at ? event.end_at.strftime('%-I:%M %p') : nil
     time_range = end_label ? "#{time_label}-#{end_label}" : time_label
     "#{date_label} #{time_range} - #{event.title}"
   end
@@ -2034,7 +2034,7 @@ class WebChatMessageHandler
   def format_candidates(candidates)
     candidates.first(5).each_with_index.map do |entry, idx|
       event = entry[:event]
-      time_label = event.start_at ? event.start_at.strftime('%b %d %H:%M') : 'Unknown time'
+      time_label = event.start_at ? event.start_at.strftime('%b %d %-I:%M %p') : 'Unknown time'
       "#{idx + 1}) #{event.title} — #{time_label}"
     end.join("\n")
   end

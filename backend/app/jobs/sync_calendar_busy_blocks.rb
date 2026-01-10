@@ -14,7 +14,7 @@ class SyncCalendarBusyBlocks
       begin
         client = GoogleCalendarClient.new(user)
         time_min = Time.current.beginning_of_day - PAST_DAYS.days
-        time_max = time_min + WINDOW_DAYS.days
+        time_max = time_min + (WINDOW_DAYS + PAST_DAYS).days
 
         response = client.freebusy(calendar_ids: [connection.calendar_id], time_min: time_min, time_max: time_max)
         busy_times = response.calendars[connection.calendar_id]&.busy || []
