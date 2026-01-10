@@ -47,10 +47,14 @@ class GoogleCalendarAuthController < ActionController::API
     calendars = client.list_calendars
 
     calendars.each do |cal|
+      next unless cal[:primary] || cal[:access_role] == 'freeBusyReader'
+
       CalendarConnection.find_or_initialize_by(user: user, calendar_id: cal[:id]).update(
         summary: cal[:summary],
         access_role: cal[:access_role],
         primary: cal[:primary] || false,
+        busy_only: cal[:access_role] == 'freeBusyReader',
+        sync_enabled: true,
         time_zone: cal[:time_zone]
       )
     end

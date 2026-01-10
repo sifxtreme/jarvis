@@ -655,13 +655,16 @@ class WebChatMessageHandler
     date = data['date'].to_s.strip
     title = fallback_list_title(title)
     scope = CalendarEvent.where(user: @user).where.not(status: 'cancelled')
-    start_at = Time.zone.now
-    end_at = start_at + CALENDAR_WINDOW_FUTURE_DAYS.days
-    scope = scope.where(start_at: start_at..end_at)
-
     if date.present?
       day = Date.parse(date) rescue nil
       scope = scope.where(start_at: day.beginning_of_day..day.end_of_day) if day
+    elsif title.empty?
+      today = Time.zone.today
+      scope = scope.where(start_at: today.beginning_of_day..today.end_of_day)
+    else
+      start_at = Time.zone.now
+      end_at = start_at + CALENDAR_WINDOW_FUTURE_DAYS.days
+      scope = scope.where(start_at: start_at..end_at)
     end
 
     if title.present?
@@ -708,8 +711,13 @@ class WebChatMessageHandler
     title = fallback_list_title(@text) if title.empty?
 
     scope = CalendarEvent.where(user: @user).where.not(status: 'cancelled')
-    scope = scope.where(start_at: Time.zone.now..(Time.zone.now + CALENDAR_WINDOW_FUTURE_DAYS.days))
-    scope = apply_title_filters(scope, title) if title.present?
+    if title.present?
+      scope = scope.where(start_at: Time.zone.now..(Time.zone.now + CALENDAR_WINDOW_FUTURE_DAYS.days))
+      scope = apply_title_filters(scope, title)
+    else
+      today = Time.zone.today
+      scope = scope.where(start_at: today.beginning_of_day..today.end_of_day)
+    end
 
     events = scope.order(:start_at).limit(5).to_a
     events = fuzzy_event_candidates(title).map { |entry| entry[:event] } if events.empty? && title.present?
@@ -2237,10 +2245,14 @@ class WebChatMessageHandler
     calendars = client.list_calendars
 
     calendars.each do |cal|
+      next unless cal[:primary] || cal[:access_role] == 'freeBusyReader'
+
       CalendarConnection.find_or_initialize_by(user: user, calendar_id: cal[:id]).update(
         summary: cal[:summary],
         access_role: cal[:access_role],
         primary: cal[:primary] || false,
+        busy_only: cal[:access_role] == 'freeBusyReader',
+        sync_enabled: true,
         time_zone: cal[:time_zone]
       )
     end

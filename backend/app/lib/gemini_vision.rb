@@ -365,7 +365,7 @@ class GeminiVision
   end
 
   def timezone_label
-    Time.zone.tzinfo&.name || 'America/Los_Angeles'
+    'America/Los_Angeles'
   end
 
   def memory_prompt(text)

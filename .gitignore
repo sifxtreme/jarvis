@@ -3,3 +3,6 @@ jarvis.env
 
 # Teller mTLS credentials
 teller/*.pem
+
+# Local DB connection
+db/*.env
