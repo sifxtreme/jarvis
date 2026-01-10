@@ -844,13 +844,38 @@ class WebChatMessageHandler
   end
 
   def handle_list_query_clarification(payload)
-    data = payload['query'] || {}
-    title = data['title'].to_s.strip
-    title = fallback_list_title(title)
-    title = fallback_list_title(@text) if title.empty?
+    query = gemini.extract_event_query_from_text(@text, context: recent_context_text)
+    log_ai_request(
+      @message,
+      query[:usage],
+      request_kind: 'event_query',
+      model: gemini_intent_model,
+      status: query[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: query[:event])
+    )
+    data = query[:event] || {}
+    if data['error']
+      return build_response(
+        clarify_missing_details(
+          intent: 'list_events',
+          missing_fields: ['date', 'title'],
+          extracted: {},
+          fallback: data['message'] || "What date or title should I look for?"
+        )
+      )
+    end
+
+    title = fallback_list_title(data['title'].to_s.strip)
+    date = data['date'].to_s.strip
 
     scope = CalendarEvent.where(user: @user).where.not(status: 'cancelled')
-    if title.present?
+    if date.present?
+      day = Date.parse(date) rescue nil
+      if day
+        zone = la_now.time_zone
+        scope = scope.where(start_at: day.in_time_zone(zone).beginning_of_day..day.in_time_zone(zone).end_of_day)
+      end
+    elsif title.present?
       scope = scope.where(start_at: la_now..(la_now + CALENDAR_WINDOW_FUTURE_DAYS.days))
       scope = apply_title_filters(scope, title)
     else
@@ -860,10 +885,10 @@ class WebChatMessageHandler
     end
 
     events = scope.order(:start_at).limit(5).to_a
-    events = fuzzy_event_candidates(title).map { |entry| entry[:event] } if events.empty? && title.present?
+    events = fuzzy_event_candidates(title).map { |entry| entry[:event] } if events.empty? && title.present? && date.blank?
 
     if events.empty?
-      if title.present?
+      if title.present? || date.present?
         return build_response("Still nothing. Try a more specific title or date.")
       end
       return build_response("No events today. Want me to check what's next on your calendar?")
@@ -1124,7 +1149,7 @@ class WebChatMessageHandler
   end
 
   def extract_from_text
-    result = gemini.extract_event_from_text(@text)
+    result = gemini.extract_event_from_text(@text, context: recent_context_text)
     log_ai_request(
       @message,
       result[:usage],
@@ -1192,7 +1217,7 @@ class WebChatMessageHandler
   end
 
   def extract_transaction_from_text
-    result = gemini.extract_transaction_from_text(@text)
+    result = gemini.extract_transaction_from_text(@text, context: recent_context_text)
     log_ai_request(
       @message,
       result[:usage],
@@ -1723,7 +1748,7 @@ class WebChatMessageHandler
   def extract_query_tokens(text)
     cleaned = text.to_s.downcase
     cleaned = cleaned.gsub(/[^a-z0-9\s]/, ' ')
-    cleaned = cleaned.gsub(/\b(when|what|next|upcoming|event|events|find|show|list|the|a|an|is|are|me|please|for)\b/, ' ')
+    cleaned = cleaned.gsub(/\b(when|what|next|upcoming|event|events|find|show|list|the|a|an|is|are|me|please|for|today|tonight|tomorrow|this|morning|afternoon|evening)\b/, ' ')
     tokens = cleaned.split(/\s+/).reject(&:empty?)
     tokens.map { |token| normalize_token(token) }.uniq
   end

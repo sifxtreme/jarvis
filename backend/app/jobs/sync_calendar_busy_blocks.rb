@@ -13,10 +13,29 @@ class SyncCalendarBusyBlocks
 
       begin
         client = GoogleCalendarClient.new(user)
-        time_min = Time.current.beginning_of_day - PAST_DAYS.days
+        time_min = la_now.beginning_of_day - PAST_DAYS.days
         time_max = time_min + (WINDOW_DAYS + PAST_DAYS).days
 
+        started_at = Time.current
+        request_payload = {
+          calendar_ids: [connection.calendar_id],
+          time_min: time_min.iso8601,
+          time_max: time_max.iso8601
+        }
         response = client.freebusy(calendar_ids: [connection.calendar_id], time_min: time_min, time_max: time_max)
+        response_payload = response.respond_to?(:to_h) ? response.to_h : {}
+        BusySyncLog.create!(
+          calendar_connection: connection,
+          user: user,
+          calendar_id: connection.calendar_id,
+          time_min: time_min,
+          time_max: time_max,
+          status: 'success',
+          request_payload: request_payload,
+          response_payload: response_payload,
+          started_at: started_at,
+          finished_at: Time.current
+        )
         busy_times = response.calendars[connection.calendar_id]&.busy || []
 
         BusyBlock.where(user_id: user.id, calendar_id: connection.calendar_id)
@@ -41,8 +60,42 @@ class SyncCalendarBusyBlocks
         fingerprint = token_fingerprint(user.google_refresh_token)
         handle_calendar_auth_expired!(user, error: e.message, calendar_id: connection.calendar_id, source: 'calendar_busy_sync')
         Rails.logger.warn("[CalendarBusySync] Auth expired user_id=#{user.id} calendar_id=#{connection.calendar_id} token_fingerprint=#{fingerprint} error=#{e.message}")
+        BusySyncLog.create!(
+          calendar_connection: connection,
+          user: user,
+          calendar_id: connection.calendar_id,
+          time_min: time_min,
+          time_max: time_max,
+          status: 'error',
+          error_message: e.message,
+          request_payload: {
+            calendar_ids: [connection.calendar_id],
+            time_min: time_min.iso8601,
+            time_max: time_max.iso8601
+          },
+          response_payload: {},
+          started_at: started_at,
+          finished_at: Time.current
+        )
       rescue GoogleCalendarClient::CalendarError => e
         Rails.logger.warn("[CalendarBusySync] Sync failed user_id=#{user.id} calendar_id=#{connection.calendar_id} error=#{e.message}")
+        BusySyncLog.create!(
+          calendar_connection: connection,
+          user: user,
+          calendar_id: connection.calendar_id,
+          time_min: time_min,
+          time_max: time_max,
+          status: 'error',
+          error_message: e.message,
+          request_payload: {
+            calendar_ids: [connection.calendar_id],
+            time_min: time_min.iso8601,
+            time_max: time_max.iso8601
+          },
+          response_payload: {},
+          started_at: started_at,
+          finished_at: Time.current
+        )
       end
     end
   end
@@ -53,6 +106,10 @@ class SyncCalendarBusyBlocks
     Time.zone.parse(value.to_s)
   rescue StandardError
     nil
+  end
+
+  def self.la_now
+    Time.now.in_time_zone('America/Los_Angeles')
   end
 
   def self.handle_calendar_auth_expired!(user, error: nil, calendar_id: nil, source: 'unknown')

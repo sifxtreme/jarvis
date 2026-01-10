@@ -20,8 +20,8 @@ class GeminiVision
     parse_json_response(response, adjust_event_date: true)
   end
 
-  def extract_event_from_text(text)
-    parts = [{ text: text_prompt(text) }]
+  def extract_event_from_text(text, context: nil)
+    parts = [{ text: text_prompt(text, context: context) }]
 
     response = make_request(parts: parts, model: DEFAULT_EXTRACT_MODEL)
     parse_json_response(response, adjust_event_date: true)
@@ -34,8 +34,8 @@ class GeminiVision
     parse_json_response(response)
   end
 
-  def extract_transaction_from_text(text)
-    parts = [{ text: transaction_text_prompt(text) }]
+  def extract_transaction_from_text(text, context: nil)
+    parts = [{ text: transaction_text_prompt(text, context: context) }]
 
     response = make_request(parts: parts, model: DEFAULT_EXTRACT_MODEL)
     parse_json_response(response)
@@ -226,11 +226,12 @@ class GeminiVision
     PROMPT
   end
 
-  def text_prompt(text)
+  def text_prompt(text, context: nil)
+    context_block = format_context_block(context)
     <<~PROMPT
       Today is #{today_in_timezone} (Timezone: #{timezone_label}).
 
-      Extract calendar event details from the text below. Return JSON:
+      #{context_block}Extract calendar event details from the text below. Return JSON:
       {
         "title": "Event name",
         "date": "YYYY-MM-DD" (if year missing, infer closest future date),
@@ -291,11 +292,12 @@ class GeminiVision
     PROMPT
   end
 
-  def transaction_text_prompt(text)
+  def transaction_text_prompt(text, context: nil)
+    context_block = format_context_block(context)
     <<~PROMPT
       Today is #{today_in_timezone} (Timezone: #{timezone_label}).
 
-      Extract a financial transaction from the text. Return JSON:
+      #{context_block}Extract a financial transaction from the text. Return JSON:
       {
         "amount": 12.34,
         "merchant": "Merchant name",
