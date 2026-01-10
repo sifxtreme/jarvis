@@ -14,10 +14,17 @@ testing_resque:
 
 calendar_busy_sync:
   cron: "*/10 * * * *"
+  class: "SyncCalendarBusyBlocks"
+  queue: calendar
+  args:
+  description: "Sync busy blocks from connected calendars"
+
+calendar_events_sync:
+  cron: "*/10 * * * *"
   class: "SyncCalendarEvents"
   queue: calendar
   args:
-  description: "Sync events or busy blocks from connected calendars"
+  description: "Sync full calendar events from connected calendars"
 
 slack_daily_digest:
   cron: "0 7 * * *"
