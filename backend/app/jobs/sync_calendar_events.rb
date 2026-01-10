@@ -1,3 +1,5 @@
+require 'digest'
+
 class SyncCalendarEvents
   @queue = :calendar
 
@@ -19,14 +21,22 @@ class SyncCalendarEvents
       user = connection.user
       next if user.nil? || user.google_refresh_token.to_s.empty?
 
-      client = GoogleCalendarClient.new(user)
-      time_min = Time.current.beginning_of_day - PAST_DAYS.days
-      time_max = time_min + WINDOW_DAYS.days
+      begin
+        client = GoogleCalendarClient.new(user)
+        time_min = Time.current.beginning_of_day - PAST_DAYS.days
+        time_max = time_min + WINDOW_DAYS.days
 
-      if connection.busy_only
-        sync_busy_blocks(connection, client, time_min, time_max)
-      else
-        sync_full_events(connection, client, time_min, time_max)
+        if connection.busy_only
+          sync_busy_blocks(connection, client, time_min, time_max)
+        else
+          sync_full_events(connection, client, time_min, time_max)
+        end
+      rescue GoogleCalendarClient::CalendarAuthError => e
+        fingerprint = token_fingerprint(user.google_refresh_token)
+        handle_calendar_auth_expired!(user, error: e.message, calendar_id: connection.calendar_id, source: 'calendar_sync')
+        Rails.logger.warn("[CalendarSync] Auth expired user_id=#{user.id} calendar_id=#{connection.calendar_id} token_fingerprint=#{fingerprint} error=#{e.message}")
+      rescue GoogleCalendarClient::CalendarError => e
+        Rails.logger.warn("[CalendarSync] Sync failed user_id=#{user.id} calendar_id=#{connection.calendar_id} error=#{e.message}")
       end
     end
   end
@@ -138,5 +148,28 @@ class SyncCalendarEvents
 
   def self.busy_key(start_at, end_at)
     "#{start_at.iso8601}-#{end_at.iso8601}"
+  end
+
+  def self.handle_calendar_auth_expired!(user, error: nil, calendar_id: nil, source: 'unknown')
+    return if user.nil?
+
+    fingerprint = token_fingerprint(user.google_refresh_token)
+    user.update(google_refresh_token: nil)
+    CalendarConnection.where(user: user).update_all(sync_enabled: false)
+    CalendarAuthLog.create!(
+      user: user,
+      calendar_id: calendar_id,
+      source: source,
+      error_code: 'invalid_grant',
+      error_message: error,
+      token_fingerprint: fingerprint
+    )
+    Rails.logger.warn("[CalendarAuth] Revoked refresh token for user_id=#{user.id} token_fingerprint=#{fingerprint} error=#{error}") if error
+  end
+
+  def self.token_fingerprint(token)
+    return nil if token.to_s.empty?
+
+    Digest::SHA256.hexdigest(token.to_s)[0, 12]
   end
 end

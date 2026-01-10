@@ -1,3 +1,5 @@
+require 'digest'
+
 class ChatMessagesController < ApplicationController
   include Rails.application.routes.url_helpers
 
@@ -76,10 +78,29 @@ class ChatMessagesController < ApplicationController
   rescue StandardError => e
     Rails.logger.error "[Chat] Failed to process message: #{e.message}"
     thread_state = defined?(thread) && thread ? thread.state || {} : {}
+    user = current_user
+    source = if e.backtrace&.any? { |line| line.include?('sync_calendar_list_for') }
+               'calendar_list_sync'
+             elsif e.backtrace&.any? { |line| line.include?('sync_calendar_events') }
+               'calendar_sync'
+             elsif e.backtrace&.any? { |line| line.include?('sync_calendar_busy_blocks') }
+               'calendar_busy_sync'
+             else
+               nil
+             end
+    token_fingerprint = if user&.google_refresh_token.to_s.empty?
+                          nil
+                        else
+                          Digest::SHA256.hexdigest(user.google_refresh_token)[0, 12]
+                        end
     action_context = {
       pending_action: thread_state['pending_action'],
       payload: thread_state['payload'],
-      last_action: thread_state['last_action']
+      last_action: thread_state['last_action'],
+      user_id: user&.id,
+      user_email: user&.email,
+      source: source,
+      token_fingerprint: token_fingerprint
     }.compact
     if defined?(user_message) && user_message
       ChatAction.create!(
@@ -103,7 +124,13 @@ class ChatMessagesController < ApplicationController
       error: e.message,
       error_code: 'chat_processing_failed',
       request_id: request.request_id,
-      action_context: action_context
+      action_context: action_context,
+      debug: {
+        user_id: user&.id,
+        user_email: user&.email,
+        source: source,
+        token_fingerprint: token_fingerprint
+      }.compact
     }, status: :internal_server_error
   end
 

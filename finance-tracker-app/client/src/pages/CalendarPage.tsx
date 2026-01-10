@@ -1166,6 +1166,9 @@ export default function CalendarPage() {
                               const palette = getEntryPalette(entry);
                               const muted = entry.type === "busy" ? "opacity-75" : "";
                               const label = entry.userIds.map((id) => userMap.get(id)).filter(Boolean).join(" + ");
+                              const calendarLabel = entry.isWork
+                                ? workCalendarLabelMap.get(entry.calendarId) || entry.calendarSummary || entry.calendarId
+                                : entry.calendarSummary;
                               return (
                                 <HoverCard key={entry.key}>
                                   <HoverCardTrigger asChild>
@@ -1202,8 +1205,8 @@ export default function CalendarPage() {
                                       {entry.location && (
                                         <div className="text-xs text-slate-600 dark:text-slate-300">Location: {entry.location}</div>
                                       )}
-                                      {entry.calendarSummary && (
-                                        <div className="text-xs text-slate-500 dark:text-slate-400">Calendar: {entry.calendarSummary}</div>
+                                      {calendarLabel && (
+                                        <div className="text-xs text-slate-500 dark:text-slate-400">Calendar: {calendarLabel}</div>
                                       )}
                                       {!entry.isWork && label && (
                                         <div className="text-xs text-slate-500 dark:text-slate-400">People: {label}</div>

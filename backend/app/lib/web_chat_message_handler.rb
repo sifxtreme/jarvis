@@ -1132,6 +1132,31 @@ class WebChatMessageHandler
       response_lines << "Recurrence: #{recurrence_rules.join(', ')}"
     end
     build_response(response_lines.compact.join("\n"), event_created: true, action: 'calendar_event_created')
+  rescue GoogleCalendarClient::CalendarAuthError => e
+    fingerprint = token_fingerprint(@user&.google_refresh_token)
+    handle_calendar_auth_expired!(
+      @user,
+      error: e.message,
+      calendar_id: primary_calendar_id,
+      source: 'web_chat_create'
+    )
+    log_action(
+      @message,
+      calendar_event_id: nil,
+      calendar_id: primary_calendar_id,
+      status: 'error',
+      action_type: 'create_calendar_event',
+      metadata: {
+        error_code: 'calendar_auth_expired',
+        error: e.message,
+        token_fingerprint: fingerprint,
+        correlation_id: @correlation_id
+      }
+    )
+    build_response(
+      "Your calendar authorization expired. Please reconnect at https://finances.sifxtre.me.",
+      error_code: 'calendar_auth_expired'
+    )
   rescue GoogleCalendarClient::CalendarError => e
     log_action(
       @message,
@@ -1261,6 +1286,34 @@ class WebChatMessageHandler
       response_lines << "Detached: this instance is now standalone"
     end
     build_response(response_lines.compact.join("\n"), event_created: true, action: 'calendar_event_updated')
+  rescue GoogleCalendarClient::CalendarAuthError => e
+    fingerprint = token_fingerprint(@user&.google_refresh_token)
+    handle_calendar_auth_expired!(
+      @user,
+      error: e.message,
+      calendar_id: event_record.calendar_id,
+      source: 'web_chat_update'
+    )
+    log_action(
+      @message,
+      calendar_event_id: event_record.id,
+      calendar_id: event_record.calendar_id,
+      status: 'error',
+      action_type: 'update_calendar_event',
+      metadata: {
+        error_code: 'calendar_auth_expired',
+        error: e.message,
+        token_fingerprint: fingerprint,
+        event_id: target_event_id,
+        changes: changes,
+        scope: scope,
+        correlation_id: @correlation_id
+      }
+    )
+    build_response(
+      "Your calendar authorization expired. Please reconnect at https://finances.sifxtre.me.",
+      error_code: 'calendar_auth_expired'
+    )
   rescue GoogleCalendarClient::CalendarError => e
     log_action(
       @message,
@@ -1336,6 +1389,33 @@ class WebChatMessageHandler
       "Scope: #{scope_label(scope, detached_instance: false)}"
     ]
     build_response(response_lines.compact.join("\n"), event_created: true, action: 'calendar_event_deleted')
+  rescue GoogleCalendarClient::CalendarAuthError => e
+    fingerprint = token_fingerprint(@user&.google_refresh_token)
+    handle_calendar_auth_expired!(
+      @user,
+      error: e.message,
+      calendar_id: event_record.calendar_id,
+      source: 'web_chat_delete'
+    )
+    log_action(
+      @message,
+      calendar_event_id: event_record.id,
+      calendar_id: event_record.calendar_id,
+      status: 'error',
+      action_type: 'delete_calendar_event',
+      metadata: {
+        error_code: 'calendar_auth_expired',
+        error: e.message,
+        token_fingerprint: fingerprint,
+        event_id: target_event_id,
+        scope: scope,
+        correlation_id: @correlation_id
+      }
+    )
+    build_response(
+      "Your calendar authorization expired. Please reconnect at https://finances.sifxtre.me.",
+      error_code: 'calendar_auth_expired'
+    )
   rescue GoogleCalendarClient::CalendarError => e
     log_action(
       @message,
@@ -2097,6 +2177,14 @@ class WebChatMessageHandler
 
       begin
         sync_calendar_list_for(user)
+      rescue GoogleCalendarClient::CalendarAuthError => e
+        handle_calendar_auth_expired!(
+          user,
+          error: e.message,
+          calendar_id: nil,
+          source: 'calendar_list_sync'
+        )
+        Rails.logger.warn("[CalendarUpdate] Calendar auth expired user_id=#{user.id} error=#{e.message}")
       rescue GoogleCalendarClient::CalendarError => e
         Rails.logger.warn("[CalendarUpdate] Calendar list sync failed user_id=#{user.id} error=#{e.message}")
       end
@@ -2166,6 +2254,30 @@ class WebChatMessageHandler
     return 'this event only (detached)' if detached_instance
 
     scope == 'series' ? 'entire series' : 'this event only'
+  end
+
+  def handle_calendar_auth_expired!(user, error: nil, calendar_id: nil, source: 'unknown')
+    return if user.nil?
+
+    fingerprint = token_fingerprint(user.google_refresh_token)
+    user.update(google_refresh_token: nil)
+    CalendarConnection.where(user: user).update_all(sync_enabled: false)
+    CalendarAuthLog.create!(
+      user: user,
+      calendar_id: calendar_id,
+      source: source,
+      error_code: 'invalid_grant',
+      error_message: error,
+      token_fingerprint: fingerprint,
+      metadata: { correlation_id: @correlation_id }.compact
+    )
+    Rails.logger.warn("[CalendarAuth] Revoked refresh token for user_id=#{user.id} token_fingerprint=#{fingerprint} error=#{error}") if error
+  end
+
+  def token_fingerprint(token)
+    return nil if token.to_s.empty?
+
+    Digest::SHA256.hexdigest(token.to_s)[0, 12]
   end
 
   def log_action(message, calendar_event_id:, calendar_id:, status:, action_type:, metadata: {})

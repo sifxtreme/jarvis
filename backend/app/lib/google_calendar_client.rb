@@ -3,6 +3,7 @@ require 'signet/oauth_2/client'
 
 class GoogleCalendarClient
   class CalendarError < StandardError; end
+  class CalendarAuthError < CalendarError; end
 
   def initialize(user)
     @user = user
@@ -176,12 +177,24 @@ class GoogleCalendarClient
   private
 
   def build_oauth_client
-    Signet::OAuth2::Client.new(
+    client = Signet::OAuth2::Client.new(
       client_id: ENV.fetch('GOOGLE_OAUTH_CLIENT_ID'),
       client_secret: ENV.fetch('GOOGLE_OAUTH_CLIENT_SECRET'),
       token_credential_uri: 'https://oauth2.googleapis.com/token',
       refresh_token: @user.google_refresh_token
-    ).tap(&:fetch_access_token!)
+    )
+
+    begin
+      client.fetch_access_token!
+    rescue StandardError => e
+      message = e.message.to_s
+      if message.include?('invalid_grant') || message.include?('expired or revoked')
+        raise CalendarAuthError, message
+      end
+      raise CalendarError, message
+    end
+
+    client
   end
 
   def parse_datetime(date_str, time_str)

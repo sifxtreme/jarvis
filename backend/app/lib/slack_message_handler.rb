@@ -1,4 +1,5 @@
 require 'base64'
+require 'digest'
 require 'net/http'
 require 'securerandom'
 
@@ -213,6 +214,21 @@ class SlackMessageHandler
       "Time: #{event_time(result)}",
       "Link: #{result.html_link}"
     ].compact.join("\n")
+  rescue GoogleCalendarClient::CalendarAuthError => e
+    fingerprint = token_fingerprint(user&.google_refresh_token)
+    handle_calendar_auth_expired!(
+      user,
+      error: e.message,
+      calendar_id: calendar_id,
+      source: 'slack_create'
+    )
+    log_action(
+      message,
+      calendar_event: nil,
+      status: 'error',
+      metadata: { error_code: 'calendar_auth_expired', error: e.message, token_fingerprint: fingerprint }
+    )
+    "Your calendar authorization expired. Please reconnect at https://finances.sifxtre.me."
   rescue GoogleCalendarClient::CalendarError => e
     log_action(message, calendar_event: nil, status: 'error', metadata: { error: e.message })
     "Calendar error: #{e.message}"
@@ -510,6 +526,29 @@ class SlackMessageHandler
     data['interval'] = data['interval'].to_i if data['interval']
     data['count'] = data['count'].to_i if data['count']
     data
+  end
+
+  def handle_calendar_auth_expired!(user, error: nil, calendar_id: nil, source: 'unknown')
+    return if user.nil?
+
+    fingerprint = token_fingerprint(user.google_refresh_token)
+    user.update(google_refresh_token: nil)
+    CalendarConnection.where(user: user).update_all(sync_enabled: false)
+    CalendarAuthLog.create!(
+      user: user,
+      calendar_id: calendar_id,
+      source: source,
+      error_code: 'invalid_grant',
+      error_message: error,
+      token_fingerprint: fingerprint
+    )
+    Rails.logger.warn("[CalendarAuth] Revoked refresh token for user_id=#{user.id} token_fingerprint=#{fingerprint} error=#{error}") if error
+  end
+
+  def token_fingerprint(token)
+    return nil if token.to_s.empty?
+
+    Digest::SHA256.hexdigest(token.to_s)[0, 12]
   end
 
   def log_action(message, calendar_event:, status:, metadata: {})
