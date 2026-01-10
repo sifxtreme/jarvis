@@ -417,6 +417,9 @@ class WebChatMessageHandler
     end
 
     if candidates.length > 1
+      if (auto_pick = auto_pick_candidate(candidates))
+        return confirm_or_update_event(auto_pick[:event], changes)
+      end
       set_pending_action('select_event_for_update', { 'candidates' => serialize_candidates(candidates), 'changes' => changes })
       return build_response("Which event should I update?\n#{format_candidates(candidates)}")
     end
@@ -455,6 +458,10 @@ class WebChatMessageHandler
     end
 
     if candidates.length > 1
+      if (auto_pick = auto_pick_candidate(candidates))
+        clear_thread_state
+        return confirm_or_update_event(auto_pick[:event], changes)
+      end
       set_pending_action('select_event_for_update', { 'candidates' => serialize_candidates(candidates), 'changes' => changes })
       return build_response("Which event should I update?\n#{format_candidates(candidates)}")
     end
@@ -506,6 +513,10 @@ class WebChatMessageHandler
     end
 
     if candidates.length > 1
+      if (auto_pick = auto_pick_candidate(candidates))
+        clear_thread_state
+        return confirm_or_update_event(auto_pick[:event], changes)
+      end
       set_pending_action('select_event_for_update', { 'candidates' => serialize_candidates(candidates), 'changes' => changes })
       return build_response("Which event should I update?\n#{format_candidates(candidates)}")
     end
@@ -616,6 +627,9 @@ class WebChatMessageHandler
     end
 
     if candidates.length > 1
+      if (auto_pick = auto_pick_candidate(candidates))
+        return confirm_or_delete_event(auto_pick[:event])
+      end
       set_pending_action('select_event_for_delete', { 'candidates' => serialize_candidates(candidates) })
       return build_response("Which event should I delete?\n#{format_candidates(candidates)}")
     end
@@ -731,6 +745,9 @@ class WebChatMessageHandler
     return build_response("I couldn't find that event. Can you share the title and date?") if candidates.empty?
 
     if candidates.length > 1
+      if (auto_pick = auto_pick_candidate(candidates))
+        return confirm_or_delete_event(auto_pick[:event])
+      end
       set_pending_action('select_event_for_delete', { 'candidates' => serialize_candidates(candidates) })
       return build_response("Which event should I delete?\n#{format_candidates(candidates)}")
     end
@@ -1838,6 +1855,19 @@ class WebChatMessageHandler
       time_label = event.start_at ? event.start_at.strftime('%b %d %H:%M') : 'Unknown time'
       "#{idx + 1}) #{event.title} — #{time_label}"
     end.join("\n")
+  end
+
+  def auto_pick_candidate(candidates)
+    return nil if candidates.length < 2
+
+    top, second = candidates[0], candidates[1]
+    top_score = top[:score].to_f
+    second_score = second[:score].to_f
+
+    return nil if top_score < 6
+    return top if top_score >= second_score + 3
+
+    nil
   end
 
   def selection_index_from_text(max_count)
