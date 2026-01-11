@@ -27,8 +27,8 @@ class GeminiVision
     parse_json_response(response, adjust_event_date: true)
   end
 
-  def classify_intent(text:, has_image:)
-    parts = [{ text: intent_prompt(text, has_image: has_image, today: today_in_timezone) }]
+  def classify_intent(text:, has_image:, context: nil)
+    parts = [{ text: intent_prompt(text, has_image: has_image, today: today_in_timezone, context: context) }]
 
     response = make_request(parts: parts, model: DEFAULT_INTENT_MODEL)
     parse_json_response(response)
@@ -260,11 +260,12 @@ class GeminiVision
     PROMPT
   end
 
-  def intent_prompt(text, has_image:, today:)
+  def intent_prompt(text, has_image:, today:, context: nil)
+    context_block = format_context_block(context)
     <<~PROMPT
       Today is #{today} (Timezone: #{timezone_label}).
 
-      You are classifying the user's intent for a chat assistant that manages calendars and finances.
+      #{context_block}You are classifying the user's intent for a chat assistant that manages calendars and finances.
       Return JSON only:
       {
         "intent": "create_event" | "update_event" | "delete_event" | "create_transaction" | "create_memory" | "search_memory" | "list_events" | "digest" | "help",

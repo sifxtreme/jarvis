@@ -785,7 +785,7 @@ class WebChatMessageHandler
 
     title = data['title'].to_s.strip
     date = data['date'].to_s.strip
-    title = fallback_list_title(title)
+    title = fallback_list_title(title) if date.blank?
     scope = CalendarEvent.where(user: @user).where.not(status: 'cancelled')
     if date.present?
       day = Date.parse(date) rescue nil
@@ -1882,7 +1882,7 @@ class WebChatMessageHandler
   end
 
   def classify_intent
-    result = gemini.classify_intent(text: @text, has_image: image_attached?)
+    result = gemini.classify_intent(text: @text, has_image: image_attached?, context: recent_context_text)
     log_ai_request(
       @message,
       result[:usage],

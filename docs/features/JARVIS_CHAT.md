@@ -19,6 +19,14 @@ Date: 2026-01-02
 - Gemini + Google Calendar requests/responses are logged with correlation IDs for traceability.
 - Recurring events are supported for create/update/delete with scope choice (this event vs whole series).
 
+## Reliability + Context (Future Idea)
+
+- **Planner → Executor → Verifier loop** (not implemented):
+  - **Planner**: returns a small JSON plan (intent, missing fields, tool calls, confirmation needs).
+  - **Executor**: runs only the planned tools with strict input constraints.
+  - **Verifier**: re-checks the API/DB response vs the plan and reports partial failures.
+  - Rationale: reduces mis-routing, improves multi-step context handling, and prevents silent failures.
+
 ## Product Vision
 
 ### Why Chat?
