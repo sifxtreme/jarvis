@@ -100,51 +100,51 @@ This section reflects current desired behavior and priorities for the first robu
 
 ## Core Architecture
 
-### The Butler's Notebook Pattern
+### The Butler's Notebook Pattern (Implementation Strategy)
 
-Following Stevens' approach, Jarvis uses a single `memories` table as its "butler's notebook":
+Following Stevens' approach, Jarvis uses a single `memories` table as its "butler's notebook".
+**Infrastructure Choice:** We will leverage the existing **PostgreSQL on EC2** by installing the **`pgvector`** extension. This allows semantic search (RAG) directly alongside relational data without new infrastructure.
 
 ```ruby
 # db/migrate/xxx_create_memories.rb
 create_table :memories do |t|
-  t.text :content, null: false           # Free-form text (LLM interprets meaning)
-  t.string :category                      # finance, calendar, email, household, family, etc.
-  t.string :source                        # teller, gmail, gcal, manual, screenshot, etc.
-  t.date :relevant_date                   # When is this memory relevant? (nullable = always)
-  t.date :expiry_date                     # When does this become irrelevant?
-  t.jsonb :metadata, default: {}          # Structured data for programmatic access
-  t.references :family_member, optional: true  # Link to specific person
+  t.text :content, null: false           # Free-form text
+  t.vector :embedding, limit: 768        # pgvector column for semantic search
+  t.string :category                      # finance, calendar, email, household
+  t.string :source                        # teller, gmail, gcal, manual
+  t.date :relevant_date                   # When is this relevant?
+  t.date :expiry_date                     # When does this expire?
+  t.jsonb :metadata, default: {}          # Structured data
+  t.references :family_member, optional: true
   t.timestamps
 end
 ```
 
-### Why This Works
+### Why This Works (EC2 + Rails)
 
-1. **LLMs are flexible** — They can interpret "Pick up [kid] from soccer at 4pm Tuesday" without rigid schemas
-2. **Easy to extend** — New data sources just write to the same table
-3. **Context windows are huge** — Claude handles 200K tokens; we can load weeks of context
-4. **Simple to query** — `Memory.where(relevant_date: Date.today..7.days.from_now)`
+1. **Zero Latency:** Memories live in the same DB as your Finance/Calendar data.
+2. **Hybrid Search:** You can query `Memory.where(date: Date.today).nearest_neighbors(:embedding, question_embedding)`.
+3. **Cost Effective:** No Pinecone/Weaviate fees; just your existing EC2 instance.
 
-### Data Flow
+### Data Flow (Updated)
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   Data Sources  │────▶│   Cron Jobs     │────▶│   Memories DB   │
-│                 │     │   (Importers)   │     │                 │
-│ • Gmail         │     │                 │     │ • Unified store │
-│ • Google Cal    │     │ • Sync hourly   │     │ • Date-indexed  │
-│ • Screenshots   │     │ • Parse & store │     │ • LLM-readable  │
+│   Data Sources  │────▶│   Rails Jobs    │────▶│   Postgres DB   │
+│                 │     │ (Resque/Sidekiq)│     │  (with Vector)  │
+│ • Gmail         │     │                 │     │                 │
+│ • Google Cal    │     │ • Sync hourly   │     │ • Relational    │
+│ • Screenshots   │     │ • Generate Embed│     │ • Semantic Idx  │
 │ • Teller        │     │                 │     │                 │
-│ • Manual input  │     │                 │     │                 │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
                                                         │
                                                         ▼
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   User Query    │────▶│   LLM Engine    │────▶│   Response      │
-│                 │     │                 │     │                 │
-│ • "What's today"│     │ • Load context  │     │ • Daily brief   │
-│ • Screenshot    │     │ • Claude API    │     │ • Actions taken │
-│ • Voice/Text    │     │ • Tool calling  │     │ • Reminders     │
+│   User Query    │────▶│   Rails Router  │────▶│   Response      │
+│                 │     │ (Current Arch)  │     │                 │
+│ • "What's today"│     │ • Classify      │     │ • Daily brief   │
+│ • Chat          │     │ • RAG Search    │     │ • Actions taken │
+│ • Voice         │     │ • Tool Call     │     │ • Reminders     │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
 ```
 
