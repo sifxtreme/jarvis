@@ -7,8 +7,11 @@ class SyncCalendarBusyBlocks
   PAST_DAYS = 7
 
   def self.perform
-    CalendarConnection.where(busy_only: true, sync_enabled: true).includes(:user).find_each do |connection|
-      user = connection.user
+    connections_by_calendar = CalendarConnection.where(busy_only: true, sync_enabled: true).includes(:user).group_by(&:calendar_id)
+
+    connections_by_calendar.each_value do |connections|
+      connection = select_connection(connections)
+      user = connection&.user
       next if user.nil? || user.google_refresh_token.to_s.empty?
 
       begin
@@ -16,11 +19,17 @@ class SyncCalendarBusyBlocks
         time_min = la_now.beginning_of_day - PAST_DAYS.days
         time_max = time_min + (WINDOW_DAYS + PAST_DAYS).days
 
+        BusyBlock.where(calendar_id: connection.calendar_id, start_at: time_min..time_max)
+                 .where.not(user_id: user.id)
+                 .delete_all
+
         started_at = Time.current
         request_payload = {
           calendar_ids: [connection.calendar_id],
           time_min: time_min.iso8601,
-          time_max: time_max.iso8601
+          time_max: time_max.iso8601,
+          selected_connection_id: connection.id,
+          skipped_connection_ids: connections.map(&:id) - [connection.id]
         }
         response = client.freebusy(calendar_ids: [connection.calendar_id], time_min: time_min, time_max: time_max)
         response_payload = response.respond_to?(:to_h) ? response.to_h : {}
@@ -71,7 +80,9 @@ class SyncCalendarBusyBlocks
           request_payload: {
             calendar_ids: [connection.calendar_id],
             time_min: time_min.iso8601,
-            time_max: time_max.iso8601
+            time_max: time_max.iso8601,
+            selected_connection_id: connection.id,
+            skipped_connection_ids: connections.map(&:id) - [connection.id]
           },
           response_payload: {},
           started_at: started_at,
@@ -90,7 +101,9 @@ class SyncCalendarBusyBlocks
           request_payload: {
             calendar_ids: [connection.calendar_id],
             time_min: time_min.iso8601,
-            time_max: time_max.iso8601
+            time_max: time_max.iso8601,
+            selected_connection_id: connection.id,
+            skipped_connection_ids: connections.map(&:id) - [connection.id]
           },
           response_payload: {},
           started_at: started_at,
@@ -110,6 +123,14 @@ class SyncCalendarBusyBlocks
 
   def self.la_now
     Time.now.in_time_zone('America/Los_Angeles')
+  end
+
+  def self.select_connection(connections)
+    return nil if connections.empty?
+
+    connections.find { |conn| conn.user&.email == conn.calendar_id } ||
+      connections.find(&:primary) ||
+      connections.min_by { |conn| conn.user_id.to_i }
   end
 
   def self.handle_calendar_auth_expired!(user, error: nil, calendar_id: nil, source: 'unknown')

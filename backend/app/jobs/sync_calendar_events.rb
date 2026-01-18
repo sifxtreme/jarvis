@@ -26,11 +26,9 @@ class SyncCalendarEvents
         time_min = Time.current.beginning_of_day - PAST_DAYS.days
         time_max = time_min + WINDOW_DAYS.days
 
-        if connection.busy_only
-          sync_busy_blocks(connection, client, time_min, time_max)
-        else
-          sync_full_events(connection, client, time_min, time_max)
-        end
+        next if connection.busy_only
+
+        sync_full_events(connection, client, time_min, time_max)
       rescue GoogleCalendarClient::CalendarAuthError => e
         fingerprint = token_fingerprint(user.google_refresh_token)
         handle_calendar_auth_expired!(user, error: e.message, calendar_id: connection.calendar_id, source: 'calendar_sync')
