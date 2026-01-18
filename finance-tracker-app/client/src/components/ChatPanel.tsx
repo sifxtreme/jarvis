@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { ImagePlus, Send, X } from "lucide-react";
@@ -73,7 +74,7 @@ const dispatchDataRefresh = (action?: string | null) => {
   }
 };
 
-const linkifyText = (text: string) => {
+const linkifyText = (text: string, className: string) => {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const parts = text.split(urlRegex);
   return parts.map((part, index) => {
@@ -86,7 +87,7 @@ const linkifyText = (text: string) => {
         href={part}
         target="_blank"
         rel="noreferrer"
-        className="text-blue-600 underline underline-offset-2 break-words dark:text-blue-300"
+        className={cn("underline underline-offset-2 break-words", className)}
       >
         {part}
       </a>
@@ -94,7 +95,7 @@ const linkifyText = (text: string) => {
   });
 };
 
-const renderMessageText = (text: string) => {
+const renderMessageText = (text: string, linkClassName: string) => {
   const lines = text.split("\n");
   const header = lines[0]?.trim() || "";
   const isListHeader =
@@ -103,12 +104,12 @@ const renderMessageText = (text: string) => {
   if (isListHeader) {
     return (
       <div className="space-y-2">
-        <div className="font-medium">{linkifyText(header)}</div>
+        <div className="font-medium">{linkifyText(header, linkClassName)}</div>
         <ul className="space-y-1">
           {lines.slice(1).filter(Boolean).map((line, index) => (
             <li key={index} className="flex gap-2">
               <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400/80 dark:bg-slate-500" />
-              <span className="flex-1">{linkifyText(line.trim())}</span>
+              <span className="flex-1">{linkifyText(line.trim(), linkClassName)}</span>
             </li>
           ))}
         </ul>
@@ -116,7 +117,7 @@ const renderMessageText = (text: string) => {
     );
   }
 
-  return <div className="whitespace-pre-wrap">{linkifyText(text)}</div>;
+  return <div className="whitespace-pre-wrap">{linkifyText(text, linkClassName)}</div>;
 };
 
 export function ChatPanel({ onEventCreated }: ChatPanelProps) {
@@ -133,6 +134,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [isPreparingImage, setIsPreparingImage] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -405,13 +407,26 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
                       ) : (
                         <div className="space-y-2">
                           {message.imageUrl && (
-                            <img
-                              src={message.imageUrl}
-                              alt="Chat upload"
-                              className="max-h-64 w-full rounded-lg object-cover"
-                            />
+                            <button
+                              type="button"
+                              className="block w-full cursor-zoom-in"
+                              onClick={() => setPreviewImageUrl(message.imageUrl ?? null)}
+                              aria-label="Preview image"
+                            >
+                              <img
+                                src={message.imageUrl}
+                                alt="Chat upload"
+                                className="max-h-64 w-full rounded-lg object-cover"
+                              />
+                            </button>
                           )}
-                          {message.text && renderMessageText(message.text)}
+                          {message.text &&
+                            renderMessageText(
+                              message.text,
+                              isUser
+                                ? "text-white/90 decoration-white/80"
+                                : "text-blue-600 dark:text-blue-300"
+                            )}
                         </div>
                       )}
                     </div>
@@ -514,6 +529,18 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
           Enter to send • Shift+Enter for a new line • Paste or drag an image
         </div>
       </form>
+
+      <Dialog open={!!previewImageUrl} onOpenChange={(open) => !open && setPreviewImageUrl(null)}>
+        <DialogContent className="max-w-[95vw] max-h-[90vh] p-2">
+          {previewImageUrl && (
+            <img
+              src={previewImageUrl}
+              alt="Chat preview"
+              className="max-h-[80vh] w-auto max-w-full rounded-md object-contain"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

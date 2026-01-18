@@ -23,16 +23,21 @@ class WebChatMessageHandler
   def process!
     return handle_pending_action if pending_action?
 
-    if image_attached? && @text.strip.empty?
-      return ask_image_intent
+    if image_attached?
+      image_intent = classify_image_intent
+      if image_intent['intent'].present?
+        intent = image_intent
+      else
+        intent = classify_intent
+      end
+    else
+      intent = classify_intent
     end
-
-    intent = classify_intent
     intent_name = intent['intent'] || 'create_event'
     intent_confidence = normalize_confidence(intent['confidence'])
 
-    if intent_confidence == 'low'
-      return ask_intent_clarification
+    if intent_confidence == 'low' || intent_name == 'ambiguous'
+      return image_attached? ? ask_image_intent : ask_intent_clarification
     end
 
     case intent_name
@@ -106,6 +111,25 @@ class WebChatMessageHandler
     build_response("Do you want me to add or update a calendar event, delete an event, add a transaction, or save a memory?")
   end
 
+  def classify_image_intent
+    return {} unless image_attached?
+
+    image_base64, mime_type = gemini_image_payload(@image)
+    result = gemini.classify_image_intent(image_base64, mime_type: mime_type, text: @text, context: recent_context_text)
+    log_ai_request(
+      @message,
+      result[:usage],
+      request_kind: 'image_intent',
+      model: gemini_intent_model,
+      status: result[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: result[:event])
+    )
+    result[:event] || {}
+  rescue StandardError => e
+    Rails.logger.warn("[ImageIntent] Failed to classify image intent: #{e.message}")
+    {}
+  end
+
   def handle_pending_action
     action = thread_state['pending_action']
     payload = thread_state['payload'] || {}
@@ -131,6 +155,8 @@ class WebChatMessageHandler
       return handle_event_selection(payload, action_type: 'update')
     when 'select_event_from_extraction'
       return handle_event_extraction_selection(payload)
+    when 'select_transaction_from_extraction'
+      return handle_transaction_extraction_selection(payload)
     when 'confirm_update'
       return handle_update_confirmation(payload)
     when 'clarify_update_changes'
@@ -173,75 +199,40 @@ class WebChatMessageHandler
   end
 
   def handle_create_memory
-    urls = extract_urls(@text)
-    if image_attached? && @text.strip.empty?
-      return create_memory({ 'content' => 'Saved image', 'category' => 'image', 'urls' => urls })
-    end
-
-    if urls.any? && strip_urls(@text).strip.empty?
-      return create_memory({ 'content' => 'Saved link', 'category' => 'link', 'urls' => urls })
-    end
-
-    result = gemini.extract_memory_from_text(@text)
-    log_ai_request(
-      @message,
-      result[:usage],
-      request_kind: 'memory',
-      model: gemini_extract_model,
-      status: result[:event]['error'] ? 'error' : 'success',
-      metadata: ai_metadata(response: result[:event])
-    )
-    data = result[:event] || {}
-    data['urls'] = urls if urls.any?
-
-    if data['error']
-      set_pending_action('clarify_memory_fields', { 'memory' => {} })
-      return build_response(
-        clarify_missing_details(
-          intent: 'create_memory',
-          missing_fields: ['content'],
-          extracted: {},
-          fallback: data['message'] || "What should I remember?"
-        )
-      )
-    end
-
-    content = data['content'].to_s.strip
-    confidence = normalize_confidence(data['confidence'])
-    if content.empty?
-      set_pending_action('clarify_memory_fields', { 'memory' => data })
-      return build_response(
-        clarify_missing_details(
-          intent: 'create_memory',
-          missing_fields: ['content'],
-          extracted: data,
-          fallback: "What should I remember?"
-        )
-      )
-    end
-
-    if confidence != 'high'
-      set_pending_action('confirm_memory', { 'memory' => data })
-      return build_response("Should I save this memory?\n\n#{format_memory(data)}")
-    end
-
-    create_memory(data)
+    handle_create_flow(:memory)
   rescue StandardError => e
     build_response("Memory error: #{e.message}")
   end
 
   def handle_memory_correction(payload)
-    result = gemini.extract_memory_from_text(@text)
-    log_ai_request(
-      @message,
-      result[:usage],
-      request_kind: 'memory',
-      model: gemini_extract_model,
-      status: result[:event]['error'] ? 'error' : 'success',
-      metadata: ai_metadata(response: result[:event])
-    )
-    updated = result[:event] || {}
+    if payload['force_content']
+      content = @text.to_s.strip
+      urls = extract_urls(@text)
+      if content.empty?
+        set_pending_action('clarify_memory_fields', payload)
+        return build_response(
+          clarify_missing_details(
+            intent: 'create_memory',
+            missing_fields: ['content'],
+            extracted: payload['memory'] || {},
+            extra: 'An image is attached. Ask what the user wants to remember from the image. Do not mention events.',
+            fallback: "What should I remember from this image?"
+          )
+        )
+      end
 
+      data = {
+        'content' => content,
+        'category' => payload['category'].presence || 'image',
+        'urls' => urls.presence
+      }.compact
+      return create_memory(data)
+    end
+
+    result = extract_memory_from_text
+    return result if result.is_a?(Hash) && result[:text]
+
+    updated = result[:event] || {}
     if updated['error']
       set_pending_action('clarify_memory_fields', { 'memory' => {} })
       return build_response(
@@ -254,29 +245,7 @@ class WebChatMessageHandler
       )
     end
 
-    urls = extract_urls(@text)
-    updated['urls'] = urls if urls.any?
-
-    content = updated['content'].to_s.strip
-    confidence = normalize_confidence(updated['confidence'])
-    if content.empty?
-      set_pending_action('clarify_memory_fields', { 'memory' => updated })
-      return build_response(
-        clarify_missing_details(
-          intent: 'create_memory',
-          missing_fields: ['content'],
-          extracted: updated,
-          fallback: "What should I remember?"
-        )
-      )
-    end
-
-    if confidence != 'high'
-      set_pending_action('confirm_memory', { 'memory' => updated })
-      return build_response("Should I save this memory?\n\n#{format_memory(updated)}")
-    end
-
-    create_memory(updated)
+    handle_correction_flow(:memory, updated)
   rescue StandardError => e
     build_response("Memory error: #{e.message}")
   end
@@ -332,57 +301,287 @@ class WebChatMessageHandler
     build_response("Memory search error: #{e.message}")
   end
 
-  def handle_create_event(image_message_id: nil)
-    result = if image_message_id
-      extract_event_from_message(image_message_id)
-    elsif image_attached?
-      extract_from_image
-    else
-      extract_from_text
+  def handle_create_flow(kind, image_message_id: nil)
+    config = create_flow_config(kind)
+    if (preflight = resolve_flow_value(config[:preflight]))
+      return resolve_flow_value(config[:executor], preflight[:payload]) if preflight[:action] == :execute
+      return preflight[:result] if preflight[:action] == :return
     end
-
+    result = extract_payload_for(kind, image_message_id: image_message_id)
     return result if result.is_a?(Hash) && result[:text]
 
-    event = result[:event] || {}
-    if (events = extracted_events(event)).any?
-      set_pending_action('select_event_from_extraction', { 'events' => events })
+    payload = result[:event] || {}
+    if config[:multi_extractor] && (items = resolve_flow_value(config[:multi_extractor], payload)).any?
+      set_pending_action(config[:multi_action], { config[:multi_payload_key] => items })
       return build_response(
-        "I found multiple events. Reply with the numbers to add (e.g., 1,2) or say \"all\":\n#{format_extracted_candidates(events)}"
+        "I found multiple #{config[:plural_label]}. Reply with the numbers to add (e.g., 1,2) or say \"all\":\n#{resolve_flow_value(config[:multi_formatter], items)}"
       )
     end
-    if event['error']
-      set_pending_action('clarify_event_fields', { 'event' => {} })
-      return build_response(
-        clarify_missing_details(
-          intent: 'create_event',
-          missing_fields: ['title', 'date', 'time'],
-          extracted: {},
-          fallback: event['message'].presence || "What is the title, date, and time?"
-        )
+
+    if payload['error']
+      clear_thread_state if config[:clear_on_error]
+      missing = config[:error_missing_fields]
+      return build_missing_prompt(
+        config,
+        payload,
+        missing,
+        fallback: payload['message'].presence || resolve_flow_value(config[:error_fallback]),
+        stage: :error
       )
     end
-    event['recurrence'] = normalize_recurrence(event['recurrence'])
-    missing = missing_event_fields(event)
-    confidence = normalize_confidence(event['confidence'])
+
+    payload = normalize_flow_payload(config, payload)
+    missing = resolve_flow_value(config[:missing_fields], payload)
+    confidence = normalize_confidence(payload['confidence'])
 
     if missing.any?
-      set_pending_action('clarify_event_fields', { 'event' => event, 'missing_fields' => missing })
-      return build_response(
-        clarify_missing_details(
-          intent: 'create_event',
-          missing_fields: missing,
-          extracted: event,
-          fallback: "I need #{missing.join(', ')} to add this event."
-        )
+      fallback = resolve_flow_value(config[:missing_fallback], missing, payload)
+      fallback ||= "I need #{missing.join(', ')} to add this #{config[:singular_label]}."
+      return build_missing_prompt(
+        config,
+        payload,
+        missing,
+        fallback: fallback,
+        stage: :missing
       )
     end
 
     if confidence != 'high'
-      set_pending_action('confirm_event', { 'event' => event })
-      return build_response("I found this event:\n\n#{format_event(event)}\n\nShould I add it?")
+      set_pending_action(config[:confirm_action], { config[:payload_key] => payload })
+      return build_response(resolve_flow_value(config[:confirm_prompt], payload, :initial))
     end
 
-    create_event(event)
+    resolve_flow_value(config[:executor], payload)
+  end
+
+  def handle_correction_flow(kind, payload)
+    config = create_flow_config(kind)
+    if config[:allow_multi_on_correction] && config[:multi_extractor] && (items = resolve_flow_value(config[:multi_extractor], payload)).any?
+      set_pending_action(config[:multi_action], { config[:multi_payload_key] => items })
+      return build_response(
+        "I found multiple #{config[:plural_label]}. Reply with the numbers to add (e.g., 1,2) or say \"all\":\n#{resolve_flow_value(config[:multi_formatter], items)}"
+      )
+    end
+
+    payload = normalize_flow_payload(config, payload)
+    missing = resolve_flow_value(config[:missing_fields], payload)
+    confidence = normalize_confidence(payload['confidence'])
+
+    if missing.any?
+      fallback = resolve_flow_value(config[:correction_fallback], missing, payload)
+      fallback ||= "I still need #{missing.join(', ')}."
+      return build_missing_prompt(
+        config,
+        payload,
+        missing,
+        fallback: fallback,
+        stage: :corrected
+      )
+    end
+
+    if confidence != 'high'
+      set_pending_action(config[:confirm_action], { config[:payload_key] => payload })
+      return build_response(resolve_flow_value(config[:confirm_prompt], payload, :corrected))
+    end
+
+    resolve_flow_value(config[:executor], payload)
+  end
+
+  def build_missing_prompt(config, payload, missing_fields, fallback:, stage:)
+    pending_payload = { config[:payload_key] => payload }
+    pending_payload['missing_fields'] = missing_fields if missing_fields.present?
+    pending_payload = resolve_flow_value(config[:pending_adjuster], pending_payload, payload, missing_fields, stage) if config[:pending_adjuster]
+    set_pending_action(config[:clarify_action], pending_payload)
+    build_response(
+      clarify_missing_details(
+        intent: config[:intent],
+        missing_fields: missing_fields,
+        extracted: payload,
+        extra: resolve_flow_value(config[:extra], stage, payload, missing_fields),
+        fallback: fallback
+      )
+    )
+  end
+
+  def extract_payload_for(kind, image_message_id: nil)
+    case kind
+    when :event
+      return extract_event_from_message(image_message_id, context: @text.presence || recent_context_text) if image_message_id
+      return extract_from_image if image_attached?
+
+      extract_from_text
+    when :transaction
+      return extract_transaction_from_message(image_message_id, context: @text.presence || recent_context_text) if image_message_id
+      return extract_transaction_from_image if image_attached?
+
+      extract_transaction_from_text
+    when :memory
+      extract_memory_from_text
+    else
+      { text: "Unsupported flow: #{kind}" }
+    end
+  end
+
+  def normalize_flow_payload(config, payload)
+    return payload unless config[:normalize]
+
+    resolve_flow_value(config[:normalize], payload)
+  end
+
+  def resolve_flow_value(value, *args)
+    return send(value, *args) if value.is_a?(Symbol)
+    if value.respond_to?(:call)
+      return value.call(*args.take(value.arity)) if value.arity >= 0
+      return value.call(*args)
+    end
+
+    value
+  end
+
+  def create_flow_config(kind)
+    case kind
+    when :event
+      {
+        intent: 'create_event',
+        payload_key: 'event',
+        plural_label: 'events',
+        singular_label: 'event',
+        multi_extractor: :extracted_events,
+        multi_action: 'select_event_from_extraction',
+        multi_payload_key: 'events',
+        multi_formatter: :format_extracted_candidates,
+        clarify_action: 'clarify_event_fields',
+        confirm_action: 'confirm_event',
+        missing_fields: :missing_event_fields,
+        error_missing_fields: ['title', 'date', 'time'],
+        error_fallback: -> { "What is the title, date, and time?" },
+        confirm_prompt: lambda { |payload, stage|
+          base = stage == :corrected ? "Got it. Here’s the event:" : "I found this event:"
+          "#{base}\n\n#{format_event(payload)}\n\nShould I add it?"
+        },
+        normalize: :normalize_event_payload,
+        executor: :create_event,
+        extra: nil,
+        clear_on_error: false,
+        allow_multi_on_correction: false
+      }
+    when :transaction
+      {
+        intent: 'create_transaction',
+        payload_key: 'transaction',
+        plural_label: 'transactions',
+        singular_label: 'transaction',
+        multi_extractor: :extracted_transactions,
+        multi_action: 'select_transaction_from_extraction',
+        multi_payload_key: 'transactions',
+        multi_formatter: :format_extracted_transactions,
+        clarify_action: 'clarify_transaction_fields',
+        confirm_action: 'confirm_transaction',
+        missing_fields: :missing_transaction_fields,
+        error_missing_fields: ['merchant', 'amount', 'date', 'source'],
+        error_fallback: -> { "What is the merchant, amount, date, and source?" },
+        confirm_prompt: lambda { |payload, stage|
+          base = stage == :corrected ? "Got it. I’m ready to add this transaction:" : "I’m ready to add this transaction:"
+          "#{base}\n\n#{format_transaction(payload)}\n\nShould I add it?"
+        },
+        normalize: nil,
+        executor: :create_transaction,
+        extra: -> { "Valid sources: #{TransactionSources.prompt_list}" },
+        clear_on_error: true,
+        allow_multi_on_correction: true
+      }
+    when :memory
+      {
+        intent: 'create_memory',
+        payload_key: 'memory',
+        plural_label: 'memories',
+        singular_label: 'memory',
+        multi_extractor: nil,
+        multi_action: nil,
+        multi_payload_key: nil,
+        multi_formatter: nil,
+        clarify_action: 'clarify_memory_fields',
+        confirm_action: 'confirm_memory',
+        missing_fields: :missing_memory_fields,
+        error_missing_fields: ['content'],
+        error_fallback: -> { "What should I remember?" },
+        missing_fallback: -> { "What should I remember?" },
+        correction_fallback: -> { "What should I remember?" },
+        confirm_prompt: ->(payload, _stage) { "Should I save this memory?\n\n#{format_memory(payload)}" },
+        normalize: :normalize_memory_payload,
+        executor: :create_memory,
+        extra: :memory_missing_extra,
+        pending_adjuster: :adjust_memory_pending_payload,
+        clear_on_error: false,
+        allow_multi_on_correction: false,
+        preflight: :memory_preflight
+      }
+    else
+      {}
+    end
+  end
+
+  def normalize_event_payload(event)
+    event['recurrence'] = normalize_recurrence(event['recurrence'])
+    event
+  end
+
+  def normalize_memory_payload(memory)
+    urls = extract_urls(@text)
+    memory['urls'] = urls if urls.any?
+    memory
+  end
+
+  def missing_memory_fields(memory)
+    missing = []
+    missing << 'content' if memory['content'].to_s.strip.empty?
+    missing
+  end
+
+  def memory_missing_extra(_stage, _payload, missing_fields)
+    return nil unless image_attached?
+    return nil unless missing_fields.include?('content')
+
+    'An image is attached. Ask what the user wants to remember from the image. Do not mention events.'
+  end
+
+  def adjust_memory_pending_payload(pending_payload, _payload, missing_fields, _stage)
+    return pending_payload unless image_attached?
+    return pending_payload unless missing_fields.include?('content')
+
+    pending_payload.merge('force_content' => true, 'category' => 'image')
+  end
+
+  def memory_preflight
+    urls = extract_urls(@text)
+    if image_attached? && @text.strip.empty?
+      return { action: :execute, payload: { 'content' => 'Saved image', 'category' => 'image', 'urls' => urls } }
+    end
+
+    if urls.any? && strip_urls(@text).strip.empty?
+      return { action: :execute, payload: { 'content' => 'Saved link', 'category' => 'link', 'urls' => urls } }
+    end
+
+    nil
+  end
+
+  def extract_memory_from_text
+    result = gemini.extract_memory_from_text(@text)
+    log_ai_request(
+      @message,
+      result[:usage],
+      request_kind: 'memory',
+      model: gemini_extract_model,
+      status: result[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: result[:event])
+    )
+    result
+  rescue StandardError => e
+    { text: "Memory error: #{e.message}" }
+  end
+
+  def handle_create_event(image_message_id: nil)
+    handle_create_flow(:event, image_message_id: image_message_id)
   end
 
   def handle_event_correction(payload)
@@ -397,37 +596,13 @@ class WebChatMessageHandler
       metadata: ai_metadata(response: result[:event])
     )
 
-    updated = result[:event]
+    updated = result[:event] || {}
     if updated['error']
       clear_thread_state
-      return build_response(updated['message'] || "I couldn't update the transaction.")
-    end
-    if updated['error']
-      clear_thread_state
-      return build_response(updated['message'] || "I couldn't update the event details.")
-    end
-    missing = missing_event_fields(updated)
-    confidence = normalize_confidence(updated['confidence'])
-    updated['recurrence'] = normalize_recurrence(updated['recurrence'])
-
-    if missing.any?
-      set_pending_action('clarify_event_fields', { 'event' => updated, 'missing_fields' => missing })
-      return build_response(
-        clarify_missing_details(
-          intent: 'create_event',
-          missing_fields: missing,
-          extracted: updated,
-          fallback: "I still need #{missing.join(', ')}."
-        )
-      )
+      return build_response(updated['message'] || "I couldn't update the event.")
     end
 
-    if confidence != 'high'
-      set_pending_action('confirm_event', { 'event' => updated })
-      return build_response("Got it. Here’s the event:\n\n#{format_event(updated)}\n\nShould I add it?")
-    end
-
-    create_event(updated)
+    handle_correction_flow(:event, updated)
   rescue StandardError => e
     clear_thread_state
     build_response("Event correction error: #{e.message}")
@@ -490,44 +665,22 @@ class WebChatMessageHandler
       )
     end
 
-    candidates = find_event_candidates_with_fallback(target)
-    if candidates.empty?
-      set_pending_action('clarify_update_target', { 'changes' => changes })
-      return build_response(
-        clarify_missing_details(
-          intent: 'update_event_target',
-          missing_fields: ['title', 'date'],
-          extracted: changes,
-          fallback: "I couldn't find that event. Can you share the title and date?"
-        )
-      )
-    end
-
-    if candidates.length > 1
-      if (auto_pick = auto_pick_candidate(candidates))
-        return confirm_or_update_event(auto_pick[:event], changes)
-      end
-      set_pending_action('select_event_for_update', { 'candidates' => serialize_candidates(candidates), 'changes' => changes })
-      return build_response("Which event should I update?\n#{format_candidates(candidates)}")
-    end
-
-    event_record = candidates.first[:event]
-    confirm_or_update_event(event_record, changes)
+    result = handle_event_candidate_flow(
+      target,
+      action_type: 'update',
+      changes: changes,
+      clarify_action: 'clarify_update_target',
+      clarify_fallback: "I couldn't find that event. Can you share the title and date?"
+    )
+    return result if result
   rescue StandardError => e
     build_response("Update error: #{e.message}")
   end
 
   def handle_update_target_clarification(payload)
     changes = payload['changes'] || {}
-    query = gemini.extract_event_query_from_text(@text, context: recent_context_text)
-    log_ai_request(
-      @message,
-      query[:usage],
-      request_kind: 'event_query',
-      model: gemini_intent_model,
-      status: query[:event]['error'] ? 'error' : 'success',
-      metadata: ai_metadata(response: query[:event])
-    )
+    query = extract_event_query
+    return query if query.is_a?(Hash) && query[:text]
     data = query[:event]
 
     if data['error']
@@ -545,30 +698,15 @@ class WebChatMessageHandler
       )
     end
 
-    candidates = find_event_candidates_with_fallback(data)
-    if candidates.empty?
-      set_pending_action('clarify_update_target', { 'changes' => changes })
-      return build_response(
-        clarify_missing_details(
-          intent: 'update_event_target',
-          missing_fields: ['title', 'date'],
-          extracted: changes,
-          fallback: "I couldn't find that event. Can you share the title and date?"
-        )
-      )
-    end
-
-    if candidates.length > 1
-      if (auto_pick = auto_pick_candidate(candidates))
-        clear_thread_state
-        return confirm_or_update_event(auto_pick[:event], changes)
-      end
-      set_pending_action('select_event_for_update', { 'candidates' => serialize_candidates(candidates), 'changes' => changes })
-      return build_response("Which event should I update?\n#{format_candidates(candidates)}")
-    end
-
-    clear_thread_state
-    confirm_or_update_event(candidates.first[:event], changes)
+    result = handle_event_candidate_flow(
+      data,
+      action_type: 'update',
+      changes: changes,
+      clarify_action: 'clarify_update_target',
+      clarify_fallback: "I couldn't find that event. Can you share the title and date?",
+      clear_state: true
+    )
+    return result if result
   rescue StandardError => e
     build_response("Update error: #{e.message}")
   end
@@ -614,30 +752,15 @@ class WebChatMessageHandler
       return build_response("Which event should I update? Please share the title and date.")
     end
 
-    candidates = find_event_candidates(target)
-    if candidates.empty?
-      set_pending_action('clarify_update_target', { 'changes' => changes })
-      return build_response(
-        clarify_missing_details(
-          intent: 'update_event_target',
-          missing_fields: ['title', 'date'],
-          extracted: changes,
-          fallback: "I couldn't find that event. Can you share the title and date?"
-        )
-      )
-    end
-
-    if candidates.length > 1
-      if (auto_pick = auto_pick_candidate(candidates))
-        clear_thread_state
-        return confirm_or_update_event(auto_pick[:event], changes)
-      end
-      set_pending_action('select_event_for_update', { 'candidates' => serialize_candidates(candidates), 'changes' => changes })
-      return build_response("Which event should I update?\n#{format_candidates(candidates)}")
-    end
-
-    clear_thread_state
-    confirm_or_update_event(candidates.first[:event], changes)
+    result = handle_event_candidate_flow(
+      target,
+      action_type: 'update',
+      changes: changes,
+      clarify_action: 'clarify_update_target',
+      clarify_fallback: "I couldn't find that event. Can you share the title and date?",
+      clear_state: true
+    )
+    return result if result
   rescue StandardError => e
     build_response("Update error: #{e.message}")
   end
@@ -720,15 +843,8 @@ class WebChatMessageHandler
   end
 
   def handle_delete_event
-    query = gemini.extract_event_query_from_text(@text, context: recent_context_text)
-    log_ai_request(
-      @message,
-      query[:usage],
-      request_kind: 'event_query',
-      model: gemini_intent_model,
-      status: query[:event]['error'] ? 'error' : 'success',
-      metadata: ai_metadata(response: query[:event])
-    )
+    query = extract_event_query
+    return query if query.is_a?(Hash) && query[:text]
     data = query[:event]
 
     if data['error']
@@ -742,42 +858,20 @@ class WebChatMessageHandler
       )
     end
 
-    candidates = find_event_candidates_with_fallback(data)
-    if candidates.empty?
-      set_pending_action('clarify_delete_target')
-      return build_response(
-        clarify_missing_details(
-          intent: 'delete_event_target',
-          missing_fields: ['title', 'date'],
-          extracted: {},
-          fallback: "I couldn't find that event. Can you share the title and date?"
-        )
-      )
-    end
-
-    if candidates.length > 1
-      if (auto_pick = auto_pick_candidate(candidates))
-        return confirm_or_delete_event(auto_pick[:event])
-      end
-      set_pending_action('select_event_for_delete', { 'candidates' => serialize_candidates(candidates) })
-      return build_response("Which event should I delete?\n#{format_candidates(candidates)}")
-    end
-
-    confirm_or_delete_event(candidates.first[:event])
+    result = handle_event_candidate_flow(
+      data,
+      action_type: 'delete',
+      clarify_action: 'clarify_delete_target',
+      clarify_fallback: "I couldn't find that event. Can you share the title and date?"
+    )
+    return result if result
   rescue StandardError => e
     build_response("Delete error: #{e.message}")
   end
 
   def handle_list_events
-    query = gemini.extract_event_query_from_text(@text, context: recent_context_text)
-    log_ai_request(
-      @message,
-      query[:usage],
-      request_kind: 'event_query',
-      model: gemini_intent_model,
-      status: query[:event]['error'] ? 'error' : 'success',
-      metadata: ai_metadata(response: query[:event])
-    )
+    query = extract_event_query
+    return query if query.is_a?(Hash) && query[:text]
     data = query[:event] || {}
     if data['error']
       set_pending_action('clarify_list_query', { 'query' => {} })
@@ -791,49 +885,9 @@ class WebChatMessageHandler
       )
     end
 
-    title = data['title'].to_s.strip
-    date = data['date'].to_s.strip
-    title = fallback_list_title(title) if date.blank?
-    scope = CalendarEvent.where(user: @user).where.not(status: 'cancelled')
-    if date.present?
-      day = Date.parse(date) rescue nil
-      if day
-        zone = la_now.time_zone
-        scope = scope.where(start_at: day.in_time_zone(zone).beginning_of_day..day.in_time_zone(zone).end_of_day)
-      end
-    elsif title.empty?
-      today = la_today
-      zone = la_now.time_zone
-      scope = scope.where(start_at: today.in_time_zone(zone).beginning_of_day..today.in_time_zone(zone).end_of_day)
-    else
-      start_at = la_now
-      end_at = start_at + CALENDAR_WINDOW_FUTURE_DAYS.days
-      scope = scope.where(start_at: start_at..end_at)
-    end
-
-    if title.present?
-      scope = apply_title_filters(scope, title)
-    end
-
-    events = scope.order(:start_at).limit(5).to_a
-    if events.empty? && title.present?
-      events = fuzzy_event_candidates(title).map { |entry| entry[:event] }
-    end
-
+    events, title, date = list_events_for_query(data)
     if events.empty?
-      set_pending_action('clarify_list_query', { 'query' => data })
-      log_action(
-        @message,
-        calendar_event_id: nil,
-        calendar_id: nil,
-        status: 'success',
-        action_type: 'list_events',
-        metadata: { query: data, result_count: 0 }
-      )
-      if title.empty? && date.empty?
-        return build_response("No events today. Want me to check what's next on your calendar?")
-      end
-      return build_response("I couldn't find any upcoming events that match. Want me to search a different title?")
+      return handle_list_empty_results(data, title: title, date: date)
     end
 
     lines = events.map { |event| format_event_brief(event) }
@@ -852,15 +906,8 @@ class WebChatMessageHandler
   end
 
   def handle_list_query_clarification(payload)
-    query = gemini.extract_event_query_from_text(@text, context: recent_context_text)
-    log_ai_request(
-      @message,
-      query[:usage],
-      request_kind: 'event_query',
-      model: gemini_intent_model,
-      status: query[:event]['error'] ? 'error' : 'success',
-      metadata: ai_metadata(response: query[:event])
-    )
+    query = extract_event_query
+    return query if query.is_a?(Hash) && query[:text]
     data = query[:event] || {}
     if data['error']
       return build_response(
@@ -873,33 +920,9 @@ class WebChatMessageHandler
       )
     end
 
-    title = fallback_list_title(data['title'].to_s.strip)
-    date = data['date'].to_s.strip
-
-    scope = CalendarEvent.where(user: @user).where.not(status: 'cancelled')
-    if date.present?
-      day = Date.parse(date) rescue nil
-      if day
-        zone = la_now.time_zone
-        scope = scope.where(start_at: day.in_time_zone(zone).beginning_of_day..day.in_time_zone(zone).end_of_day)
-      end
-    elsif title.present?
-      scope = scope.where(start_at: la_now..(la_now + CALENDAR_WINDOW_FUTURE_DAYS.days))
-      scope = apply_title_filters(scope, title)
-    else
-      today = la_today
-      zone = la_now.time_zone
-      scope = scope.where(start_at: today.in_time_zone(zone).beginning_of_day..today.in_time_zone(zone).end_of_day)
-    end
-
-    events = scope.order(:start_at).limit(5).to_a
-    events = fuzzy_event_candidates(title).map { |entry| entry[:event] } if events.empty? && title.present? && date.blank?
-
+    events, title, date = list_events_for_query(data)
     if events.empty?
-      if title.present? || date.present?
-        return build_response("Still nothing. Try a more specific title or date.")
-      end
-      return build_response("No events today. Want me to check what's next on your calendar?")
+      return handle_list_empty_followup(title: title, date: date)
     end
 
     clear_thread_state
@@ -910,15 +933,8 @@ class WebChatMessageHandler
   end
 
   def handle_delete_target_clarification(_payload)
-    query = gemini.extract_event_query_from_text(@text, context: recent_context_text)
-    log_ai_request(
-      @message,
-      query[:usage],
-      request_kind: 'event_query',
-      model: gemini_intent_model,
-      status: query[:event]['error'] ? 'error' : 'success',
-      metadata: ai_metadata(response: query[:event])
-    )
+    query = extract_event_query
+    return query if query.is_a?(Hash) && query[:text]
     data = query[:event]
 
     if data['error']
@@ -932,28 +948,14 @@ class WebChatMessageHandler
       )
     end
 
-    candidates = find_event_candidates_with_fallback(data)
-    if candidates.empty?
-      return build_response(
-        clarify_missing_details(
-          intent: 'delete_event_target',
-          missing_fields: ['title', 'date'],
-          extracted: {},
-          fallback: "I couldn't find that event. Can you share the title and date?"
-        )
-      )
-    end
-
-    if candidates.length > 1
-      if (auto_pick = auto_pick_candidate(candidates))
-        return confirm_or_delete_event(auto_pick[:event])
-      end
-      set_pending_action('select_event_for_delete', { 'candidates' => serialize_candidates(candidates) })
-      return build_response("Which event should I delete?\n#{format_candidates(candidates)}")
-    end
-
-    clear_thread_state
-    confirm_or_delete_event(candidates.first[:event])
+    result = handle_event_candidate_flow(
+      data,
+      action_type: 'delete',
+      clarify_action: 'clarify_delete_target',
+      clarify_fallback: "I couldn't find that event. Can you share the title and date?",
+      clear_state: true
+    )
+    return result if result
   rescue StandardError => e
     build_response("Delete error: #{e.message}")
   end
@@ -991,6 +993,111 @@ class WebChatMessageHandler
       changes = payload['changes'] || {}
       confirm_or_update_event(event_record, changes)
     end
+  end
+
+  def handle_event_candidate_flow(data, action_type:, changes: nil, clarify_action:, clarify_fallback:, clear_state: false, set_pending: true)
+    candidates = find_event_candidates_with_fallback(data)
+    if candidates.empty?
+      if set_pending && clarify_action
+        payload = changes ? { 'changes' => changes } : {}
+        set_pending_action(clarify_action, payload)
+      end
+      return build_response(
+        clarify_missing_details(
+          intent: "#{action_type}_event_target",
+          missing_fields: ['title', 'date'],
+          extracted: changes || {},
+          fallback: clarify_fallback
+        )
+      )
+    end
+
+    handle_event_candidates(candidates, action_type: action_type, changes: changes, clear_state: clear_state)
+  end
+
+  def handle_event_candidates(candidates, action_type:, changes: nil, clear_state: false)
+    if candidates.length > 1
+      if (auto_pick = auto_pick_candidate(candidates))
+        clear_thread_state if clear_state
+        return action_type == 'delete' ? confirm_or_delete_event(auto_pick[:event]) : confirm_or_update_event(auto_pick[:event], changes || {})
+      end
+      payload = { 'candidates' => serialize_candidates(candidates) }
+      payload['changes'] = changes if changes
+      set_pending_action(selection_action_for(action_type), payload)
+      return build_response("#{selection_prompt_for(action_type)}\n#{format_candidates(candidates)}")
+    end
+
+    clear_thread_state if clear_state
+    event_record = candidates.first[:event]
+    action_type == 'delete' ? confirm_or_delete_event(event_record) : confirm_or_update_event(event_record, changes || {})
+  end
+
+  def selection_action_for(action_type)
+    case action_type
+    when 'update'
+      'select_event_for_update'
+    when 'delete'
+      'select_event_for_delete'
+    else
+      'select_event_for_update'
+    end
+  end
+
+  def selection_prompt_for(action_type)
+    action_type == 'delete' ? "Which event should I delete?" : "Which event should I update?"
+  end
+
+  def list_events_for_query(data, prefer_title: false)
+    title = data['title'].to_s.strip
+    date = data['date'].to_s.strip
+    title = fallback_list_title(title) if date.blank? && !prefer_title
+
+    scope = CalendarEvent.where(user: @user).where.not(status: 'cancelled')
+    if date.present?
+      day = Date.parse(date) rescue nil
+      if day
+        zone = la_now.time_zone
+        scope = scope.where(start_at: day.in_time_zone(zone).beginning_of_day..day.in_time_zone(zone).end_of_day)
+      end
+    elsif title.present?
+      scope = scope.where(start_at: la_now..(la_now + CALENDAR_WINDOW_FUTURE_DAYS.days))
+    else
+      today = la_today
+      zone = la_now.time_zone
+      scope = scope.where(start_at: today.in_time_zone(zone).beginning_of_day..today.in_time_zone(zone).end_of_day)
+    end
+
+    scope = apply_title_filters(scope, title) if title.present?
+
+    events = scope.order(:start_at).limit(5).to_a
+    if events.empty? && title.present? && date.blank?
+      events = fuzzy_event_candidates(title).map { |entry| entry[:event] }
+    end
+
+    [events, title, date]
+  end
+
+  def handle_list_empty_results(query, title:, date:)
+    set_pending_action('clarify_list_query', { 'query' => query })
+    log_action(
+      @message,
+      calendar_event_id: nil,
+      calendar_id: nil,
+      status: 'success',
+      action_type: 'list_events',
+      metadata: { query: query, result_count: 0 }
+    )
+    if title.empty? && date.empty?
+      return build_response("No events today. Want me to check what's next on your calendar?")
+    end
+    build_response("I couldn't find any upcoming events that match. Want me to search a different title?")
+  end
+
+  def handle_list_empty_followup(title:, date:)
+    if title.present? || date.present?
+      return build_response("Still nothing. Try a more specific title or date.")
+    end
+    build_response("No events today. Want me to check what's next on your calendar?")
   end
 
   def handle_event_extraction_selection(payload)
@@ -1041,6 +1148,57 @@ class WebChatMessageHandler
     build_response(
       "Added #{created_titles.length} events. ✅\n#{created_titles.map { |title| "- #{title}" }.join("\n")}",
       action: 'calendar_event_created'
+    )
+  end
+
+  def handle_transaction_extraction_selection(payload)
+    transactions = extracted_transactions(payload['transactions'])
+    if transactions.empty?
+      return build_response("Reply with the transaction numbers to add, or say \"all\".")
+    end
+
+    indices = selection_indices_from_text(transactions.length)
+    if indices.nil?
+      return build_response("Reply with the transaction numbers to add, or say \"all\".")
+    end
+
+    if indices == :all
+      selected = transactions
+    elsif indices.empty?
+      return build_response("Reply with the transaction numbers to add, or say \"all\".")
+    else
+      selected = indices.map { |idx| transactions[idx] }.compact
+    end
+
+    if (missing_entry = selected.find { |transaction| missing_transaction_fields(transaction).any? })
+      missing = missing_transaction_fields(missing_entry)
+      set_pending_action('clarify_transaction_fields', { 'transaction' => missing_entry, 'missing_fields' => missing })
+      return build_response(
+        clarify_missing_details(
+          intent: 'create_transaction',
+          missing_fields: missing,
+          extracted: missing_entry,
+          extra: "Valid sources: #{TransactionSources.prompt_list}",
+          fallback: "I need #{missing.join(', ')} to add this transaction."
+        )
+      )
+    end
+
+    results = selected.map { |transaction| create_transaction(transaction) }
+    created_titles = selected.map { |transaction| format_transaction(transaction) }
+    errors = results.select { |result| result.is_a?(Hash) && result[:error_code].present? }.map { |result| result[:text] }.compact
+
+    clear_thread_state
+    if errors.any?
+      return build_response(
+        "Added #{created_titles.length - errors.length} transactions. Some failed:\n#{errors.map { |err| "- #{err}" }.join("\n")}",
+        action: 'transaction_created'
+      )
+    end
+
+    build_response(
+      "Added #{created_titles.length} transactions. ✅\n#{created_titles.map { |line| "- #{line}" }.join("\n")}",
+      action: 'transaction_created'
     )
   end
 
@@ -1108,52 +1266,7 @@ class WebChatMessageHandler
   end
 
   def handle_create_transaction(image_message_id: nil)
-    result = if image_message_id
-      extract_transaction_from_message(image_message_id)
-    elsif image_attached?
-      extract_transaction_from_image
-    else
-      extract_transaction_from_text
-    end
-
-    return result if result.is_a?(Hash) && result[:text]
-
-    transaction = result[:event] || {}
-    if transaction['error']
-      clear_thread_state
-      set_pending_action('clarify_transaction_fields', { 'transaction' => {} })
-      return build_response(
-        clarify_missing_details(
-          intent: 'create_transaction',
-          missing_fields: ['merchant', 'amount', 'date', 'source'],
-          extracted: {},
-          extra: "Valid sources: #{TransactionSources.prompt_list}",
-          fallback: transaction['message'] || "What is the merchant, amount, date, and source?"
-        )
-      )
-    end
-    missing = missing_transaction_fields(transaction)
-    confidence = normalize_confidence(transaction['confidence'])
-
-    if missing.any?
-      set_pending_action('clarify_transaction_fields', { 'transaction' => transaction, 'missing_fields' => missing })
-      return build_response(
-        clarify_missing_details(
-          intent: 'create_transaction',
-          missing_fields: missing,
-          extracted: transaction,
-          extra: "Valid sources: #{TransactionSources.prompt_list}",
-          fallback: "I need #{missing.join(', ')} to add this transaction."
-        )
-      )
-    end
-
-    if confidence != 'high'
-      set_pending_action('confirm_transaction', { 'transaction' => transaction })
-      return build_response("I found this transaction:\n\n#{format_transaction(transaction)}\n\nShould I add it?")
-    end
-
-    create_transaction(transaction)
+    handle_create_flow(:transaction, image_message_id: image_message_id)
   end
 
   def handle_transaction_correction(payload)
@@ -1168,29 +1281,13 @@ class WebChatMessageHandler
       metadata: ai_metadata(response: result[:event])
     )
 
-    updated = result[:event]
-    missing = missing_transaction_fields(updated)
-    confidence = normalize_confidence(updated['confidence'])
-
-    if missing.any?
-      set_pending_action('clarify_transaction_fields', { 'transaction' => updated, 'missing_fields' => missing })
-      return build_response(
-        clarify_missing_details(
-          intent: 'create_transaction',
-          missing_fields: missing,
-          extracted: updated,
-          extra: "Valid sources: #{TransactionSources.prompt_list}",
-          fallback: "I still need #{missing.join(', ')}."
-        )
-      )
+    updated = result[:event] || {}
+    if updated['error']
+      clear_thread_state
+      return build_response(updated['message'] || "I couldn't update the transaction.")
     end
 
-    if confidence != 'high'
-      set_pending_action('confirm_transaction', { 'transaction' => updated })
-      return build_response("Got it. Here’s the transaction:\n\n#{format_transaction(updated)}\n\nShould I add it?")
-    end
-
-    create_transaction(updated)
+    handle_correction_flow(:transaction, updated)
   rescue StandardError => e
     clear_thread_state
     build_response("Transaction correction error: #{e.message}")
@@ -1231,9 +1328,24 @@ class WebChatMessageHandler
     { text: "Text extraction error: #{e.message}" }
   end
 
+  def extract_event_query
+    query = gemini.extract_event_query_from_text(@text, context: recent_context_text)
+    log_ai_request(
+      @message,
+      query[:usage],
+      request_kind: 'event_query',
+      model: gemini_intent_model,
+      status: query[:event]['error'] ? 'error' : 'success',
+      metadata: ai_metadata(response: query[:event])
+    )
+    query
+  rescue StandardError => e
+    { text: "Event query error: #{e.message}" }
+  end
+
   def extract_from_image
     image_base64, mime_type = gemini_image_payload(@image)
-    result = gemini.extract_event_from_image(image_base64, mime_type: mime_type)
+    result = gemini.extract_event_from_image(image_base64, mime_type: mime_type, context: @text.presence || recent_context_text)
     log_ai_request(
       @message,
       result[:usage],
@@ -1256,12 +1368,12 @@ class WebChatMessageHandler
     { text: "Image extraction error: #{e.message}" }
   end
 
-  def extract_event_from_message(message_id)
+  def extract_event_from_message(message_id, context: nil)
     message = ChatMessage.find_by(id: message_id)
     return { text: "I couldn't find that image anymore." } unless message&.image&.attached?
 
     image_base64, mime_type = gemini_image_payload(message.image)
-    result = gemini.extract_event_from_image(image_base64, mime_type: mime_type)
+    result = gemini.extract_event_from_image(image_base64, mime_type: mime_type, context: context)
     log_ai_request(
       @message,
       result[:usage],
@@ -1292,7 +1404,7 @@ class WebChatMessageHandler
 
   def extract_transaction_from_image
     image_base64, mime_type = gemini_image_payload(@image)
-    result = gemini.extract_transaction_from_image(image_base64, mime_type: mime_type)
+    result = gemini.extract_transaction_from_image(image_base64, mime_type: mime_type, context: @text.presence || recent_context_text)
     log_ai_request(
       @message,
       result[:usage],
@@ -1306,12 +1418,12 @@ class WebChatMessageHandler
     { text: "Transaction extraction error: #{e.message}" }
   end
 
-  def extract_transaction_from_message(message_id)
+  def extract_transaction_from_message(message_id, context: nil)
     message = ChatMessage.find_by(id: message_id)
     return { text: "I couldn't find that image anymore." } unless message&.image&.attached?
 
     image_base64, mime_type = gemini_image_payload(message.image)
-    result = gemini.extract_transaction_from_image(image_base64, mime_type: mime_type)
+    result = gemini.extract_transaction_from_image(image_base64, mime_type: mime_type, context: context)
     log_ai_request(
       @message,
       result[:usage],
@@ -2135,6 +2247,28 @@ class WebChatMessageHandler
     end.join("\n")
   end
 
+  def format_extracted_transactions(transactions)
+    transactions.first(5).each_with_index.map do |transaction, idx|
+      merchant = transaction['merchant'].presence || 'Unknown merchant'
+      amount = transaction['amount'].present? ? "$#{transaction['amount']}" : 'Unknown amount'
+      date = transaction['date'].presence || 'Unknown date'
+      source = transaction['source'].presence
+      details = [merchant, amount, date, source].compact.join(' • ')
+      "#{idx + 1}) #{details}"
+    end.join("\n")
+  end
+
+  def extracted_transactions(payload)
+    return [] if payload.nil?
+    return payload.select { |transaction| transaction.is_a?(Hash) } if payload.is_a?(Array)
+
+    if payload.is_a?(Hash) && payload['transactions'].is_a?(Array)
+      return payload['transactions'].select { |transaction| transaction.is_a?(Hash) }
+    end
+
+    []
+  end
+
   def extracted_events(payload)
     return [] if payload.nil?
     return payload.select { |event| event.is_a?(Hash) } if payload.is_a?(Array)
@@ -2160,21 +2294,39 @@ class WebChatMessageHandler
   end
 
   def selection_index_from_text(max_count)
-    match = @text.to_s.match(/\b(\d+)\b/)
-    return nil unless match
+    indices = selection_indices_from_text(max_count)
+    return nil unless indices.is_a?(Array) && indices.any?
+    return nil if indices == :all
+    return nil unless indices.length == 1
 
-    index = match[1].to_i
-    return nil if index < 1 || index > max_count
-
-    index
+    indices.first + 1
   end
 
   def selection_indices_from_text(max_count)
     text = @text.to_s.downcase
-    return :all if text.include?('all')
+    return :all if text.match?(/\ball\b/)
 
-    indices = text.scan(/\b(\d+)\b/).flatten.map(&:to_i).map { |idx| idx - 1 }
+    indices = []
+    indices.concat(text.scan(/\b(\d+)\b/).flatten.map(&:to_i).map { |idx| idx - 1 })
+    indices.concat(text.scan(/\b(\d+)(?:st|nd|rd|th)\b/).flatten.map(&:to_i).map { |idx| idx - 1 })
+    indices.concat(word_selection_indices(text, max_count))
     indices.select { |idx| idx >= 0 && idx < max_count }.uniq
+  end
+
+  def word_selection_indices(text, max_count)
+    indices = []
+    ordinals = {
+      'first' => 0,
+      'second' => 1,
+      'third' => 2,
+      'fourth' => 3,
+      'fifth' => 4
+    }
+    ordinals.each do |word, idx|
+      indices << idx if text.match?(/\b#{word}\b/)
+    end
+    indices << (max_count - 1) if max_count.positive? && text.match?(/\blast\b/)
+    indices
   end
 
   def event_snapshot(event)
@@ -2275,10 +2427,10 @@ class WebChatMessageHandler
   end
 
   def pick_candidate(candidates)
-    match = @text.to_s.match(/\b(\d+)\b/)
-    if match
-      index = match[1].to_i - 1
-      return candidates[index] if index >= 0 && index < candidates.length
+    indices = selection_indices_from_text(candidates.length)
+    if indices.is_a?(Array) && indices.length == 1
+      index = indices.first
+      return candidates[index] if index && index >= 0 && index < candidates.length
     end
 
     lowered = @text.downcase
