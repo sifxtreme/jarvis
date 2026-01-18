@@ -97,7 +97,7 @@ class SlackMessageHandler
   def extract_from_image(message)
     file = image_files.first
     base64 = download_file(file['url_private_download'] || file['url_private'])
-    result = gemini.extract_event_from_image(base64, mime_type: file['mimetype'])
+    result = gemini.extract_event_from_image(base64, mime_type: file['mimetype'], context: cleaned_text)
     log_ai_request(
       message,
       result[:usage],
@@ -124,7 +124,7 @@ class SlackMessageHandler
   end
 
   def extract_from_text(message)
-    result = gemini.extract_event_from_text(cleaned_text)
+    result = gemini.extract_event_from_text(cleaned_text, context: nil)
     log_ai_request(
       message,
       result[:usage],

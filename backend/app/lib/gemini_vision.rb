@@ -10,10 +10,10 @@ class GeminiVision
     @api_key = api_key
   end
 
-  def extract_event_from_image(image_base64, mime_type: 'image/png')
+  def extract_event_from_image(image_base64, mime_type: 'image/png', context: nil)
     parts = [
       { inlineData: { mimeType: mime_type, data: image_base64 } },
-      { text: extraction_prompt(today: today_in_timezone) }
+      { text: extraction_prompt(today: today_in_timezone, context: context) }
     ]
 
     response = make_request(parts: parts, model: DEFAULT_EXTRACT_MODEL)
@@ -34,6 +34,16 @@ class GeminiVision
     parse_json_response(response)
   end
 
+  def classify_image_intent(image_base64, mime_type: 'image/png', text: '', context: nil)
+    parts = [
+      { inlineData: { mimeType: mime_type, data: image_base64 } },
+      { text: image_intent_prompt(text: text, context: context) }
+    ]
+
+    response = make_request(parts: parts, model: DEFAULT_INTENT_MODEL)
+    parse_json_response(response)
+  end
+
   def extract_transaction_from_text(text, context: nil)
     parts = [{ text: transaction_text_prompt(text, context: context) }]
 
@@ -41,10 +51,10 @@ class GeminiVision
     parse_json_response(response)
   end
 
-  def extract_transaction_from_image(image_base64, mime_type: 'image/png')
+  def extract_transaction_from_image(image_base64, mime_type: 'image/png', context: nil)
     parts = [
       { inlineData: { mimeType: mime_type, data: image_base64 } },
-      { text: transaction_image_prompt(today: today_in_timezone) }
+      { text: transaction_image_prompt(today: today_in_timezone, context: context) }
     ]
 
     response = make_request(parts: parts, model: DEFAULT_EXTRACT_MODEL)
@@ -226,11 +236,12 @@ class GeminiVision
     cleaned[start_idx..end_idx]
   end
 
-  def extraction_prompt(today:)
+  def extraction_prompt(today:, context: nil)
+    context_block = format_context_block(context)
     <<~PROMPT
       Today is #{today} (Timezone: #{timezone_label}).
 
-      Extract calendar event details from this image. Return JSON:
+      #{context_block}Extract calendar event details from this image. Return JSON:
       {
         "title": "Event name",
         "date": "YYYY-MM-DD" (if year missing, infer closest future date),
@@ -348,6 +359,11 @@ class GeminiVision
         "confidence": "low|medium|high"
       }
 
+      If the text includes multiple transactions, return:
+      {
+        "transactions": [<transaction objects with the same schema>]
+      }
+
       If the text does not contain a transaction, return:
       {
         "error": "no_transaction_found",
@@ -359,11 +375,12 @@ class GeminiVision
     PROMPT
   end
 
-  def transaction_image_prompt(today:)
+  def transaction_image_prompt(today:, context: nil)
+    context_block = format_context_block(context)
     <<~PROMPT
       Today is #{today} (Timezone: #{timezone_label}).
 
-      Extract a financial transaction from this image (receipt, invoice, or payment confirmation). Return JSON:
+      #{context_block}Extract a financial transaction from this image (receipt, invoice, or payment confirmation). Return JSON:
       {
         "amount": 12.34,
         "merchant": "Merchant name",
@@ -373,11 +390,33 @@ class GeminiVision
         "confidence": "low|medium|high"
       }
 
+      If this image includes multiple transactions, return:
+      {
+        "transactions": [<transaction objects with the same schema>]
+      }
+
       If the image does not contain transaction information, return:
       {
         "error": "no_transaction_found",
         "message": "I couldn't find a transaction in that image."
       }
+    PROMPT
+  end
+
+  def image_intent_prompt(text:, context: nil)
+    context_block = format_context_block(context)
+    <<~PROMPT
+      Today is #{today_in_timezone} (Timezone: #{timezone_label}).
+
+      #{context_block}Determine whether the image is a calendar event or a financial transaction. Return JSON:
+      {
+        "intent": "create_event" | "create_transaction" | "ambiguous",
+        "confidence": "low|medium|high",
+        "reason": "short explanation"
+      }
+
+      If the text helps, use it:
+      "#{text}"
     PROMPT
   end
 
