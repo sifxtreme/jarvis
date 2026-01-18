@@ -106,6 +106,9 @@ class SlackMessageHandler
       status: result[:event]['error'] ? 'error' : 'success',
       metadata: ai_metadata(response: result[:event])
     )
+    events = extracted_events(result[:event])
+    return format_multiple_events(events) if events.any?
+
     handle_event_creation(message, result[:event])
   rescue StandardError => e
     log_ai_request(
@@ -130,6 +133,9 @@ class SlackMessageHandler
       status: result[:event]['error'] ? 'error' : 'success',
       metadata: ai_metadata(response: result[:event])
     )
+    events = extracted_events(result[:event])
+    return format_multiple_events(events) if events.any?
+
     handle_event_creation(message, result[:event])
   end
 
@@ -143,6 +149,37 @@ class SlackMessageHandler
         "Reply with any changes. (Calendar creation comes next.)"
       ].compact.join("\n\n")
     end
+  end
+
+  def format_multiple_events(events)
+    lines = events.first(5).each_with_index.map do |event, idx|
+      title = event['title'].to_s.strip
+      title = 'Untitled event' if title.empty?
+      date = event['date'].to_s.strip
+      date = 'Unknown date' if date.empty?
+      start_time = event['start_time'].to_s.strip
+      end_time = event['end_time'].to_s.strip
+      time_range = [start_time, end_time].reject(&:empty?).join('-')
+      time_label = time_range.empty? ? 'Unknown time' : time_range
+      "#{idx + 1}) #{title} — #{date} #{time_label}"
+    end
+
+    [
+      "I found multiple events.",
+      "Please reply with the title/date/time for the one you want, or send them one at a time:",
+      lines.join("\n")
+    ].join("\n")
+  end
+
+  def extracted_events(payload)
+    return [] if payload.nil?
+    return payload.select { |event| event.is_a?(Hash) } if payload.is_a?(Array)
+
+    if payload.is_a?(Hash) && payload['events'].is_a?(Array)
+      return payload['events'].select { |event| event.is_a?(Hash) }
+    end
+
+    []
   end
 
   def handle_event_creation(message, event)

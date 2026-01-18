@@ -129,6 +129,8 @@ class WebChatMessageHandler
       return handle_delete_target_clarification(payload)
     when 'select_event_for_update'
       return handle_event_selection(payload, action_type: 'update')
+    when 'select_event_from_extraction'
+      return handle_event_extraction_selection(payload)
     when 'confirm_update'
       return handle_update_confirmation(payload)
     when 'clarify_update_changes'
@@ -342,6 +344,12 @@ class WebChatMessageHandler
     return result if result.is_a?(Hash) && result[:text]
 
     event = result[:event] || {}
+    if (events = extracted_events(event)).any?
+      set_pending_action('select_event_from_extraction', { 'events' => events })
+      return build_response(
+        "I found multiple events. Reply with the numbers to add (e.g., 1,2) or say \"all\":\n#{format_extracted_candidates(events)}"
+      )
+    end
     if event['error']
       set_pending_action('clarify_event_fields', { 'event' => {} })
       return build_response(
@@ -983,6 +991,57 @@ class WebChatMessageHandler
       changes = payload['changes'] || {}
       confirm_or_update_event(event_record, changes)
     end
+  end
+
+  def handle_event_extraction_selection(payload)
+    events = extracted_events(payload['events'])
+    if events.empty?
+      return build_response("Reply with the event numbers to add, or say \"all\".")
+    end
+
+    indices = selection_indices_from_text(events.length)
+    if indices.nil?
+      return build_response("Reply with the event numbers to add, or say \"all\".")
+    end
+
+    if indices == :all
+      selected = events
+    elsif indices.empty?
+      return build_response("Reply with the event numbers to add, or say \"all\".")
+    else
+      selected = indices.map { |idx| events[idx] }.compact
+    end
+    selected.each { |event| event['recurrence'] = normalize_recurrence(event['recurrence']) }
+
+    if (missing_entry = selected.find { |event| missing_event_fields(event).any? })
+      missing = missing_event_fields(missing_entry)
+      set_pending_action('clarify_event_fields', { 'event' => missing_entry, 'missing_fields' => missing })
+      return build_response(
+        clarify_missing_details(
+          intent: 'create_event',
+          missing_fields: missing,
+          extracted: missing_entry,
+          fallback: "I need #{missing.join(', ')} to add this event."
+        )
+      )
+    end
+
+    results = selected.map { |event| create_event(event) }
+    created_titles = selected.map { |event| event['title'].presence || 'Untitled event' }
+    errors = results.select { |result| result.is_a?(Hash) && result[:error_code].present? }.map { |result| result[:text] }.compact
+
+    clear_thread_state
+    if errors.any?
+      return build_response(
+        "Added #{created_titles.length - errors.length} events. Some failed:\n#{errors.map { |err| "- #{err}" }.join("\n")}",
+        action: 'calendar_event_created'
+      )
+    end
+
+    build_response(
+      "Added #{created_titles.length} events. ✅\n#{created_titles.map { |title| "- #{title}" }.join("\n")}",
+      action: 'calendar_event_created'
+    )
   end
 
   def confirm_or_delete_event(event_record)
@@ -2064,6 +2123,29 @@ class WebChatMessageHandler
     end.join("\n")
   end
 
+  def format_extracted_candidates(events)
+    events.first(5).each_with_index.map do |event, idx|
+      title = event['title'].presence || 'Untitled event'
+      date = event['date'].presence || 'Unknown date'
+      start_time = event['start_time'].presence
+      end_time = event['end_time'].presence
+      time_range = [start_time, end_time].compact.join('-')
+      time_label = time_range.present? ? time_range : 'Unknown time'
+      "#{idx + 1}) #{title} — #{date} #{time_label}"
+    end.join("\n")
+  end
+
+  def extracted_events(payload)
+    return [] if payload.nil?
+    return payload.select { |event| event.is_a?(Hash) } if payload.is_a?(Array)
+
+    if payload.is_a?(Hash) && payload['events'].is_a?(Array)
+      return payload['events'].select { |event| event.is_a?(Hash) }
+    end
+
+    []
+  end
+
   def auto_pick_candidate(candidates)
     return nil if candidates.length < 2
 
@@ -2085,6 +2167,14 @@ class WebChatMessageHandler
     return nil if index < 1 || index > max_count
 
     index
+  end
+
+  def selection_indices_from_text(max_count)
+    text = @text.to_s.downcase
+    return :all if text.include?('all')
+
+    indices = text.scan(/\b(\d+)\b/).flatten.map(&:to_i).map { |idx| idx - 1 }
+    indices.select { |idx| idx >= 0 && idx < max_count }.uniq
   end
 
   def event_snapshot(event)

@@ -144,14 +144,14 @@ class GeminiVision
 
   def parse_json_response(response_body, adjust_event_date: false)
     text = response_body.dig('candidates', 0, 'content', 'parts', 0, 'text').to_s
-    event = JSON.parse(text)
-    event = adjust_event_date(event) if adjust_event_date
-    { event: event, usage: response_body['usageMetadata'] || {} }
+    payload = parse_json_payload(text)
+    payload = normalize_extracted_payload(payload, adjust_event_date: adjust_event_date)
+    { event: payload, usage: response_body['usageMetadata'] || {} }
   rescue JSON::ParserError
     json_text = extract_json(text)
-    event = JSON.parse(json_text)
-    event = adjust_event_date(event) if adjust_event_date
-    { event: event, usage: response_body['usageMetadata'] || {} }
+    payload = JSON.parse(json_text)
+    payload = normalize_extracted_payload(payload, adjust_event_date: adjust_event_date)
+    { event: payload, usage: response_body['usageMetadata'] || {} }
   rescue StandardError => e
     {
       event: { 'error' => 'parse_error', 'message' => "Failed to parse Gemini response: #{e.message}" },
@@ -188,12 +188,42 @@ class GeminiVision
     event
   end
 
+  def normalize_extracted_payload(payload, adjust_event_date: false)
+    if payload.is_a?(Array)
+      return payload.map { |event| adjust_event_date ? adjust_event_date(event) : event }
+    end
+
+    if payload.is_a?(Hash) && payload['events'].is_a?(Array)
+      events = payload['events'].map { |event| adjust_event_date ? adjust_event_date(event) : event }
+      return payload.merge('events' => events)
+    end
+
+    adjust_event_date ? adjust_event_date(payload) : payload
+  end
+
+  def parse_json_payload(text)
+    cleaned = clean_json_text(text)
+    JSON.parse(cleaned)
+  rescue JSON::ParserError
+    JSON.parse(extract_json(cleaned))
+  end
+
+  def clean_json_text(text)
+    cleaned = text.to_s.strip
+    cleaned = cleaned.gsub(/\A```(?:json)?\s*/i, '')
+    cleaned = cleaned.gsub(/```\s*\z/, '')
+    cleaned
+  end
+
   def extract_json(text)
-    start_idx = text.index('{')
-    end_idx = text.rindex('}')
+    cleaned = text.to_s
+    start_idx = cleaned.index('{') || cleaned.index('[')
+    end_obj = cleaned.rindex('}')
+    end_arr = cleaned.rindex(']')
+    end_idx = [end_obj, end_arr].compact.max
     return '{}' unless start_idx && end_idx
 
-    text[start_idx..end_idx]
+    cleaned[start_idx..end_idx]
   end
 
   def extraction_prompt(today:)
@@ -216,6 +246,11 @@ class GeminiVision
         "location": "Venue name and/or address, or null if not found",
         "description": "Any additional relevant details",
         "confidence": "high" if date and time are clearly visible, "medium" if some guessing required, "low" if very uncertain
+      }
+
+      If this image includes multiple events, return:
+      {
+        "events": [<event objects with the same schema>]
       }
 
       If this image does not contain event information, return:
@@ -247,6 +282,11 @@ class GeminiVision
         "location": "Venue name and/or address, or null if not found",
         "description": "Any additional relevant details",
         "confidence": "high" if date and time are clearly visible, "medium" if some guessing required, "low" if very uncertain
+      }
+
+      If the text includes multiple events, return:
+      {
+        "events": [<event objects with the same schema>]
       }
 
       If the text does not contain event information, return:
