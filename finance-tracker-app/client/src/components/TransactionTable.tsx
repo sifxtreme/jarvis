@@ -63,6 +63,17 @@ interface TransactionTableProps {
 type SortField = 'transacted_at' | 'plaid_name' | 'merchant_name' | 'category' | 'amount' | 'source';
 type SortDirection = 'asc' | 'desc';
 
+const SOURCE_OPTIONS = [
+  { value: 'amex', label: 'Amex' },
+  { value: 'hafsa_chase', label: 'Hafsa Chase' },
+  { value: 'asif_chase', label: 'Asif Chase' },
+  { value: 'asif_citi', label: 'Asif Citi' },
+  { value: 'cash', label: 'Cash' },
+  { value: 'bofa', label: 'Bank of America' },
+  { value: 'zelle', label: 'Zelle' },
+  { value: 'venmo', label: 'Venmo' },
+];
+
 interface InlineEditProps {
   value: string | number;
   onSave: (value: string) => void;
@@ -130,6 +141,77 @@ const InlineEdit = ({ value, onSave, type = "text", className, prefix }: InlineE
     >
       {prefix}
       {type === "number" && !prefix ? formatCurrency(Number(value)) : (value || "Empty")}
+    </div>
+  );
+};
+
+interface InlineSelectProps {
+  value: string;
+  onSave: (value: string) => void;
+  options: { label: string; value: string }[];
+  renderValue?: (value: string) => React.ReactNode;
+  className?: string;
+}
+
+const InlineSelect = ({ value, onSave, options, renderValue, className }: InlineSelectProps) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const selectRef = useRef<HTMLSelectElement>(null);
+
+  useEffect(() => {
+    if (isEditing) {
+      selectRef.current?.focus();
+    }
+  }, [isEditing]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    onSave(e.target.value);
+    setIsEditing(false);
+  };
+
+  const handleBlur = () => {
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setIsEditing(false);
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <div className={cn("relative h-5 w-full", className)}>
+        <select
+          ref={selectRef}
+          value={value}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          className="h-full w-full border-none bg-transparent p-0 text-inherit font-inherit focus:ring-0 m-0 appearance-none outline-none cursor-pointer"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {options.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={(e) => {
+        e.stopPropagation();
+        setIsEditing(true);
+      }}
+      className={cn(
+        "cursor-pointer hover:bg-black/5 hover:rounded px-0.5 -mx-0.5 transition-colors h-5 flex items-center",
+        className
+      )}
+    >
+      {renderValue ? renderValue(value) : value}
     </div>
   );
 };
@@ -635,8 +717,9 @@ export default function TransactionTable({
                       return null;
                     })()}
                     <InlineEdit
-                      value={transaction.merchant_name || ""}
+                      value={transaction.merchant_name || transaction.plaid_name || ""}
                       onSave={(val) => handleQuickEdit(transaction, 'merchant_name', val)}
+                      className={!transaction.merchant_name ? "text-muted-foreground italic" : ""}
                     />
                   </div>
                 </TableCell>
@@ -661,26 +744,24 @@ export default function TransactionTable({
                     </div>
                   ) : (
                     <InlineEdit
-                      value={transaction.category || ""}
+                      value={transaction.category || "Uncategorized"}
                       onSave={(val) => handleQuickEdit(transaction, 'category', val)}
                       className={!transaction.category ? "text-muted-foreground italic" : ""}
                     />
                   )}
                 </TableCell>
                 <TableCell>
-                  <TooltipProvider>
-                    <div className="flex items-center gap-2">
-                      <Tooltip>
-                        <TooltipTrigger>
-                          {getSourceIcon(transaction.source)}
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="font-mono">{transaction.source} transaction</p>
-                        </TooltipContent>
-                      </Tooltip>
-                      <span className="font-mono">{transaction.source}</span>
-                    </div>
-                  </TooltipProvider>
+                  <InlineSelect
+                    value={transaction.source}
+                    options={SOURCE_OPTIONS}
+                    onSave={(val) => handleQuickEdit(transaction, 'source', val)}
+                    renderValue={(val) => (
+                      <div className="flex items-center gap-2">
+                        {getSourceIcon(val)}
+                        <span className="font-mono">{val}</span>
+                      </div>
+                    )}
+                  />
                 </TableCell>
                 <TableCell className="text-right font-mono">
                   <div className="flex justify-end">
