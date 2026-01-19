@@ -602,6 +602,17 @@ class WebChatMessageHandler
 
   def handle_event_correction(payload)
     event = payload['event'] || {}
+    image_message_id = payload['image_message_id']
+    if image_message_id && payload['missing_fields'].present?
+      result = extract_event_from_message(image_message_id, context: @text.presence || recent_context_text)
+      unless result.is_a?(Hash) && result[:text]
+        extracted = result[:event] || {}
+        if extracted['error'].nil?
+          return handle_correction_flow(:event, extracted, image_message_id: image_message_id)
+        end
+      end
+    end
+
     result = gemini.apply_event_correction(event, @text)
     log_ai_request(
       @message,
@@ -618,7 +629,7 @@ class WebChatMessageHandler
       return build_response(updated['message'] || "I couldn't update the event.")
     end
 
-    handle_correction_flow(:event, updated)
+    handle_correction_flow(:event, updated, image_message_id: image_message_id)
   rescue StandardError => e
     clear_thread_state
     build_response("Event correction error: #{e.message}")
@@ -1138,7 +1149,9 @@ class WebChatMessageHandler
 
     if (missing_entry = selected.find { |event| missing_event_fields(event).any? })
       missing = missing_event_fields(missing_entry)
-      set_pending_action('clarify_event_fields', { 'event' => missing_entry, 'missing_fields' => missing })
+      pending_payload = { 'event' => missing_entry, 'missing_fields' => missing }
+      pending_payload = merge_pending_payload(pending_payload, payload['image_message_id'])
+      set_pending_action('clarify_event_fields', pending_payload)
       return build_response(
         clarify_missing_details(
           intent: 'create_event',
