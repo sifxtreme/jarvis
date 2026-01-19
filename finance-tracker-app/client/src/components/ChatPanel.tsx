@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -140,10 +140,14 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
   const [beforeId, setBeforeId] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const shouldAutoScrollRef = useRef(true);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [isPreparingImage, setIsPreparingImage] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+
+  // Snapshot for scroll restoration
+  const scrollSnapshotRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -154,6 +158,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
         setMessages((response.messages || []).map(mapMessage));
         setHasMore(Boolean(response.has_more));
         setBeforeId(response.next_before_id ?? null);
+        // Initial scroll to bottom
         requestAnimationFrame(() => {
           const container = scrollRef.current;
           if (!container) return;
@@ -215,21 +220,35 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
     noKeyboard: true,
   });
 
-  useEffect(() => {
+  // Handle scroll positioning with useLayoutEffect to prevent jumps
+  useLayoutEffect(() => {
     const container = scrollRef.current;
-    if (!container || !shouldAutoScrollRef.current) return;
-    container.scrollTo({
-      top: container.scrollHeight,
-      behavior: "smooth",
-    });
+    if (!container) return;
+
+    if (scrollSnapshotRef.current) {
+      // Restore scroll position after loading older messages
+      const { scrollHeight: prevScrollHeight, scrollTop: prevScrollTop } = scrollSnapshotRef.current;
+      const nextScrollHeight = container.scrollHeight;
+      container.scrollTop = nextScrollHeight - prevScrollHeight + prevScrollTop;
+      scrollSnapshotRef.current = null;
+    } else if (shouldAutoScrollRef.current) {
+      // Auto-scroll to bottom for new messages
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: "smooth",
+      });
+    }
   }, [messages.length, isSending]);
 
   const handleScroll = () => {
     const container = scrollRef.current;
     if (!container) return;
+    
+    // Check if we are near top to load more
     if (container.scrollTop < 80 && hasMore && !isLoadingMore && !isLoading) {
       void loadOlderMessages();
     }
+
     const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
     shouldAutoScrollRef.current = distanceFromBottom < 80;
     setShowJumpToLatest(distanceFromBottom > 140);
@@ -239,25 +258,42 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
     if (!beforeId) return;
     const container = scrollRef.current;
     if (!container) return;
+    
+    // Capture snapshot before fetching
+    scrollSnapshotRef.current = {
+      scrollHeight: container.scrollHeight,
+      scrollTop: container.scrollTop,
+    };
+    
     setIsLoadingMore(true);
-    const prevScrollHeight = container.scrollHeight;
-    const prevScrollTop = container.scrollTop;
     try {
       const response = await getChatMessages({ limit: 10, beforeId });
       const older = (response.messages || []).map(mapMessage);
+      
       setMessages((prev) => [...older, ...prev]);
       setHasMore(Boolean(response.has_more));
       setBeforeId(response.next_before_id ?? null);
-      requestAnimationFrame(() => {
-        const nextScrollHeight = container.scrollHeight;
-        container.scrollTop = nextScrollHeight - prevScrollHeight + prevScrollTop;
-      });
+      
+      // Note: Scroll restoration happens in useLayoutEffect
     } catch (error) {
       console.error("Failed to load older chat messages", error);
+      scrollSnapshotRef.current = null; // Clear snapshot on error
     } finally {
       setIsLoadingMore(false);
     }
   };
+
+  const adjustTextareaHeight = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = "auto";
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+    }
+  };
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [draft]);
 
   const handleSend = async (event?: FormEvent) => {
     event?.preventDefault();
@@ -290,6 +326,12 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
     setSelectedImage(null);
     setSelectedImageUrl(null);
     setIsSending(true);
+    shouldAutoScrollRef.current = true; // Force scroll to bottom
+
+    // Reset height
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
 
     try {
       const response = await createChatMessage(trimmed, imageFile ?? undefined);
@@ -367,25 +409,30 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
     <div className="flex h-full flex-col">
       <div ref={scrollRef} onScroll={handleScroll} className="relative flex-1 overflow-auto px-4 py-3">
         {isLoading ? (
-          <div className="text-sm text-muted-foreground">Loading chat…</div>
+          <div className="flex h-full flex-col items-center justify-center text-sm text-muted-foreground">
+            Loading chat…
+          </div>
         ) : messages.length === 0 ? (
-          <div className="rounded-lg border border-border/60 bg-muted/30 px-4 py-6 text-sm text-muted-foreground">
-            Send event details and I’ll add it to your calendar.
+          <div className="flex h-full flex-col items-center justify-center p-8 text-center text-muted-foreground">
+            <div className="mb-2 text-lg font-medium text-foreground">Welcome to Jarvis</div>
+            <p className="max-w-xs text-sm">Send event details and I’ll add it to your calendar, or ask about your finances.</p>
           </div>
         ) : (
           <div>
             {isLoadingMore && (
-              <div className="mb-3 flex items-center gap-2 text-[11px] text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  {["0ms", "150ms", "300ms"].map((delay) => (
-                    <span
-                      key={delay}
-                      className="h-1.5 w-1.5 rounded-full bg-slate-400/80 animate-bounce dark:bg-slate-200"
-                      style={{ animationDelay: delay }}
-                    />
-                  ))}
+              <div className="mb-4 flex justify-center">
+                <div className="flex items-center gap-1 rounded-full bg-muted px-3 py-1 text-[11px] text-muted-foreground shadow-sm">
+                  <div className="flex items-center gap-1">
+                    {["0ms", "150ms", "300ms"].map((delay) => (
+                      <span
+                        key={delay}
+                        className="h-1 w-1 rounded-full bg-slate-400 animate-bounce"
+                        style={{ animationDelay: delay }}
+                      />
+                    ))}
+                  </div>
+                  <span>Loading history</span>
                 </div>
-                <span>Loading older messages…</span>
               </div>
             )}
             {groupedMessages.map(({ message, groupedWithPrev, groupedWithNext }) => {
@@ -403,22 +450,22 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
                     groupedWithPrev ? "mt-1" : "mt-4"
                   )}
                 >
-                  <div className="max-w-[80%]">
+                  <div className="max-w-[85%] sm:max-w-[75%]">
                     <div
                       className={cn(
-                        "rounded-2xl px-3 py-2 text-sm shadow-sm",
+                        "rounded-2xl px-4 py-2.5 text-sm shadow-sm",
                         isUser
-                          ? "bg-blue-600 text-white"
-                          : "bg-slate-100 text-slate-900 dark:bg-slate-900 dark:text-slate-100",
+                          ? "bg-blue-600 text-white rounded-br-sm"
+                          : "bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100 border border-border/50 rounded-bl-sm",
                         message.pending && "opacity-70"
                       )}
                     >
                       {message.pending && message.role === "assistant" ? (
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 py-1">
                           {["0ms", "150ms", "300ms"].map((delay) => (
                             <span
                               key={delay}
-                              className="h-2.5 w-2.5 rounded-full bg-slate-400/90 animate-bounce dark:bg-slate-200"
+                              className="h-2 w-2 rounded-full bg-slate-400/80 animate-bounce"
                               style={{ animationDelay: delay }}
                             />
                           ))}
@@ -428,14 +475,14 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
                           {message.imageUrl && (
                             <button
                               type="button"
-                              className="block w-full cursor-zoom-in"
+                              className="block w-full cursor-zoom-in overflow-hidden rounded-lg bg-black/5"
                               onClick={() => setPreviewImageUrl(message.imageUrl ?? null)}
                               aria-label="Preview image"
                             >
                               <img
                                 src={message.imageUrl}
                                 alt="Chat upload"
-                                className="max-h-64 w-full rounded-lg object-cover"
+                                className="max-h-64 w-full object-cover"
                               />
                             </button>
                           )}
@@ -443,8 +490,8 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
                             renderMessageText(
                               message.text,
                               isUser
-                                ? "text-white/90 decoration-white/80"
-                                : "text-blue-600 dark:text-blue-300"
+                                ? "text-white/95 decoration-white/80"
+                                : "text-blue-600 dark:text-blue-400"
                             )}
                         </div>
                       )}
@@ -452,8 +499,8 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
                     {!groupedWithNext && (
                       <div
                         className={cn(
-                          "mt-1 text-[11px] text-muted-foreground",
-                          isUser ? "text-right" : "text-left"
+                          "mt-1 text-[10px] text-muted-foreground/80",
+                          isUser ? "text-right mr-1" : "text-left ml-1"
                         )}
                       >
                         {timeLabel}
@@ -466,96 +513,118 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
           </div>
         )}
         {showJumpToLatest && (
-          <div className="absolute bottom-4 right-4">
-            <Button size="sm" variant="outline" onClick={scrollToLatest}>
+          <div className="absolute bottom-4 right-4 z-10">
+            <Button size="sm" variant="secondary" className="shadow-md rounded-full h-8 px-3 text-xs" onClick={scrollToLatest}>
               Jump to latest
             </Button>
           </div>
         )}
       </div>
 
-      <form onSubmit={handleSend} className="border-t border-border/60 p-3">
-        {isSending && (
-          <div className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
-            <span>Jarvis is typing</span>
-            <span className="flex items-center gap-1">
-              {["0ms", "150ms", "300ms"].map((delay) => (
-                <span
-                  key={delay}
-                  className="h-2 w-2 rounded-full bg-slate-400/90 animate-bounce dark:bg-slate-200"
-                  style={{ animationDelay: delay }}
-                />
-              ))}
-            </span>
-          </div>
-        )}
-        {selectedImageUrl && (
-          <div className="mb-2 flex items-center gap-3 rounded-lg border border-border/60 bg-muted/40 px-3 py-2">
-            <img
-              src={selectedImageUrl}
-              alt="Selected upload"
-              className="h-12 w-12 rounded-md object-cover"
-            />
-            <div className="flex-1 text-xs text-muted-foreground">
-              {isPreparingImage ? "Optimizing image…" : selectedImage?.name || "Selected image"}
+      <div className="border-t border-border/40 bg-background/50 p-4 backdrop-blur-sm">
+        <form onSubmit={handleSend} className="relative">
+          {selectedImageUrl && (
+            <div className="absolute bottom-full left-0 mb-2 flex items-center gap-3 rounded-xl border border-border/60 bg-background p-2 shadow-sm">
+              <img
+                src={selectedImageUrl}
+                alt="Selected upload"
+                className="h-12 w-12 rounded-lg object-cover"
+              />
+              <div className="flex-1 text-xs text-muted-foreground">
+                {isPreparingImage ? "Optimizing image…" : selectedImage?.name || "Selected image"}
+              </div>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                onClick={() => handleSelectImage(null)}
+                className="h-6 w-6 rounded-full hover:bg-muted"
+                aria-label="Remove image"
+              >
+                <X className="h-3 w-3" />
+              </Button>
             </div>
+          )}
+
+          <div
+            {...getRootProps({
+              className: cn(
+                "flex items-end gap-2 rounded-2xl border border-border/60 bg-background px-2 py-2 shadow-sm focus-within:ring-1 focus-within:ring-ring focus-within:border-ring/50 transition-all",
+                isDragActive && "bg-blue-50/50 ring-2 ring-blue-500/20"
+              ),
+            })}
+          >
+            <input {...getInputProps()} />
+            
             <Button
               type="button"
               size="icon"
               variant="ghost"
-              onClick={() => handleSelectImage(null)}
-              className="h-8 w-8"
-              aria-label="Remove image"
+              className="h-9 w-9 shrink-0 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
+              onClick={open}
+              aria-label="Add image"
+              disabled={isPreparingImage}
             >
-              <X className="h-4 w-4" />
+              <ImagePlus className="h-5 w-5" />
+            </Button>
+
+            <Textarea
+              ref={(e) => {
+                textareaRef.current = e;
+              }}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              placeholder="Type a message…"
+              rows={1}
+              className="min-h-[20px] flex-1 resize-none border-0 bg-transparent p-2 focus-visible:ring-0 shadow-none text-base sm:text-sm"
+              style={{ maxHeight: "200px" }}
+            />
+
+            <Button 
+              type="submit" 
+              size="icon" 
+              className={cn(
+                "h-9 w-9 shrink-0 rounded-xl transition-all", 
+                (!draft.trim() && !selectedImage) ? "opacity-50" : "opacity-100"
+              )}
+              disabled={isSending || isPreparingImage || (!draft.trim() && !selectedImage)}
+            >
+              <Send className="h-4 w-4" />
             </Button>
           </div>
-        )}
-        <div
-          {...getRootProps({
-            className: cn(
-              "flex items-center gap-2 rounded-lg transition-colors",
-              isDragActive && "bg-blue-50 ring-1 ring-blue-200"
-            ),
-          })}
-        >
-          <input {...getInputProps()} />
-          <Button
-            type="button"
-            size="icon"
-            variant="outline"
-            className="shrink-0"
-            onClick={open}
-            aria-label="Add image"
-            disabled={isPreparingImage}
-          >
-            <ImagePlus className="h-4 w-4" />
-          </Button>
-          <Textarea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            placeholder="Type a message…"
-            rows={3}
-            className="min-h-[80px] flex-1 resize-none"
-          />
-          <Button type="submit" size="icon" className="shrink-0" disabled={isSending || isPreparingImage}>
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
-        <div className="mt-2 text-[11px] text-muted-foreground">
-          Enter to send • Shift+Enter for a new line • Paste or drag an image
-        </div>
-      </form>
+          
+          <div className="mt-2 flex items-center justify-between px-1">
+            <div className="flex items-center gap-1 text-[10px] text-muted-foreground/60">
+              {isSending ? (
+                <>
+                   <span>Jarvis is typing</span>
+                    <span className="flex items-center gap-0.5">
+                      {["0ms", "150ms", "300ms"].map((delay) => (
+                        <span
+                          key={delay}
+                          className="h-1 w-1 rounded-full bg-slate-400 animate-bounce"
+                          style={{ animationDelay: delay }}
+                        />
+                      ))}
+                    </span>
+                </>
+              ) : (
+                <span>Enter to send, Shift+Enter for new line</span>
+              )}
+            </div>
+          </div>
+        </form>
+      </div>
 
       <Dialog open={!!previewImageUrl} onOpenChange={(open) => !open && setPreviewImageUrl(null)}>
-        <DialogContent className="w-auto max-w-[95vw] max-h-[90vh] p-2 place-items-center">
+        <DialogContent className="w-auto max-w-[95vw] max-h-[90vh] p-0 overflow-hidden bg-transparent border-0 shadow-none place-items-center flex justify-center items-center">
           {previewImageUrl && (
             <img
               src={previewImageUrl}
               alt="Chat preview"
-              className="max-h-[85vh] w-auto max-w-[90vw] rounded-md object-contain"
+              className="max-h-[85vh] w-auto max-w-[90vw] rounded-lg object-contain shadow-2xl"
             />
           )}
         </DialogContent>
