@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { ImagePlus, Send, X } from "lucide-react";
 import { API_BASE_URL, createChatMessage, getChatMessages, type ChatMessage as ChatMessageDTO } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 
 type ChatMessage = {
   id: number | string;
@@ -34,7 +35,8 @@ type ChatPanelProps = {
   onEventCreated?: () => void;
 };
 
-const MAX_IMAGE_DIMENSION = 1568;
+const MAX_IMAGE_DIMENSION = 1280;
+const MAX_UPLOAD_BYTES = 2_500_000;
 
 const resizeImage = async (file: File, maxDimension = MAX_IMAGE_DIMENSION): Promise<File> => {
   if (!file.type.startsWith("image/")) return file;
@@ -56,9 +58,16 @@ const resizeImage = async (file: File, maxDimension = MAX_IMAGE_DIMENSION): Prom
   ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
 
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob((result) => resolve(result), file.type || "image/jpeg", 0.9)
-  );
+  const toBlob = (quality: number) =>
+    new Promise<Blob | null>((resolve) => canvas.toBlob((result) => resolve(result), file.type || "image/jpeg", quality));
+
+  let blob = await toBlob(0.85);
+  if (blob && blob.size > MAX_UPLOAD_BYTES) {
+    blob = await toBlob(0.7);
+  }
+  if (blob && blob.size > MAX_UPLOAD_BYTES) {
+    blob = await toBlob(0.55);
+  }
   if (!blob) return file;
 
   return new File([blob], file.name, { type: blob.type, lastModified: Date.now() });
@@ -176,6 +185,16 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
     setIsPreparingImage(true);
     try {
       const resized = await resizeImage(file);
+      if (resized.size > MAX_UPLOAD_BYTES) {
+        toast({
+          title: "Image too large",
+          description: "Try a smaller image to upload.",
+          variant: "destructive",
+        });
+        setSelectedImage(null);
+        setSelectedImageUrl(null);
+        return;
+      }
       setSelectedImage(resized);
       setSelectedImageUrl(URL.createObjectURL(resized));
     } finally {
@@ -531,12 +550,12 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
       </form>
 
       <Dialog open={!!previewImageUrl} onOpenChange={(open) => !open && setPreviewImageUrl(null)}>
-        <DialogContent className="max-w-[95vw] max-h-[90vh] p-2">
+        <DialogContent className="w-auto max-w-[95vw] max-h-[90vh] p-2 place-items-center">
           {previewImageUrl && (
             <img
               src={previewImageUrl}
               alt="Chat preview"
-              className="max-h-[80vh] w-auto max-w-full rounded-md object-contain"
+              className="max-h-[85vh] w-auto max-w-[90vw] rounded-md object-contain"
             />
           )}
         </DialogContent>

@@ -23,16 +23,7 @@ class WebChatMessageHandler
   def process!
     return handle_pending_action if pending_action?
 
-    if image_attached?
-      image_intent = classify_image_intent
-      if image_intent['intent'].present?
-        intent = image_intent
-      else
-        intent = classify_intent
-      end
-    else
-      intent = classify_intent
-    end
+    intent = classify_intent
     intent_name = intent['intent'] || 'create_event'
     intent_confidence = normalize_confidence(intent['confidence'])
 
@@ -69,6 +60,7 @@ class WebChatMessageHandler
   def pending_action?
     thread_state['pending_action'].present?
   end
+
 
   def thread_state
     @thread.state ||= {}
@@ -2053,7 +2045,18 @@ class WebChatMessageHandler
   end
 
   def classify_intent
-    result = gemini.classify_intent(text: @text, has_image: image_attached?, context: recent_context_text)
+    image_base64 = nil
+    mime_type = nil
+    if image_attached?
+      image_base64, mime_type = gemini_image_payload(@image)
+    end
+    result = gemini.classify_intent(
+      text: @text,
+      has_image: image_attached?,
+      context: recent_context_text,
+      image_base64: image_base64,
+      mime_type: mime_type
+    )
     log_ai_request(
       @message,
       result[:usage],

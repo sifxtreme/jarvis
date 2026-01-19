@@ -48,6 +48,14 @@ const axiosInstance = axios.create({
 axiosInstance.interceptors.response.use(
   response => response,
   error => {
+    if (error.response?.status === 413) {
+      toast({
+        title: 'Upload too large',
+        description: 'Try a smaller image and resend.',
+        variant: 'destructive',
+      });
+      return Promise.reject(error);
+    }
     if (error.response?.status === 401) {
       const authHeader = error.config?.headers?.Authorization;
       const usedAuth = typeof authHeader === 'string' && authHeader.startsWith('Bearer ');

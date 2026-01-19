@@ -27,8 +27,12 @@ class GeminiVision
     parse_json_response(response, adjust_event_date: true)
   end
 
-  def classify_intent(text:, has_image:, context: nil)
-    parts = [{ text: intent_prompt(text, has_image: has_image, today: today_in_timezone, context: context) }]
+  def classify_intent(text:, has_image:, context: nil, image_base64: nil, mime_type: 'image/png')
+    parts = []
+    if image_base64
+      parts << { inlineData: { mimeType: mime_type, data: image_base64 } }
+    end
+    parts << { text: intent_prompt(text, has_image: has_image, today: today_in_timezone, context: context) }
 
     response = make_request(parts: parts, model: DEFAULT_INTENT_MODEL)
     parse_json_response(response)
@@ -326,7 +330,11 @@ class GeminiVision
       }
 
       Rules:
-      - If the user is sending an event (title/date/time/location) or an image, use "create_event".
+      - If the text explicitly says to add/create/log a transaction, receipt, payment, charge, expense, or spend, ALWAYS use "create_transaction" even if an image is attached.
+      - Use "create_memory" only when the user wants to remember/save/note something and there is no explicit transaction request.
+      - If the user is sending an event (title/date/time/location), use "create_event".
+      - If the image is a receipt, statement, or payment screenshot, use "create_transaction".
+      - If the image is a note/photo to remember, use "create_memory".
       - If the user wants to change or move an existing event, use "update_event".
       - If the user wants to cancel or delete an existing event, use "delete_event".
       - If the user is describing a spend or income transaction, use "create_transaction".
@@ -336,6 +344,19 @@ class GeminiVision
       - If the user asks for a summary (daily/weekly), use "digest".
       - If the user asks how to use the bot, use "help".
       - If unsure, default to "create_event".
+
+      Examples:
+      Text: "add this transaction - it's my mortgage"
+      Intent: "create_transaction"
+
+      Text: "save this receipt for taxes"
+      Intent: "create_memory"
+
+      Text: "remember this photo"
+      Intent: "create_memory"
+
+      Text: "add this event to my calendar"
+      Intent: "create_event"
 
       User text:
       "#{text}"
