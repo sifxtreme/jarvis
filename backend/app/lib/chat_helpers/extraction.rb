@@ -32,6 +32,21 @@ module ChatHelpers
       { 'intent' => 'create_event', 'confidence' => 'low' }
     end
 
+    def decide_pending_action(pending_action, pending_payload)
+      result = gemini.decide_pending_action(
+        pending_action: pending_action,
+        pending_payload: pending_payload,
+        text: @text,
+        has_image: image_attached?,
+        context: recent_context_text
+      )
+      log_ai_result(result, request_kind: 'pending_action', model: gemini_intent_model)
+      result[:event] || {}
+    rescue StandardError => e
+      log_ai_error(request_kind: 'pending_action', model: gemini_intent_model, error: e.message)
+      {}
+    end
+
     def resolve_intent_from_text
       text = @text.downcase
       return 'create_memory' if text.match?(/remember|note this|save this|keep in mind/)

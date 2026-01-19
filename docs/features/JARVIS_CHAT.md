@@ -320,7 +320,7 @@ export function ImageDropZone({ onImageSelect }: { onImageSelect: (base64: strin
 │  ├── message: Receives text/image, routes to appropriate handler│
 │  └── confirm_event: Creates Google Calendar event               │
 │                                                                  │
-│  GeminiVision (lib/)                                            │
+│  GeminiClient (lib/)                                            │
 │  └── extract_event: Image → structured event data               │
 │                                                                  │
 │  GoogleCalendar (lib/)                                          │
@@ -455,11 +455,11 @@ or (for corrections)
 ### Gemini Vision Service
 
 ```ruby
-# app/lib/gemini_vision.rb
+# app/lib/gemini_client.rb
 require 'net/http'
 require 'json'
 
-class GeminiVision
+class GeminiClient
   API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
   def initialize
@@ -482,7 +482,7 @@ class GeminiVision
     text = response.dig('candidates', 0, 'content', 'parts', 0, 'text')
     JSON.parse(text)
   rescue JSON::ParserError => e
-    Rails.logger.error "[GeminiVision] Failed to parse response: #{e.message}"
+    Rails.logger.error "[GeminiClient] Failed to parse response: #{e.message}"
     { error: "Could not parse event details" }
   end
 
@@ -509,7 +509,7 @@ class GeminiVision
     text = response.dig('candidates', 0, 'content', 'parts', 0, 'text')
     JSON.parse(text)
   rescue JSON::ParserError => e
-    Rails.logger.error "[GeminiVision] Failed to parse correction: #{e.message}"
+    Rails.logger.error "[GeminiClient] Failed to parse correction: #{e.message}"
     event  # Return original if parsing fails
   end
 
@@ -528,7 +528,7 @@ class GeminiVision
     response = http.request(request)
 
     unless response.is_a?(Net::HTTPSuccess)
-      Rails.logger.error "[GeminiVision] API error: #{response.code} - #{response.body}"
+      Rails.logger.error "[GeminiClient] API error: #{response.code} - #{response.body}"
       raise "Gemini API error: #{response.code}"
     end
 
@@ -696,7 +696,7 @@ class ChatController < ApplicationController
   private
 
   def handle_image_message(data)
-    gemini = GeminiVision.new
+    gemini = GeminiClient.new
     result = gemini.extract_event(data['content'], mime_type: data['mime_type'] || 'image/png')
 
     if result['error']
@@ -720,7 +720,7 @@ class ChatController < ApplicationController
 
     if pending_event.present?
       # User is correcting a previous extraction
-      gemini = GeminiVision.new
+      gemini = GeminiClient.new
       updated_event = gemini.apply_correction(pending_event, data['content'])
 
       render json: {
@@ -1084,7 +1084,7 @@ JARVIS_TIMEZONE=America/New_York
 | Task | Time |
 |------|------|
 | Add google-apis-calendar_v3 and signet gems | 10 min |
-| Create GeminiVision service | 45 min |
+| Create GeminiClient service | 45 min |
 | Create GoogleCalendar service | 45 min |
 | Create ChatController | 45 min |
 | Add routes | 5 min |

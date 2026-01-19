@@ -355,7 +355,7 @@ class SlackMessageHandler
   end
 
   def gemini
-    @gemini ||= GeminiVision.new
+    @gemini ||= GeminiClient.new
   end
 
   def create_chat_message

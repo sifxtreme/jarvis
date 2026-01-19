@@ -56,9 +56,12 @@ class WebChatMessageHandler
   end
 
   def process!
-    return handle_pending_action if pending_action?
+    if pending_action?
+      return handle_pending_action unless should_override_pending_action?
+      clear_thread_state
+    end
 
-    intent = classify_intent
+    intent = intent_for_message
     intent_name = intent['intent'] || 'create_event'
     intent_confidence = normalize_confidence(intent['confidence'])
 
@@ -110,6 +113,59 @@ class WebChatMessageHandler
 
   def pending_action?
     thread_state['pending_action'].present?
+  end
+
+  def should_override_pending_action?
+    decision = pending_action_decision
+    return false if decision.blank?
+    return false if decision['decision'] == 'continue'
+
+    if decision['intent'].present?
+      @intent_for_message = {
+        'intent' => decision['intent'],
+        'confidence' => decision['confidence'] || 'medium'
+      }
+    end
+    true
+  end
+
+  def intent_for_message
+    @intent_for_message ||= classify_intent || {}
+  end
+
+  def pending_action_decision
+    return @pending_action_decision if defined?(@pending_action_decision)
+
+    payload = thread_state['payload'] || {}
+    summary = summarize_pending_payload(payload)
+    @pending_action_decision = decide_pending_action(thread_state['pending_action'], summary)
+  end
+
+  def summarize_pending_payload(payload)
+    return {} unless payload.is_a?(Hash)
+
+    summary = {}
+    %w[missing_fields image_message_id event_id calendar_id].each do |key|
+      summary[key] = payload[key] if payload[key].present?
+    end
+
+    if payload['transaction'].is_a?(Hash)
+      summary['transaction'] = payload['transaction'].slice('amount', 'merchant', 'date', 'category', 'source', 'confidence')
+    end
+
+    if payload['event'].is_a?(Hash)
+      summary['event'] = payload['event'].slice('title', 'date', 'start_time', 'end_time', 'location', 'confidence')
+    end
+
+    if payload['changes'].is_a?(Hash)
+      summary['changes'] = payload['changes'].slice('title', 'date', 'start_time', 'end_time', 'location', 'recurrence_clear')
+    end
+
+    if payload['query'].is_a?(Hash)
+      summary['query'] = payload['query'].slice('title', 'date', 'time_window', 'raw_time_query')
+    end
+
+    summary
   end
 
 
@@ -405,7 +461,7 @@ class WebChatMessageHandler
   end
 
   def gemini
-    @gemini ||= GeminiVision.new
+    @gemini ||= GeminiClient.new
   end
 
   def spouse_emails(user)

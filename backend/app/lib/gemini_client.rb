@@ -1,7 +1,7 @@
 require 'json'
 require 'net/http'
 
-class GeminiVision
+class GeminiClient
   API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
   DEFAULT_EXTRACT_MODEL = ENV.fetch('GEMINI_EXTRACT_MODEL', 'gemini-3-flash-preview')
   DEFAULT_INTENT_MODEL = ENV.fetch('GEMINI_INTENT_MODEL', 'gemini-2.0-flash')
@@ -42,6 +42,23 @@ class GeminiVision
     parts = [
       { inlineData: { mimeType: mime_type, data: image_base64 } },
       { text: image_intent_prompt(text: text, context: context) }
+    ]
+
+    response = make_request(parts: parts, model: DEFAULT_INTENT_MODEL)
+    parse_json_response(response)
+  end
+
+  def decide_pending_action(pending_action:, pending_payload:, text:, has_image:, context: nil)
+    parts = [
+      {
+        text: pending_action_prompt(
+          pending_action: pending_action,
+          pending_payload: pending_payload,
+          text: text,
+          has_image: has_image,
+          context: context
+        )
+      }
     ]
 
     response = make_request(parts: parts, model: DEFAULT_INTENT_MODEL)
@@ -359,6 +376,33 @@ class GeminiVision
       Intent: "create_event"
 
       User text:
+      "#{text}"
+
+      Has image: #{has_image}
+    PROMPT
+  end
+
+  def pending_action_prompt(pending_action:, pending_payload:, text:, has_image:, context: nil)
+    context_block = format_context_block(context)
+    <<~PROMPT
+      #{context_block}You are deciding whether the user is responding to a pending question or starting a new request.
+      Return JSON only:
+      {
+        "decision": "continue" | "new_intent",
+        "intent": "create_event" | "update_event" | "delete_event" | "create_transaction" | "create_memory" | "search_memory" | "list_events" | "digest" | "help" | null,
+        "confidence": "low|medium|high",
+        "reason": "short"
+      }
+
+      Rules:
+      - If the user's message directly answers the pending question, choose "continue".
+      - If the user's message clearly starts a different task, choose "new_intent" and set intent.
+      - If unsure, choose "continue".
+
+      Pending action: #{pending_action}
+      Pending payload (summary): #{pending_payload.to_json}
+
+      User message:
       "#{text}"
 
       Has image: #{has_image}

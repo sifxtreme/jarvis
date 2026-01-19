@@ -68,7 +68,7 @@
 If we revisit the chatbot architecture, here is the recommended path:
 
 1.  **Phase 1: Native Function Calling (Refactor)**
-    *   Replace `GeminiVision#classify_intent` and `GeminiVision#extract_event` with a single **Gemini Function Calling** API request.
+    *   Replace `GeminiClient#classify_intent` and `GeminiClient#extract_event` with a single **Gemini Function Calling** API request.
     *   Define tools: `create_event`, `delete_event`, `get_balance`.
     *   Let Gemini explicitly choose the tool and arguments in one shot.
 
