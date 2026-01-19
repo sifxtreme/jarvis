@@ -139,8 +139,12 @@ const InlineEdit = ({ value, onSave, type = "text", className, prefix }: InlineE
         className
       )}
     >
-      {prefix}
-      {type === "number" && !prefix ? formatCurrency(Number(value)) : (value || "Empty")}
+      {type === "number" ? formatCurrency(Number(value)) : (
+        <>
+          {prefix}
+          {value || "Empty"}
+        </>
+      )}
     </div>
   );
 };
@@ -769,7 +773,6 @@ export default function TransactionTable({
                       value={transaction.amount}
                       onSave={(val) => handleQuickEdit(transaction, 'amount', val)}
                       type="number"
-                      prefix={transaction.amount < 0 ? "-" : "$"}
                     />
                   </div>
                 </TableCell>
@@ -951,7 +954,6 @@ export default function TransactionTable({
                     value={transaction.amount}
                     onSave={(val) => handleQuickEdit(transaction, 'amount', val)}
                     type="number"
-                    prefix={transaction.amount < 0 ? "-" : "$"}
                   />
                 </div>
                 <div className="flex items-center justify-end gap-1 text-sm text-muted-foreground mt-2">
