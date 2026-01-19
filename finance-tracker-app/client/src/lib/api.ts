@@ -244,6 +244,10 @@ export const deleteCalendarEvent = async (id: number): Promise<void> => {
   await axiosInstance.delete(`/calendar/events/${id}`);
 };
 
+export const patchCalendarEvent = async (id: number, updates: { title?: string }): Promise<void> => {
+  await axiosInstance.patch(`/calendar/events/${id}`, updates);
+};
+
 export interface Transaction {
   id: number;
   transacted_at: string;

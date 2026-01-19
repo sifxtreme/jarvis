@@ -37,7 +37,7 @@ import { RiLeafLine } from 'react-icons/ri';
 import { api, Transaction } from "../lib/api";
 import { formatCurrency, formatDate } from "../lib/utils";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TransactionModal } from "./TransactionModal";
@@ -49,6 +49,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
 
 interface TransactionTableProps {
   transactions: Transaction[];
@@ -61,6 +62,77 @@ interface TransactionTableProps {
 
 type SortField = 'transacted_at' | 'plaid_name' | 'merchant_name' | 'category' | 'amount' | 'source';
 type SortDirection = 'asc' | 'desc';
+
+interface InlineEditProps {
+  value: string | number;
+  onSave: (value: string) => void;
+  type?: "text" | "number";
+  className?: string;
+  prefix?: React.ReactNode;
+}
+
+const InlineEdit = ({ value, onSave, type = "text", className, prefix }: InlineEditProps) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState(value.toString());
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [isEditing]);
+
+  const handleSave = () => {
+    setIsEditing(false);
+    if (draft !== value.toString()) {
+      onSave(draft);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSave();
+    } else if (e.key === "Escape") {
+      setDraft(value.toString());
+      setIsEditing(false);
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <div className={cn("relative flex items-center h-5", className)}>
+        {prefix}
+        <Input
+          ref={inputRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={handleSave}
+          onKeyDown={handleKeyDown}
+          type={type}
+          className="h-full w-full border-none bg-transparent p-0 text-inherit font-inherit focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none leading-none shadow-none min-w-[60px]"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={(e) => {
+        e.stopPropagation();
+        setIsEditing(true);
+      }}
+      className={cn(
+        "cursor-text truncate hover:bg-black/5 hover:rounded px-0.5 -mx-0.5 transition-colors h-5 flex items-center",
+        !value && "text-muted-foreground italic",
+        className
+      )}
+    >
+      {prefix}
+      {type === "number" && !prefix ? formatCurrency(Number(value)) : (value || "Empty")}
+    </div>
+  );
+};
 
 const getSourceIcon = (source: string | null) => {
   if (!source) return null;
@@ -253,6 +325,24 @@ export default function TransactionTable({
       onUpdate?.();
     } catch (error) {
       console.error('Failed to update transaction:', error);
+    }
+  };
+
+  const handleQuickEdit = async (transaction: Transaction, field: keyof Transaction, value: string | number) => {
+    try {
+      await api.updateTransaction(transaction.id, {
+        transacted_at: transaction.transacted_at,
+        plaid_name: transaction.plaid_name || '',
+        merchant_name: field === 'merchant_name' ? String(value) : (transaction.merchant_name || ''),
+        category: field === 'category' ? String(value) : (transaction.category || ''),
+        source: transaction.source || '',
+        amount: field === 'amount' ? Number(value) : Number(transaction.amount),
+        hidden: transaction.hidden,
+        reviewed: transaction.reviewed
+      });
+      onUpdate?.();
+    } catch (error) {
+      console.error(`Failed to update transaction ${field}:`, error);
     }
   };
 
@@ -528,32 +618,26 @@ export default function TransactionTable({
                       const merchantIcon = getMerchantIcon(transaction.plaid_name, transaction.merchant_name);
                       if (merchantIcon) {
                         return (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger>
-                                {merchantIcon.icon}
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>{merchantIcon.label}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                          <div className="mr-1">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  {merchantIcon.icon}
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{merchantIcon.label}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
                         );
                       }
                       return null;
                     })()}
-                    {transaction.merchant_name ? (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="cursor-default">{transaction.merchant_name}</span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="font-mono">Original: {transaction.plaid_name || 'N/A'}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    ) : transaction.plaid_name}
+                    <InlineEdit
+                      value={transaction.merchant_name || ""}
+                      onSave={(val) => handleQuickEdit(transaction, 'merchant_name', val)}
+                    />
                   </div>
                 </TableCell>
                 <TableCell className={cn(
@@ -568,12 +652,19 @@ export default function TransactionTable({
                    !transaction.category.toLowerCase().includes('income') &&
                    budgetedCategories.size > 0 &&
                    !budgetedCategories.has(transaction.category) ? (
-                    <span className="inline-flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" />
-                      {transaction.category}
-                    </span>
+                    <div className="flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      <InlineEdit
+                        value={transaction.category}
+                        onSave={(val) => handleQuickEdit(transaction, 'category', val)}
+                      />
+                    </div>
                   ) : (
-                    transaction.category || 'Uncategorized'
+                    <InlineEdit
+                      value={transaction.category || ""}
+                      onSave={(val) => handleQuickEdit(transaction, 'category', val)}
+                      className={!transaction.category ? "text-muted-foreground italic" : ""}
+                    />
                   )}
                 </TableCell>
                 <TableCell>
@@ -592,7 +683,14 @@ export default function TransactionTable({
                   </TooltipProvider>
                 </TableCell>
                 <TableCell className="text-right font-mono">
-                  {formatCurrency(transaction.amount)}
+                  <div className="flex justify-end">
+                    <InlineEdit
+                      value={transaction.amount}
+                      onSave={(val) => handleQuickEdit(transaction, 'amount', val)}
+                      type="number"
+                      prefix={transaction.amount < 0 ? "-" : "$"}
+                    />
+                  </div>
                 </TableCell>
                 <TableCell>
                   <TooltipProvider>
@@ -742,38 +840,39 @@ export default function TransactionTable({
                       const merchantIcon = getMerchantIcon(transaction.plaid_name, transaction.merchant_name);
                       if (merchantIcon) {
                         return (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger>
-                                {merchantIcon.icon}
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>{merchantIcon.label}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                          <div className="mr-1">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  {merchantIcon.icon}
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{merchantIcon.label}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
                         );
                       }
                       return null;
                     })()}
-                    {transaction.merchant_name ? (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="cursor-default">{transaction.merchant_name}</span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="font-mono">Original: {transaction.plaid_name || 'N/A'}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    ) : transaction.plaid_name}
+                    <InlineEdit
+                      value={transaction.merchant_name || ""}
+                      onSave={(val) => handleQuickEdit(transaction, 'merchant_name', val)}
+                    />
                   </div>
                 </div>
                 <div className="font-mono text-sm text-muted-foreground">{formatDate(transaction.transacted_at)}</div>
               </div>
               <div className="text-right">
-                <div className="font-mono font-medium">{formatCurrency(transaction.amount)}</div>
+                <div className="font-mono font-medium flex justify-end">
+                  <InlineEdit
+                    value={transaction.amount}
+                    onSave={(val) => handleQuickEdit(transaction, 'amount', val)}
+                    type="number"
+                    prefix={transaction.amount < 0 ? "-" : "$"}
+                  />
+                </div>
                 <div className="flex items-center justify-end gap-1 text-sm text-muted-foreground mt-2">
                   {getSourceIcon(transaction.source)}
                   <span className="font-mono">{transaction.source}</span>
@@ -783,7 +882,7 @@ export default function TransactionTable({
 
             <div className="flex items-center justify-between mt-4">
               <div className={cn(
-                "font-mono text-sm",
+                "font-mono text-sm w-full mr-4",
                 transaction.category &&
                   !transaction.category.toLowerCase().includes('income') &&
                   budgetedCategories.size > 0 &&
@@ -794,12 +893,19 @@ export default function TransactionTable({
                  !transaction.category.toLowerCase().includes('income') &&
                  budgetedCategories.size > 0 &&
                  !budgetedCategories.has(transaction.category) ? (
-                  <span className="inline-flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
-                    {transaction.category}
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3 shrink-0" />
+                    <InlineEdit
+                      value={transaction.category}
+                      onSave={(val) => handleQuickEdit(transaction, 'category', val)}
+                    />
+                  </div>
                 ) : (
-                  transaction.category || 'Uncategorized'
+                  <InlineEdit
+                    value={transaction.category || ""}
+                    onSave={(val) => handleQuickEdit(transaction, 'category', val)}
+                    className={!transaction.category ? "text-muted-foreground italic" : ""}
+                  />
                 )}
               </div>
               <div className="flex items-center gap-2">

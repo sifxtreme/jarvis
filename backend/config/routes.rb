@@ -31,6 +31,7 @@ Rails.application.routes.draw do
   get 'calendar/calendars', to: 'calendar#calendars'
   get 'calendar/overview', to: 'calendar#overview'
   post 'calendar/connections', to: 'calendar#upsert_connection'
+  patch 'calendar/events/:id', to: 'calendar#patch_event'
   delete 'calendar/events/:id', to: 'calendar#destroy_event'
 
   mount Resque::Server, :at => "resque"

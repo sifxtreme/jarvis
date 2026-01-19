@@ -15,8 +15,9 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
-import { CalendarOverviewResponse, CalendarItem, deleteCalendarEvent, getCalendarOverview } from "@/lib/api";
+import { CalendarOverviewResponse, CalendarItem, deleteCalendarEvent, getCalendarOverview, patchCalendarEvent } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -196,6 +197,9 @@ export default function CalendarPage() {
   const [scrollbarWidth, setScrollbarWidth] = useState(0);
   const pendingDayRef = useRef<Date | null>(null);
   const [deletingEventId, setDeletingEventId] = useState<number | null>(null);
+  const [editingEventId, setEditingEventId] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -643,6 +647,27 @@ export default function CalendarPage() {
   };
 
   const handleToday = () => setAnchorDate(startOfDay(new Date()));
+
+  const handleStartEdit = (entry: CalendarEntry, e: React.MouseEvent) => {
+    if (entry.type === "busy") return;
+    e.stopPropagation();
+    setEditingEventId(entry.id);
+    setEditTitle(entry.title);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingEventId || isUpdating) return;
+    setIsUpdating(true);
+    try {
+      await patchCalendarEvent(editingEventId, { title: editTitle });
+      setRefreshKey((curr) => curr + 1);
+      setEditingEventId(null);
+    } catch (error) {
+      console.error("Failed to update event title", error);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const handleMonth = (direction: "prev" | "next") => {
     setAnchorDate((current) => addMonths(current, direction === "prev" ? -1 : 1));
@@ -1169,18 +1194,37 @@ export default function CalendarPage() {
                               const calendarLabel = entry.isWork
                                 ? workCalendarLabelMap.get(entry.calendarId) || entry.calendarSummary || entry.calendarId
                                 : entry.calendarSummary;
+                              const isEditing = editingEventId === entry.id;
+
                               return (
-                                <HoverCard key={entry.key}>
+                                <HoverCard key={entry.key} open={isEditing ? false : undefined} openDelay={300}>
                                   <HoverCardTrigger asChild>
                                     <div
                                       className={cn(
                                         "absolute overflow-hidden rounded-md border border-slate-200/70 px-2 py-1 text-[11px] shadow-sm border-l-[3px] dark:border-slate-700/70",
                                         palette.className,
-                                        muted
+                                        muted,
+                                        !isEditing && entry.type !== "busy" && "cursor-pointer hover:ring-1 hover:ring-slate-400/50"
                                       )}
                                       style={{ top, height, left, width, ...palette.style }}
+                                      onClick={(e) => handleStartEdit(entry, e)}
                                     >
-                                      <div className="truncate text-[11px] font-semibold">{entry.title}</div>
+                                      {isEditing ? (
+                                        <Input
+                                          autoFocus
+                                          value={editTitle}
+                                          onChange={(e) => setEditTitle(e.target.value)}
+                                          onKeyDown={(e) => {
+                                            if (e.key === "Enter") handleSaveEdit();
+                                            if (e.key === "Escape") setEditingEventId(null);
+                                          }}
+                                          onBlur={handleSaveEdit}
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="h-5 w-full bg-white px-1 py-0 text-[11px] focus-visible:ring-1 dark:bg-slate-900"
+                                        />
+                                      ) : (
+                                        <div className="truncate text-[11px] font-semibold">{entry.title}</div>
+                                      )}
                                       {durationMinutes >= 30 && (
                                         <div className="truncate text-[10px] text-slate-500 dark:text-slate-400">
                                           {format(entry.startAt, "h:mm a")}–{format(entry.endAt, "h:mm a")}

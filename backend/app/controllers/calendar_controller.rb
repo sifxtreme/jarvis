@@ -131,6 +131,42 @@ class CalendarController < ApplicationController
     }, status: :bad_gateway
   end
 
+  def patch_event
+    user = current_user
+    return render json: { msg: 'Unauthorized' }, status: :unauthorized unless user
+
+    event = CalendarEvent.find_by(id: params[:id])
+    return render json: { msg: 'Event not found' }, status: :not_found unless event
+
+    updates = params.permit(:title)
+    return render json: { msg: 'Nothing to update' }, status: :unprocessable_entity if updates.to_h.empty?
+
+    # For now, we only support updating title.
+    # We update the original event and its synchronized copies if applicable.
+    related_events = related_calendar_events(event)
+    failures = []
+
+    related_events.each do |related|
+      owner = related.user || user
+      if owner.google_refresh_token.to_s.empty?
+        failures << { event_id: related.id, error: 'Calendar not connected' }
+        next
+      end
+
+      client = GoogleCalendarClient.new(owner)
+      client.update_event(calendar_id: related.calendar_id, event_id: related.event_id, updates: updates.to_h)
+      related.update(updates)
+    rescue GoogleCalendarClient::CalendarError => e
+      failures << { event_id: related.id, error: e.message }
+    end
+
+    if failures.any?
+      return render json: { msg: 'One or more updates failed', failures: failures }, status: :bad_gateway
+    end
+
+    render json: { success: true, updated: related_events.size }
+  end
+
   def related_calendar_events(event)
     raw = event.raw_event || {}
     recurring_id = raw['recurringEventId']
