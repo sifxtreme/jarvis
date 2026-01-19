@@ -6,3 +6,4 @@ teller/*.pem
 
 # Local DB connection
 db/*.env
+.gemini-clipboard/

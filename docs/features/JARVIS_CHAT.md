@@ -8,6 +8,7 @@ Date: 2026-01-02
 ## Status (Current vs Future)
 
 - Implemented: Slack + web chat flows using Gemini for intent + extraction, including upcoming event queries.
+- Implemented: ChatFlowEngine + flow registry for plug-in capabilities (event/transaction/memory).
 - Future/UX vision: Full chat UI with rich previews and edit/confirm flows (mockups below).
 
 ## Reliability + Observability (Current)
@@ -94,6 +95,26 @@ With Jarvis:
 - Update or delete events with confirm flows (supports recurring scope: this event vs series).
 - List upcoming events and answer “when is the next ___?” style queries.
 - Add transactions and save/search memories.
+
+## Extensibility (Current)
+
+- New capabilities are added as ChatFlows (see `backend/app/lib/chat_flows/`) and registered in `ChatFlows::Registry`.
+- The core flow engine handles extract → missing fields → confirm → execute with consistent pending state.
+- Shared helpers live in `backend/app/lib/chat_helpers/` (calendar actions, formatting, payload normalization, AI logging).
+
+### Plug-and-Play Checklist
+
+To add a new capability without touching the main handler:
+
+1. Create a flow in `backend/app/lib/chat_flows/` that implements:
+   - `extract(text:, image_message_id:)`
+   - `missing_fields(extracted)`
+   - `confirm_payload(extracted)`
+   - `execute(extracted, context:)`
+2. Register the flow in `backend/app/lib/chat_flows/registry.rb`.
+3. (Optional) Add helpers under `backend/app/lib/chat_helpers/` for shared logic.
+
+The handler now delegates all action handling to `ChatFlowEngine` + helpers, so most new features live entirely inside the flow + helpers.
 
 ### After Sending a Screenshot
 

@@ -148,6 +148,18 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
 
   // Snapshot for scroll restoration
   const scrollSnapshotRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
+  const isInitialLoadRef = useRef(true);
+
+  const scrollToBottom = (instant = false) => {
+    const container = scrollRef.current;
+    if (!container) return;
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: instant ? "auto" : "smooth",
+    });
+    shouldAutoScrollRef.current = true;
+    setShowJumpToLatest(false);
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -158,14 +170,6 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
         setMessages((response.messages || []).map(mapMessage));
         setHasMore(Boolean(response.has_more));
         setBeforeId(response.next_before_id ?? null);
-        // Initial scroll to bottom
-        requestAnimationFrame(() => {
-          const container = scrollRef.current;
-          if (!container) return;
-          container.scrollTop = container.scrollHeight;
-          shouldAutoScrollRef.current = true;
-          setShowJumpToLatest(false);
-        });
       } catch (error) {
         console.error("Failed to load chat messages", error);
       } finally {
@@ -232,11 +236,11 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
       container.scrollTop = nextScrollHeight - prevScrollHeight + prevScrollTop;
       scrollSnapshotRef.current = null;
     } else if (shouldAutoScrollRef.current) {
-      // Auto-scroll to bottom for new messages
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior: "smooth",
-      });
+      // Scroll to bottom for new messages or initial load
+      scrollToBottom(isInitialLoadRef.current);
+      if (messages.length > 0) {
+        isInitialLoadRef.current = false;
+      }
     }
   }, [messages.length, isSending]);
 
@@ -398,11 +402,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
   }, [messages]);
 
   const scrollToLatest = () => {
-    const container = scrollRef.current;
-    if (!container) return;
-    container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
-    shouldAutoScrollRef.current = true;
-    setShowJumpToLatest(false);
+    scrollToBottom(false);
   };
 
   return (
@@ -483,6 +483,11 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
                                 src={message.imageUrl}
                                 alt="Chat upload"
                                 className="max-h-64 w-full object-cover"
+                                onLoad={() => {
+                                  if (shouldAutoScrollRef.current) {
+                                    scrollToBottom(true);
+                                  }
+                                }}
                               />
                             </button>
                           )}
