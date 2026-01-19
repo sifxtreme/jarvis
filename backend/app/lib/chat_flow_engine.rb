@@ -15,7 +15,7 @@ class ChatFlowEngine
       return preflight[:result] if preflight[:action] == :return
     end
 
-    result = flow.extract(image_message_id: image_message_id)
+    result = flow.extract(_image_message_id: image_message_id)
     return result if result.is_a?(Hash) && result[:text]
 
     payload = result[:event] || {}
