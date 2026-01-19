@@ -32,8 +32,8 @@ class SlackDailyDigest
           next
         end
 
-        message = build_digest_message(user)
-        if message.to_s.strip.empty?
+        blocks = build_digest_blocks(user)
+        if blocks.empty?
           SlackMessageLog.create!(
             user_id: user.id,
             channel: channel,
@@ -44,7 +44,11 @@ class SlackDailyDigest
           next
         end
 
-        response = client.chat_postMessage(channel: channel, text: message, mrkdwn: true)
+        response = client.chat_postMessage(
+          channel: channel,
+          text: "Daily Digest — #{Time.zone.today.strftime('%b %d, %Y')}",
+          blocks: blocks
+        )
         SlackMessageLog.create!(
           user_id: user.id,
           channel: channel,
@@ -69,48 +73,58 @@ class SlackDailyDigest
 
   private
 
-  def build_digest_message(user)
+  def build_digest_blocks(user)
     today = Time.zone.today
-    events = CalendarEvent.where(user: user)
-                          .where.not(status: 'cancelled')
-                          .where(start_at: today.beginning_of_day..today.end_of_day)
-                          .order(:start_at)
+    blocks = []
 
-    weather_lines = weather_for(user)
-    busy_lines = busy_blocks_for(user, today)
+    # Title Header
+    blocks << {
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: "Jarvis Daily Digest — #{today.strftime('%A, %b %d')}",
+        emoji: true
+      }
+    }
 
-    return nil if events.empty? && busy_lines.empty? && (weather_lines.nil? || weather_lines.empty?)
-
-    lines = []
-    lines << "*Daily Digest — #{today.strftime('%b %d, %Y')}*"
-    lines.concat(weather_lines) if weather_lines&.any?
-
-    if events.any?
-      lines << "\n*Today's Events*"
-      events.each do |event|
-        time = event.start_at ? event.start_at.strftime('%H:%M') : 'All day'
-        lines << "• #{time} — #{event.title}"
-      end
+    # Weather
+    weather_blocks = build_weather_blocks(user)
+    if weather_blocks.any?
+      blocks << { type: "divider" }
+      blocks.concat(weather_blocks)
     end
 
-    if busy_lines.any?
-      lines << "\n*Busy Blocks*"
-      lines.concat(busy_lines)
+    # Events
+    event_blocks = build_event_blocks(user, today)
+    if event_blocks.any?
+      blocks << { type: "divider" }
+      blocks.concat(event_blocks)
     end
 
-    lines.join("\n")
+    # Busy Blocks
+    busy_blocks = build_busy_blocks_section(user, today)
+    if busy_blocks.any?
+      blocks << { type: "divider" }
+      blocks.concat(busy_blocks)
+    end
+
+    blocks
   end
 
-  def weather_for(user)
+  def build_weather_blocks(user)
     locations = user.user_locations.where(label: ['home', 'school']).order(:label)
-    if locations.empty?
-      return [
-        "*Weather*",
-        "• Add a home/school location to enable weather."
-      ]
-    end
+    return [] if locations.empty?
 
-    lines = ["*Weather*"]
+    blocks = [
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: "*🌡️ Weather Forecast*"
+        }
+      }
+    ]
+
     locations.each do |location|
       next unless location.latitude && location.longitude
 
@@ -120,18 +134,78 @@ class SlackDailyDigest
         time_zone: location.time_zone || 'America/Los_Angeles',
         hours: [8, 13, 16, 19]
       )
-      description = weather_client.describe_hourly(summary)
-      next if description.to_s.strip.empty?
+      
+      next unless summary&.values&.any?
 
+      icon = location.label == 'home' ? '🏠' : '🏫'
       label = location.label.to_s.capitalize
-      lines << "• #{label}: #{description}"
+      
+      weather_parts = summary.map do |hour, data|
+        next unless data
+        h_label = weather_client.format_hour(hour)
+        temp = data[:temp] ? "#{data[:temp].round}°" : "—"
+        emoji = weather_client.weather_emoji(data[:code])
+        precip = data[:precip] && data[:precip].to_f >= 10 ? " ☔#{data[:precip]}%" : ""
+        "`#{h_label}` *#{temp}#{emoji}*#{precip}"
+      end.compact
+
+      blocks << {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: "#{icon} *#{label}*\n#{weather_parts.join('  ·  ')}"
+        }
+      }
     end
 
-    return lines if lines.length > 1
+    blocks.size > 1 ? blocks : []
+  end
+
+  def build_event_blocks(user, today)
+    events = CalendarEvent.where(user: user)
+                          .where.not(status: 'cancelled')
+                          .where(start_at: today.beginning_of_day..today.end_of_day)
+                          .order(:start_at)
+    return [] if events.empty?
+
+    lines = events.map do |event|
+      time = event.start_at ? event.start_at.strftime('%H:%M') : 'All day'
+      "• `#{time}` *#{event.title}*"
+    end
 
     [
-      "*Weather*",
-      "• Add coordinates to home/school locations to enable weather."
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: "*🗓️ Today's Events*\n#{lines.join("\n")}"
+        }
+      }
+    ]
+  end
+
+  def build_busy_blocks_section(user, today)
+    lines = busy_blocks_for(user, today)
+    return [] if lines.empty?
+
+    # Reformat busy lines for better Slack display
+    formatted_lines = lines.map do |line|
+      # line format is: "• 09:00-10:00 — Label"
+      if line =~ /• (.*?) — (.*)/
+        "• `#{$1}` *#{$2}*"
+      else
+        line
+      end
+    end
+
+    [
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: "*⌛ Busy Blocks*\n#{formatted_lines.join("\n")}"
+        }
+      }
     ]
   end
 
