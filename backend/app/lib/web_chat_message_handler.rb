@@ -295,6 +295,7 @@ class WebChatMessageHandler
 
   def handle_create_flow(kind, image_message_id: nil)
     config = create_flow_config(kind)
+    flow_image_message_id = resolve_flow_image_message_id(image_message_id)
     if (preflight = resolve_flow_value(config[:preflight]))
       return resolve_flow_value(config[:executor], preflight[:payload]) if preflight[:action] == :execute
       return preflight[:result] if preflight[:action] == :return
@@ -304,7 +305,9 @@ class WebChatMessageHandler
 
     payload = result[:event] || {}
     if config[:multi_extractor] && (items = resolve_flow_value(config[:multi_extractor], payload)).any?
-      set_pending_action(config[:multi_action], { config[:multi_payload_key] => items })
+      pending_payload = { config[:multi_payload_key] => items }
+      pending_payload = merge_pending_payload(pending_payload, flow_image_message_id)
+      set_pending_action(config[:multi_action], pending_payload)
       return build_response(
         "I found multiple #{config[:plural_label]}. Reply with the numbers to add (e.g., 1,2) or say \"all\":\n#{resolve_flow_value(config[:multi_formatter], items)}"
       )
@@ -318,7 +321,8 @@ class WebChatMessageHandler
         payload,
         missing,
         fallback: payload['message'].presence || resolve_flow_value(config[:error_fallback]),
-        stage: :error
+        stage: :error,
+        image_message_id: flow_image_message_id
       )
     end
 
@@ -334,22 +338,26 @@ class WebChatMessageHandler
         payload,
         missing,
         fallback: fallback,
-        stage: :missing
+        stage: :missing,
+        image_message_id: flow_image_message_id
       )
     end
 
     if confidence != 'high'
-      set_pending_action(config[:confirm_action], { config[:payload_key] => payload })
+      pending_payload = merge_pending_payload({ config[:payload_key] => payload }, flow_image_message_id)
+      set_pending_action(config[:confirm_action], pending_payload)
       return build_response(resolve_flow_value(config[:confirm_prompt], payload, :initial))
     end
 
     resolve_flow_value(config[:executor], payload)
   end
 
-  def handle_correction_flow(kind, payload)
+  def handle_correction_flow(kind, payload, image_message_id: nil)
     config = create_flow_config(kind)
     if config[:allow_multi_on_correction] && config[:multi_extractor] && (items = resolve_flow_value(config[:multi_extractor], payload)).any?
-      set_pending_action(config[:multi_action], { config[:multi_payload_key] => items })
+      pending_payload = { config[:multi_payload_key] => items }
+      pending_payload = merge_pending_payload(pending_payload, image_message_id)
+      set_pending_action(config[:multi_action], pending_payload)
       return build_response(
         "I found multiple #{config[:plural_label]}. Reply with the numbers to add (e.g., 1,2) or say \"all\":\n#{resolve_flow_value(config[:multi_formatter], items)}"
       )
@@ -367,22 +375,25 @@ class WebChatMessageHandler
         payload,
         missing,
         fallback: fallback,
-        stage: :corrected
+        stage: :corrected,
+        image_message_id: image_message_id
       )
     end
 
     if confidence != 'high'
-      set_pending_action(config[:confirm_action], { config[:payload_key] => payload })
+      pending_payload = merge_pending_payload({ config[:payload_key] => payload }, image_message_id)
+      set_pending_action(config[:confirm_action], pending_payload)
       return build_response(resolve_flow_value(config[:confirm_prompt], payload, :corrected))
     end
 
     resolve_flow_value(config[:executor], payload)
   end
 
-  def build_missing_prompt(config, payload, missing_fields, fallback:, stage:)
+  def build_missing_prompt(config, payload, missing_fields, fallback:, stage:, image_message_id: nil)
     pending_payload = { config[:payload_key] => payload }
     pending_payload['missing_fields'] = missing_fields if missing_fields.present?
     pending_payload = resolve_flow_value(config[:pending_adjuster], pending_payload, payload, missing_fields, stage) if config[:pending_adjuster]
+    pending_payload = merge_pending_payload(pending_payload, image_message_id)
     set_pending_action(config[:clarify_action], pending_payload)
     build_response(
       clarify_missing_details(
@@ -428,6 +439,19 @@ class WebChatMessageHandler
     end
 
     value
+  end
+
+  def resolve_flow_image_message_id(image_message_id)
+    return image_message_id if image_message_id
+    return @message.id if image_attached?
+
+    nil
+  end
+
+  def merge_pending_payload(payload, image_message_id)
+    return payload unless image_message_id
+
+    payload.merge('image_message_id' => image_message_id)
   end
 
   def create_flow_config(kind)
@@ -1164,7 +1188,9 @@ class WebChatMessageHandler
 
     if (missing_entry = selected.find { |transaction| missing_transaction_fields(transaction).any? })
       missing = missing_transaction_fields(missing_entry)
-      set_pending_action('clarify_transaction_fields', { 'transaction' => missing_entry, 'missing_fields' => missing })
+      pending_payload = { 'transaction' => missing_entry, 'missing_fields' => missing }
+      pending_payload = merge_pending_payload(pending_payload, payload['image_message_id'])
+      set_pending_action('clarify_transaction_fields', pending_payload)
       return build_response(
         clarify_missing_details(
           intent: 'create_transaction',
@@ -1263,6 +1289,17 @@ class WebChatMessageHandler
 
   def handle_transaction_correction(payload)
     transaction = payload['transaction'] || {}
+    image_message_id = payload['image_message_id']
+    if image_message_id && payload['missing_fields'].present?
+      result = extract_transaction_from_message(image_message_id, context: @text.presence || recent_context_text)
+      unless result.is_a?(Hash) && result[:text]
+        extracted = result[:event] || {}
+        if extracted['error'].nil?
+          return handle_correction_flow(:transaction, extracted, image_message_id: image_message_id)
+        end
+      end
+    end
+
     result = gemini.apply_transaction_correction(transaction, @text)
     log_ai_request(
       @message,
@@ -1279,7 +1316,7 @@ class WebChatMessageHandler
       return build_response(updated['message'] || "I couldn't update the transaction.")
     end
 
-    handle_correction_flow(:transaction, updated)
+    handle_correction_flow(:transaction, updated, image_message_id: image_message_id)
   rescue StandardError => e
     clear_thread_state
     build_response("Transaction correction error: #{e.message}")
