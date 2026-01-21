@@ -1,3 +1,5 @@
+require 'chat_constants'
+
 module ChatFlows
   class Transaction < Base
     def kind
@@ -5,7 +7,7 @@ module ChatFlows
     end
 
     def intent
-      'create_transaction'
+      ChatConstants::Intent::CREATE_TRANSACTION
     end
 
     def plural_label
@@ -60,7 +62,7 @@ module ChatFlows
     end
 
     def multi_action
-      'select_transaction_from_extraction'
+      ChatConstants::PendingAction::SELECT_TRANSACTION_FROM_EXTRACTION
     end
 
     def multi_payload_key
@@ -68,11 +70,11 @@ module ChatFlows
     end
 
     def clarify_action
-      'clarify_transaction_fields'
+      ChatConstants::PendingAction::CLARIFY_TRANSACTION_FIELDS
     end
 
     def confirm_action
-      'confirm_transaction'
+      ChatConstants::PendingAction::CONFIRM_TRANSACTION
     end
 
     def allow_multi_on_correction?

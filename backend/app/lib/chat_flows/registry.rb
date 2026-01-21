@@ -1,4 +1,6 @@
 require 'chat_flows/event'
+require 'chat_flows/event_update'
+require 'chat_flows/event_delete'
 require 'chat_flows/transaction'
 require 'chat_flows/memory'
 
@@ -8,6 +10,8 @@ module ChatFlows
       @handler = handler
       @flows = {
         event: ChatFlows::Event.new(handler),
+        event_update: ChatFlows::EventUpdate.new(handler),
+        event_delete: ChatFlows::EventDelete.new(handler),
         transaction: ChatFlows::Transaction.new(handler),
         memory: ChatFlows::Memory.new(handler)
       }

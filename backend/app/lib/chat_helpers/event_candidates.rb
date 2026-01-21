@@ -40,11 +40,11 @@ module ChatHelpers
     def selection_action_for(action_type)
       case action_type
       when 'update'
-        'select_event_for_update'
+        ChatConstants::PendingAction::SELECT_EVENT_FOR_UPDATE
       when 'delete'
-        'select_event_for_delete'
+        ChatConstants::PendingAction::SELECT_EVENT_FOR_DELETE
       else
-        'select_event_for_update'
+        ChatConstants::PendingAction::SELECT_EVENT_FOR_UPDATE
       end
     end
 
@@ -57,7 +57,7 @@ module ChatHelpers
       date = data['date'].to_s.strip
       title = fallback_list_title(title) if date.blank? && !prefer_title
 
-      scope = CalendarEvent.where(user: @user).where.not(status: 'cancelled')
+      scope = CalendarEvent.where(user: @user).where.not(status: ChatConstants::RecordStatus::CANCELLED)
       if date.present?
         day = Date.parse(date) rescue nil
         if day
@@ -83,13 +83,13 @@ module ChatHelpers
     end
 
     def handle_list_empty_results(query, title:, date:)
-      set_pending_action('clarify_list_query', { 'query' => query })
+      set_pending_action(ChatConstants::PendingAction::CLARIFY_LIST_QUERY, { 'query' => query })
       log_action(
         @message,
         calendar_event_id: nil,
         calendar_id: nil,
-        status: 'success',
-        action_type: 'list_events',
+        status: ChatConstants::Status::SUCCESS,
+        action_type: ChatConstants::ActionType::LIST_EVENTS,
         metadata: { query: query, result_count: 0 }
       )
       if title.empty? && date.empty?

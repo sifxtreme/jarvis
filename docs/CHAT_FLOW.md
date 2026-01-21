@@ -2,6 +2,8 @@
 
 This doc shows how chat requests flow through the frontend, backend, and AI services, including uploads and clarification state.
 
+> **See also**: [CHAT_STATE_MACHINE.md](./CHAT_STATE_MACHINE.md) for detailed documentation of all pending action states and their transitions.
+
 ## Mermaid (System Flow)
 
 ```mermaid

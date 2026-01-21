@@ -36,7 +36,7 @@ module ChatHelpers
 
       return [] if title.empty? && date.empty?
 
-      scope = CalendarEvent.where(user: @user).where.not(status: 'cancelled')
+      scope = CalendarEvent.where(user: @user).where.not(status: ChatConstants::RecordStatus::CANCELLED)
       if date.present?
         day = Date.parse(date) rescue nil
         if day
@@ -113,7 +113,7 @@ module ChatHelpers
       quoted_title = ActiveRecord::Base.connection.quote(title)
 
       scope = CalendarEvent.where(user: @user)
-                           .where.not(status: 'cancelled')
+                           .where.not(status: ChatConstants::RecordStatus::CANCELLED)
                            .where(start_at: start_at.beginning_of_day..end_at.end_of_day)
       results = scope
                 .select("calendar_events.*, similarity(title, #{quoted_title}) AS similarity_score")

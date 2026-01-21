@@ -27,10 +27,10 @@ module ChatHelpers
         missing = missing_transaction_fields(missing_entry)
         pending_payload = { 'transaction' => missing_entry, 'missing_fields' => missing }
         pending_payload = merge_pending_payload(pending_payload, payload['image_message_id'])
-        set_pending_action('clarify_transaction_fields', pending_payload)
+        set_pending_action(ChatConstants::PendingAction::CLARIFY_TRANSACTION_FIELDS, pending_payload)
         return build_response(
           clarify_missing_details(
-            intent: 'create_transaction',
+            intent: ChatConstants::Intent::CREATE_TRANSACTION,
             missing_fields: missing,
             extracted: missing_entry,
             extra: "Valid sources: #{TransactionSources.prompt_list}",
@@ -47,13 +47,13 @@ module ChatHelpers
       if errors.any?
         return build_response(
           "Added #{created_titles.length - errors.length} transactions. Some failed:\n#{errors.map { |err| "- #{err}" }.join("\n")}",
-          action: 'transaction_created'
+          action: ChatConstants::FrontendAction::TRANSACTION_CREATED
         )
       end
 
       build_response(
         "Added #{created_titles.length} transactions. ✅\n#{created_titles.map { |line| "- #{line}" }.join("\n")}",
-        action: 'transaction_created'
+        action: ChatConstants::FrontendAction::TRANSACTION_CREATED
       )
     end
   end

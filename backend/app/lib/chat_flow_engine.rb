@@ -6,6 +6,91 @@ class ChatFlowEngine
     @registry = ChatFlows::Registry.new(handler)
   end
 
+  # Update flow entry point
+  def handle_update
+    flow = @registry.fetch(:event_update)
+    flow.handle_update
+  rescue StandardError => e
+    @handler.build_response("Update error: #{e.message}")
+  end
+
+  # Delete flow entry point
+  def handle_delete
+    flow = @registry.fetch(:event_delete)
+    flow.handle_delete
+  rescue StandardError => e
+    @handler.build_response("Delete error: #{e.message}")
+  end
+
+  # Update flow: target clarification
+  def handle_update_target_clarification(payload)
+    flow = @registry.fetch(:event_update)
+    flow.handle_target_clarification(payload)
+  rescue StandardError => e
+    @handler.build_response("Update error: #{e.message}")
+  end
+
+  # Update flow: changes clarification
+  def handle_update_changes_clarification(payload)
+    flow = @registry.fetch(:event_update)
+    flow.handle_changes_clarification(payload)
+  rescue StandardError => e
+    @handler.build_response("Update error: #{e.message}")
+  end
+
+  # Update flow: event selection
+  def handle_update_selection(payload)
+    flow = @registry.fetch(:event_update)
+    flow.handle_selection(payload)
+  rescue StandardError => e
+    @handler.build_response("Update error: #{e.message}")
+  end
+
+  # Update flow: confirmation
+  def handle_update_confirmation(payload)
+    flow = @registry.fetch(:event_update)
+    flow.handle_confirmation(payload)
+  rescue StandardError => e
+    @handler.build_response("Update error: #{e.message}")
+  end
+
+  # Delete flow: target clarification
+  def handle_delete_target_clarification(payload)
+    flow = @registry.fetch(:event_delete)
+    flow.handle_target_clarification(payload)
+  rescue StandardError => e
+    @handler.build_response("Delete error: #{e.message}")
+  end
+
+  # Delete flow: event selection
+  def handle_delete_selection(payload)
+    flow = @registry.fetch(:event_delete)
+    flow.handle_selection(payload)
+  rescue StandardError => e
+    @handler.build_response("Delete error: #{e.message}")
+  end
+
+  # Delete flow: confirmation
+  def handle_delete_confirmation(payload)
+    flow = @registry.fetch(:event_delete)
+    flow.handle_confirmation(payload)
+  rescue StandardError => e
+    @handler.build_response("Delete error: #{e.message}")
+  end
+
+  # Shared: recurring scope clarification (used by both update and delete)
+  def handle_recurring_scope_clarification(payload)
+    action = payload['action']
+    if action == 'delete'
+      flow = @registry.fetch(:event_delete)
+    else
+      flow = @registry.fetch(:event_update)
+    end
+    flow.handle_recurring_scope(payload)
+  rescue StandardError => e
+    @handler.build_response("#{action == 'delete' ? 'Delete' : 'Update'} error: #{e.message}")
+  end
+
   def handle_create(kind, image_message_id: nil)
     flow = @registry.fetch(kind)
     image_message_id = resolve_image_message_id(image_message_id)

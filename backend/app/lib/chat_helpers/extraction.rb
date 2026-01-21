@@ -95,14 +95,14 @@ module ChatHelpers
 
     def extract_event_from_message(message_id, context: nil)
       message = ChatMessage.find_by(id: message_id)
-      return { text: "I couldn't find that image anymore." } unless message&.image&.attached?
+      return build_response("I couldn't find that image anymore.") unless message&.image&.attached?
 
       image_base64, mime_type = gemini_image_payload(message.image)
       result = gemini.extract_event_from_image(image_base64, mime_type: mime_type, context: context)
       log_ai_result(result, request_kind: 'image', model: gemini_extract_model)
       result
     rescue StandardError => e
-      { text: "Image extraction error: #{e.message}" }
+      build_response("Image extraction error: #{e.message}")
     end
 
     def extract_transaction_from_text
@@ -124,14 +124,14 @@ module ChatHelpers
 
     def extract_transaction_from_message(message_id, context: nil)
       message = ChatMessage.find_by(id: message_id)
-      return { text: "I couldn't find that image anymore." } unless message&.image&.attached?
+      return build_response("I couldn't find that image anymore.") unless message&.image&.attached?
 
       image_base64, mime_type = gemini_image_payload(message.image)
       result = gemini.extract_transaction_from_image(image_base64, mime_type: mime_type, context: context)
       log_ai_result(result, request_kind: 'transaction_image', model: gemini_extract_model)
       result
     rescue StandardError => e
-      { text: "Transaction extraction error: #{e.message}" }
+      build_response("Transaction extraction error: #{e.message}")
     end
 
     def extract_urls(text)

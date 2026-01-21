@@ -1,3 +1,5 @@
+require 'chat_constants'
+
 module ChatFlows
   class Memory < Base
     def kind
@@ -5,7 +7,7 @@ module ChatFlows
     end
 
     def intent
-      'create_memory'
+      ChatConstants::Intent::CREATE_MEMORY
     end
 
     def plural_label
@@ -72,11 +74,11 @@ module ChatFlows
     end
 
     def clarify_action
-      'clarify_memory_fields'
+      ChatConstants::PendingAction::CLARIFY_MEMORY_FIELDS
     end
 
     def confirm_action
-      'confirm_memory'
+      ChatConstants::PendingAction::CONFIRM_MEMORY
     end
 
     def extra_prompt(stage:, _payload:, missing_fields:)

@@ -1,3 +1,5 @@
+require 'chat_constants'
+
 module ChatFlows
   class Event < Base
     def kind
@@ -5,7 +7,7 @@ module ChatFlows
     end
 
     def intent
-      'create_event'
+      ChatConstants::Intent::CREATE_EVENT
     end
 
     def plural_label
@@ -65,7 +67,7 @@ module ChatFlows
     end
 
     def multi_action
-      'select_event_from_extraction'
+      ChatConstants::PendingAction::SELECT_EVENT_FROM_EXTRACTION
     end
 
     def multi_payload_key
@@ -73,11 +75,11 @@ module ChatFlows
     end
 
     def clarify_action
-      'clarify_event_fields'
+      ChatConstants::PendingAction::CLARIFY_EVENT_FIELDS
     end
 
     def confirm_action
-      'confirm_event'
+      ChatConstants::PendingAction::CONFIRM_EVENT
     end
   end
 end

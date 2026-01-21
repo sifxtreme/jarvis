@@ -2,7 +2,7 @@ module ChatHelpers
   module CalendarActions
     def create_event(event)
       if event['error']
-        log_action(@message, calendar_event_id: nil, calendar_id: primary_calendar_id, status: 'error', action_type: 'create_calendar_event', metadata: { error: event['message'] })
+        log_action(@message, calendar_event_id: nil, calendar_id: primary_calendar_id, status: ChatConstants::Status::ERROR, action_type: ChatConstants::ActionType::CREATE_CALENDAR_EVENT, metadata: { error: event['message'] })
         return build_response(render_extraction_result(event))
       end
       if @user.google_refresh_token.to_s.empty?
@@ -10,11 +10,11 @@ module ChatHelpers
           @message,
           calendar_event_id: nil,
           calendar_id: primary_calendar_id,
-          status: 'error',
-          action_type: 'create_calendar_event',
-          metadata: { error_code: 'insufficient_permissions', correlation_id: @correlation_id }
+          status: ChatConstants::Status::ERROR,
+          action_type: ChatConstants::ActionType::CREATE_CALENDAR_EVENT,
+          metadata: { error_code: ChatConstants::ErrorCode::INSUFFICIENT_PERMISSIONS, correlation_id: @correlation_id }
         )
-        return build_response("Please connect your calendar at https://finances.sifxtre.me first.", error_code: 'insufficient_permissions')
+        return build_response("Please connect your calendar at https://finances.sifxtre.me first.", error_code: ChatConstants::ErrorCode::INSUFFICIENT_PERMISSIONS)
       end
 
       calendar_id = primary_calendar_id
@@ -23,17 +23,17 @@ module ChatHelpers
       recurrence_rules = build_recurrence_rules(event['recurrence'], start_date: event['date'])
 
       idempotency_payload = { event: event, attendees: attendees, calendar_id: calendar_id }
-      signature = idempotency_signature('create_calendar_event', idempotency_payload)
-      if duplicate_action?('create_calendar_event', signature)
+      signature = idempotency_signature(ChatConstants::ActionType::CREATE_CALENDAR_EVENT, idempotency_payload)
+      if duplicate_action?(ChatConstants::ActionType::CREATE_CALENDAR_EVENT, signature)
         log_action(
           @message,
           calendar_event_id: nil,
           calendar_id: calendar_id,
-          status: 'duplicate',
-          action_type: 'create_calendar_event',
+          status: ChatConstants::Status::DUPLICATE,
+          action_type: ChatConstants::ActionType::CREATE_CALENDAR_EVENT,
           metadata: { error_code: 'duplicate_request', event: event, correlation_id: @correlation_id }
         )
-        return build_response("I already added that event. ✅", action: 'calendar_event_created')
+        return build_response("I already added that event. ✅", action: ChatConstants::FrontendAction::CALENDAR_EVENT_CREATED)
       end
 
       result = calendar.create_event(
@@ -62,8 +62,8 @@ module ChatHelpers
         @message,
         calendar_event_id: calendar_event.id,
         calendar_id: calendar_event.calendar_id,
-        status: 'success',
-        action_type: 'create_calendar_event',
+        status: ChatConstants::Status::SUCCESS,
+        action_type: ChatConstants::ActionType::CREATE_CALENDAR_EVENT,
         metadata: {
           event_id: calendar_event.event_id,
           title: calendar_event.title,
@@ -74,7 +74,7 @@ module ChatHelpers
         }.compact
       )
       remember_last_event(calendar_event.id)
-      remember_idempotency!('create_calendar_event', signature)
+      remember_idempotency!(ChatConstants::ActionType::CREATE_CALENDAR_EVENT, signature)
 
       response_lines = [
         "Added to your calendar! ✅",
@@ -87,7 +87,7 @@ module ChatHelpers
       if recurrence_rules.present?
         response_lines << "Recurrence: #{recurrence_rules.join(', ')}"
       end
-      build_response(response_lines.compact.join("\n"), event_created: true, action: 'calendar_event_created')
+      build_response(response_lines.compact.join("\n"), event_created: true, action: ChatConstants::FrontendAction::CALENDAR_EVENT_CREATED)
     rescue GoogleCalendarClient::CalendarAuthError => e
       fingerprint = token_fingerprint(@user&.google_refresh_token)
       handle_calendar_auth_expired!(
@@ -100,8 +100,8 @@ module ChatHelpers
         @message,
         calendar_event_id: nil,
         calendar_id: primary_calendar_id,
-        status: 'error',
-        action_type: 'create_calendar_event',
+        status: ChatConstants::Status::ERROR,
+        action_type: ChatConstants::ActionType::CREATE_CALENDAR_EVENT,
         metadata: {
           error_code: 'calendar_auth_expired',
           error: e.message,
@@ -118,8 +118,8 @@ module ChatHelpers
         @message,
         calendar_event_id: nil,
         calendar_id: primary_calendar_id,
-        status: 'error',
-        action_type: 'create_calendar_event',
+        status: ChatConstants::Status::ERROR,
+        action_type: ChatConstants::ActionType::CREATE_CALENDAR_EVENT,
         metadata: { error_code: 'calendar_create_failed', error: e.message, correlation_id: @correlation_id }
       )
       build_response("Calendar error: #{e.message}", error_code: 'calendar_create_failed')
@@ -131,33 +131,33 @@ module ChatHelpers
           @message,
           calendar_event_id: event_record.id,
           calendar_id: event_record.calendar_id,
-          status: 'error',
-          action_type: 'update_calendar_event',
-          metadata: { error_code: 'insufficient_permissions', event_id: event_record.event_id, correlation_id: @correlation_id }
+          status: ChatConstants::Status::ERROR,
+          action_type: ChatConstants::ActionType::UPDATE_CALENDAR_EVENT,
+          metadata: { error_code: ChatConstants::ErrorCode::INSUFFICIENT_PERMISSIONS, event_id: event_record.event_id, correlation_id: @correlation_id }
         )
-        return build_response("Please connect your calendar at https://finances.sifxtre.me first.", error_code: 'insufficient_permissions')
+        return build_response("Please connect your calendar at https://finances.sifxtre.me first.", error_code: ChatConstants::ErrorCode::INSUFFICIENT_PERMISSIONS)
       end
 
       updates = build_event_updates(event_record, changes)
       if updates.nil?
-        return build_response("I need a new date or time to update the event.", error_code: 'missing_event_update_fields')
+        return build_response("I need a new date or time to update the event.", error_code: ChatConstants::ErrorCode::MISSING_EVENT_UPDATE_FIELDS)
       end
 
-      scope = changes['recurring_scope'] || 'instance'
-      target_event_id = scope == 'series' ? recurring_master_event_id(event_record) : event_record.event_id
+      scope = changes['recurring_scope'] || ChatConstants::RecurringScope::INSTANCE
+      target_event_id = scope == ChatConstants::RecurringScope::SERIES ? recurring_master_event_id(event_record) : event_record.event_id
 
       idempotency_payload = { event_id: target_event_id, changes: changes, scope: scope }
-      signature = idempotency_signature('update_calendar_event', idempotency_payload)
-      if duplicate_action?('update_calendar_event', signature)
+      signature = idempotency_signature(ChatConstants::ActionType::UPDATE_CALENDAR_EVENT, idempotency_payload)
+      if duplicate_action?(ChatConstants::ActionType::UPDATE_CALENDAR_EVENT, signature)
         log_action(
           @message,
           calendar_event_id: event_record.id,
           calendar_id: event_record.calendar_id,
-          status: 'duplicate',
-          action_type: 'update_calendar_event',
+          status: ChatConstants::Status::DUPLICATE,
+          action_type: ChatConstants::ActionType::UPDATE_CALENDAR_EVENT,
           metadata: { error_code: 'duplicate_request', event_id: target_event_id, changes: changes, scope: scope, correlation_id: @correlation_id }
         )
-        return build_response("I already applied that update. ✅", action: 'calendar_event_updated')
+        return build_response("I already applied that update. ✅", action: ChatConstants::FrontendAction::CALENDAR_EVENT_UPDATED)
       end
 
       client = GoogleCalendarClient.new(@user)
@@ -173,7 +173,7 @@ module ChatHelpers
       end
 
       detached_instance = nil
-      if scope == 'instance' && updates['recurrence_clear']
+      if scope == ChatConstants::RecurringScope::INSTANCE && updates['recurrence_clear']
         detached_instance = client.detach_instance(
           calendar_id: event_record.calendar_id,
           instance_id: target_event_id,
@@ -189,7 +189,7 @@ module ChatHelpers
         start_at: event_source.start&.date_time || event_source.start&.date,
         end_at: event_source.end&.date_time || event_source.end&.date,
         raw_event: event_source.to_h,
-        status: 'active'
+        status: ChatConstants::RecordStatus::ACTIVE
       }
       update_payload[:event_id] = event_source.id if detached_instance
       event_record.update!(update_payload)
@@ -198,8 +198,8 @@ module ChatHelpers
         @message,
         calendar_event_id: event_record.id,
         calendar_id: event_record.calendar_id,
-        status: 'success',
-        action_type: 'update_calendar_event',
+        status: ChatConstants::Status::SUCCESS,
+        action_type: ChatConstants::ActionType::UPDATE_CALENDAR_EVENT,
         metadata: {
           event_id: target_event_id,
           title: event_record.title,
@@ -215,13 +215,13 @@ module ChatHelpers
         }.compact
       )
       remember_last_event(event_record.id)
-      remember_idempotency!('update_calendar_event', signature)
+      remember_idempotency!(ChatConstants::ActionType::UPDATE_CALENDAR_EVENT, signature)
       refresh_household_calendar_data
 
       if verification[:mismatches].to_a.any?
         return build_response(
           "Updated the event, but these fields may not have changed: #{verification[:mismatches].join(', ')}.",
-          action: 'calendar_event_updated',
+          action: ChatConstants::FrontendAction::CALENDAR_EVENT_UPDATED,
           error_code: 'calendar_update_partial'
         )
       end
@@ -241,7 +241,7 @@ module ChatHelpers
       if detached_instance
         response_lines << "Detached: this instance is now standalone"
       end
-      build_response(response_lines.compact.join("\n"), event_created: true, action: 'calendar_event_updated')
+      build_response(response_lines.compact.join("\n"), event_created: true, action: ChatConstants::FrontendAction::CALENDAR_EVENT_UPDATED)
     rescue GoogleCalendarClient::CalendarAuthError => e
       fingerprint = token_fingerprint(@user&.google_refresh_token)
       handle_calendar_auth_expired!(
@@ -254,8 +254,8 @@ module ChatHelpers
         @message,
         calendar_event_id: event_record.id,
         calendar_id: event_record.calendar_id,
-        status: 'error',
-        action_type: 'update_calendar_event',
+        status: ChatConstants::Status::ERROR,
+        action_type: ChatConstants::ActionType::UPDATE_CALENDAR_EVENT,
         metadata: {
           error_code: 'calendar_auth_expired',
           error: e.message,
@@ -275,8 +275,8 @@ module ChatHelpers
         @message,
         calendar_event_id: event_record.id,
         calendar_id: event_record.calendar_id,
-        status: 'error',
-        action_type: 'update_calendar_event',
+        status: ChatConstants::Status::ERROR,
+        action_type: ChatConstants::ActionType::UPDATE_CALENDAR_EVENT,
         metadata: {
           error_code: 'calendar_update_failed',
           error: e.message,
@@ -295,39 +295,39 @@ module ChatHelpers
           @message,
           calendar_event_id: event_record.id,
           calendar_id: event_record.calendar_id,
-          status: 'error',
-          action_type: 'delete_calendar_event',
-          metadata: { error_code: 'insufficient_permissions', event_id: event_record.event_id, correlation_id: @correlation_id }
+          status: ChatConstants::Status::ERROR,
+          action_type: ChatConstants::ActionType::DELETE_CALENDAR_EVENT,
+          metadata: { error_code: ChatConstants::ErrorCode::INSUFFICIENT_PERMISSIONS, event_id: event_record.event_id, correlation_id: @correlation_id }
         )
-        return build_response("Please connect your calendar at https://finances.sifxtre.me first.", error_code: 'insufficient_permissions')
+        return build_response("Please connect your calendar at https://finances.sifxtre.me first.", error_code: ChatConstants::ErrorCode::INSUFFICIENT_PERMISSIONS)
       end
 
-      scope ||= 'instance'
-      target_event_id = scope == 'series' ? recurring_master_event_id(event_record) : event_record.event_id
+      scope ||= ChatConstants::RecurringScope::INSTANCE
+      target_event_id = scope == ChatConstants::RecurringScope::SERIES ? recurring_master_event_id(event_record) : event_record.event_id
 
-      signature = idempotency_signature('delete_calendar_event', { event_id: target_event_id, scope: scope })
-      if duplicate_action?('delete_calendar_event', signature)
+      signature = idempotency_signature(ChatConstants::ActionType::DELETE_CALENDAR_EVENT, { event_id: target_event_id, scope: scope })
+      if duplicate_action?(ChatConstants::ActionType::DELETE_CALENDAR_EVENT, signature)
         log_action(
           @message,
           calendar_event_id: event_record.id,
           calendar_id: event_record.calendar_id,
-          status: 'duplicate',
-          action_type: 'delete_calendar_event',
+          status: ChatConstants::Status::DUPLICATE,
+          action_type: ChatConstants::ActionType::DELETE_CALENDAR_EVENT,
           metadata: { error_code: 'duplicate_request', event_id: target_event_id, scope: scope, correlation_id: @correlation_id }
         )
-        return build_response("I already deleted that event. ✅", action: 'calendar_event_deleted')
+        return build_response("I already deleted that event. ✅", action: ChatConstants::FrontendAction::CALENDAR_EVENT_DELETED)
       end
 
       client = GoogleCalendarClient.new(@user)
       client.delete_event(calendar_id: event_record.calendar_id, event_id: target_event_id)
-      event_record.update!(status: 'cancelled')
+      event_record.update!(status: ChatConstants::RecordStatus::CANCELLED)
 
       log_action(
         @message,
         calendar_event_id: event_record.id,
         calendar_id: event_record.calendar_id,
-        status: 'success',
-        action_type: 'delete_calendar_event',
+        status: ChatConstants::Status::SUCCESS,
+        action_type: ChatConstants::ActionType::DELETE_CALENDAR_EVENT,
         metadata: {
           event_id: target_event_id,
           title: event_record.title,
@@ -336,7 +336,7 @@ module ChatHelpers
           correlation_id: @correlation_id
         }
       )
-      remember_idempotency!('delete_calendar_event', signature)
+      remember_idempotency!(ChatConstants::ActionType::DELETE_CALENDAR_EVENT, signature)
       response_lines = [
         "Deleted the event. ✅",
         "Title: #{event_record.title}",
@@ -344,7 +344,7 @@ module ChatHelpers
         "Time: #{event_record_time_range(event_record)}",
         "Scope: #{scope_label(scope, detached_instance: false)}"
       ]
-      build_response(response_lines.compact.join("\n"), event_created: true, action: 'calendar_event_deleted')
+      build_response(response_lines.compact.join("\n"), event_created: true, action: ChatConstants::FrontendAction::CALENDAR_EVENT_DELETED)
     rescue GoogleCalendarClient::CalendarAuthError => e
       fingerprint = token_fingerprint(@user&.google_refresh_token)
       handle_calendar_auth_expired!(
@@ -357,8 +357,8 @@ module ChatHelpers
         @message,
         calendar_event_id: event_record.id,
         calendar_id: event_record.calendar_id,
-        status: 'error',
-        action_type: 'delete_calendar_event',
+        status: ChatConstants::Status::ERROR,
+        action_type: ChatConstants::ActionType::DELETE_CALENDAR_EVENT,
         metadata: {
           error_code: 'calendar_auth_expired',
           error: e.message,
@@ -377,8 +377,8 @@ module ChatHelpers
         @message,
         calendar_event_id: event_record.id,
         calendar_id: event_record.calendar_id,
-        status: 'error',
-        action_type: 'delete_calendar_event',
+        status: ChatConstants::Status::ERROR,
+        action_type: ChatConstants::ActionType::DELETE_CALENDAR_EVENT,
         metadata: { error_code: 'calendar_delete_failed', error: e.message, event_id: target_event_id, scope: scope, correlation_id: @correlation_id }
       )
       build_response("Calendar delete error: #{e.message}", error_code: 'calendar_delete_failed')

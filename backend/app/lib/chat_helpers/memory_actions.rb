@@ -6,20 +6,20 @@ module ChatHelpers
         content: data['content'],
         category: data['category'],
         source: 'chat',
-        status: 'active',
+        status: ChatConstants::RecordStatus::ACTIVE,
         metadata: memory_metadata(data)
       )
       attach_memory_image(memory)
 
-      log_action(@message, calendar_event_id: nil, calendar_id: nil, status: 'success', action_type: 'create_memory', metadata: { memory_id: memory.id })
+      log_action(@message, calendar_event_id: nil, calendar_id: nil, status: ChatConstants::Status::SUCCESS, action_type: ChatConstants::ActionType::CREATE_MEMORY, metadata: { memory_id: memory.id })
       build_response("Saved that memory. ✅", action: 'memory_created')
     rescue StandardError => e
-      log_action(@message, calendar_event_id: nil, calendar_id: nil, status: 'error', action_type: 'create_memory', metadata: { error: e.message })
+      log_action(@message, calendar_event_id: nil, calendar_id: nil, status: ChatConstants::Status::ERROR, action_type: ChatConstants::ActionType::CREATE_MEMORY, metadata: { error: e.message })
       build_response("Memory error: #{e.message}")
     end
 
     def search_memories(query_text)
-      memories = Memory.where(user: @user, status: 'active')
+      memories = Memory.where(user: @user, status: ChatConstants::RecordStatus::ACTIVE)
 
       terms = query_text.to_s.split(/\s+/).map(&:strip).reject(&:empty?)
       terms.each do |term|

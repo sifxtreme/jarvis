@@ -5,10 +5,10 @@ module ChatHelpers
         content = @text.to_s.strip
         urls = extract_urls(@text)
         if content.empty?
-          set_pending_action('clarify_memory_fields', payload)
+          set_pending_action(ChatConstants::PendingAction::CLARIFY_MEMORY_FIELDS, payload)
           return build_response(
             clarify_missing_details(
-              intent: 'create_memory',
+              intent: ChatConstants::Intent::CREATE_MEMORY,
               missing_fields: ['content'],
               extracted: payload['memory'] || {},
               extra: 'An image is attached. Ask what the user wants to remember from the image. Do not mention events.',
@@ -30,10 +30,10 @@ module ChatHelpers
 
       updated = result[:event] || {}
       if updated['error']
-        set_pending_action('clarify_memory_fields', { 'memory' => {} })
+        set_pending_action(ChatConstants::PendingAction::CLARIFY_MEMORY_FIELDS, { 'memory' => {} })
         return build_response(
           clarify_missing_details(
-            intent: 'create_memory',
+            intent: ChatConstants::Intent::CREATE_MEMORY,
             missing_fields: ['content'],
             extracted: {},
             fallback: updated['message'] || "What should I remember?"
@@ -97,77 +97,15 @@ module ChatHelpers
     end
 
     def handle_update_confirmation(payload)
-      event_id = payload['event_id']
-      snapshot = payload['snapshot']
-      changes = payload['changes'] || {}
-      event_record = CalendarEvent.find_by(id: event_id)
-      unless event_record
-        calendar_id = snapshot.is_a?(Hash) ? (snapshot['calendar_id'] || snapshot[:calendar_id]) : nil
-        log_action(
-          @message,
-          calendar_event_id: nil,
-          calendar_id: calendar_id,
-          status: 'error',
-          action_type: 'update_calendar_event',
-          metadata: { error_code: 'event_not_found', event_id: event_id, snapshot: snapshot, correlation_id: @correlation_id }
-        )
-        return build_response("I couldn't find that event anymore.", error_code: 'event_not_found')
-      end
-
-      if affirmative?
-        clear_thread_state
-        return apply_event_update(event_record, changes, snapshot: snapshot)
-      end
-
-      clear_thread_state
-      build_response("Okay, what should I change?")
+      flow_engine.handle_update_confirmation(payload)
     end
 
     def handle_delete_confirmation(payload)
-      event_id = payload['event_id']
-      snapshot = payload['snapshot']
-      scope = payload['recurring_scope'] || resolve_recurring_scope(@text)[:scope]
-      event_record = CalendarEvent.find_by(id: event_id)
-      unless event_record
-        calendar_id = snapshot.is_a?(Hash) ? (snapshot['calendar_id'] || snapshot[:calendar_id]) : nil
-        log_action(
-          @message,
-          calendar_event_id: nil,
-          calendar_id: calendar_id,
-          status: 'error',
-          action_type: 'delete_calendar_event',
-          metadata: { error_code: 'event_not_found', event_id: event_id, snapshot: snapshot, correlation_id: @correlation_id }
-        )
-        return build_response("I couldn't find that event anymore.", error_code: 'event_not_found')
-      end
-
-      if affirmative?
-        clear_thread_state
-        return delete_event(event_record, scope: scope)
-      end
-
-      clear_thread_state
-      build_response("Okay, I won’t delete it.")
+      flow_engine.handle_delete_confirmation(payload)
     end
 
     def handle_recurring_scope_clarification(payload)
-      scope = resolve_recurring_scope(@text)[:scope]
-      return build_response("Reply \"this\" to change only this event or \"all\" for the whole series.") unless scope
-
-      event_record = CalendarEvent.find_by(id: payload['event_id'])
-      unless event_record
-        clear_thread_state
-        return build_response("I couldn't find that event anymore.", error_code: 'event_not_found')
-      end
-
-      clear_thread_state
-      if payload['action'] == 'delete'
-        return delete_event(event_record, scope: scope)
-      end
-
-      changes = payload['changes'] || {}
-      changes['recurring_scope'] = scope
-      apply_event_update(event_record, changes, snapshot: payload['snapshot'])
+      flow_engine.handle_recurring_scope_clarification(payload)
     end
 
     def handle_transaction_correction(payload)

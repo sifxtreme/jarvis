@@ -3,6 +3,7 @@ require 'digest'
 require 'image_processing/mini_magick'
 require 'securerandom'
 require 'stringio'
+require 'chat_constants'
 require 'chat_flow_engine'
 require 'chat_helpers/event_candidates'
 require 'chat_helpers/ai_logging'
@@ -62,34 +63,34 @@ class WebChatMessageHandler
     end
 
     intent = intent_for_message
-    intent_name = intent['intent'] || 'create_event'
+    intent_name = intent['intent'] || ChatConstants::Intent::CREATE_EVENT
     intent_confidence = normalize_confidence(intent['confidence'])
 
-    if intent_confidence == 'low' || intent_name == 'ambiguous'
+    if intent_confidence == 'low' || intent_name == ChatConstants::Intent::AMBIGUOUS
       return image_attached? ? ask_image_intent : ask_intent_clarification
     end
 
     case intent_name
-    when 'create_event'
+    when ChatConstants::Intent::CREATE_EVENT
       handle_create_event
-    when 'update_event'
+    when ChatConstants::Intent::UPDATE_EVENT
       handle_update_event
-    when 'delete_event'
+    when ChatConstants::Intent::DELETE_EVENT
       handle_delete_event
-    when 'create_transaction'
+    when ChatConstants::Intent::CREATE_TRANSACTION
       handle_create_transaction
-    when 'create_memory'
+    when ChatConstants::Intent::CREATE_MEMORY
       handle_create_memory
-    when 'search_memory'
+    when ChatConstants::Intent::SEARCH_MEMORY
       handle_search_memory
-    when 'list_events'
+    when ChatConstants::Intent::LIST_EVENTS
       handle_list_events
-    when 'digest'
+    when ChatConstants::Intent::DIGEST
       build_response("I can send daily/weekly digests soon. (Calendar querying comes next.)")
-    when 'help'
-      build_response("Send event details and I’ll add it to your calendar.")
+    when ChatConstants::Intent::HELP
+      build_response("Send event details and I'll add it to your calendar.")
     else
-      build_response("Tell me what you’d like to do with your calendar or finances.")
+      build_response("Tell me what you'd like to do with your calendar or finances.")
     end
   end
 
@@ -170,12 +171,12 @@ class WebChatMessageHandler
 
 
   def ask_image_intent
-    set_pending_action('clarify_image_intent', { 'image_message_id' => @message.id })
+    set_pending_action(ChatConstants::PendingAction::CLARIFY_IMAGE_INTENT, { 'image_message_id' => @message.id })
     build_response("Is this image for a calendar event or a transaction?")
   end
 
   def ask_intent_clarification
-    set_pending_action('clarify_intent', { 'image_message_id' => image_attached? ? @message.id : nil })
+    set_pending_action(ChatConstants::PendingAction::CLARIFY_INTENT, { 'image_message_id' => image_attached? ? @message.id : nil })
     build_response("Do you want me to add or update a calendar event, delete an event, add a transaction, or save a memory?")
   end
 
@@ -184,45 +185,45 @@ class WebChatMessageHandler
     payload = thread_state['payload'] || {}
 
     case action
-    when 'clarify_image_intent', 'clarify_intent'
+    when ChatConstants::PendingAction::CLARIFY_IMAGE_INTENT, ChatConstants::PendingAction::CLARIFY_INTENT
       return handle_clarified_intent(payload)
-    when 'clarify_event_fields'
+    when ChatConstants::PendingAction::CLARIFY_EVENT_FIELDS
       return handle_event_correction(payload)
-    when 'confirm_event'
+    when ChatConstants::PendingAction::CONFIRM_EVENT
       return handle_event_confirmation(payload)
-    when 'clarify_transaction_fields'
+    when ChatConstants::PendingAction::CLARIFY_TRANSACTION_FIELDS
       return handle_transaction_correction(payload)
-    when 'confirm_transaction'
+    when ChatConstants::PendingAction::CONFIRM_TRANSACTION
       return handle_transaction_confirmation(payload)
-    when 'select_event_for_delete'
+    when ChatConstants::PendingAction::SELECT_EVENT_FOR_DELETE
       return handle_event_selection(payload, action_type: 'delete')
-    when 'confirm_delete'
+    when ChatConstants::PendingAction::CONFIRM_DELETE
       return handle_delete_confirmation(payload)
-    when 'clarify_delete_target'
+    when ChatConstants::PendingAction::CLARIFY_DELETE_TARGET
       return handle_delete_target_clarification(payload)
-    when 'select_event_for_update'
+    when ChatConstants::PendingAction::SELECT_EVENT_FOR_UPDATE
       return handle_event_selection(payload, action_type: 'update')
-    when 'select_event_from_extraction'
+    when ChatConstants::PendingAction::SELECT_EVENT_FROM_EXTRACTION
       return handle_event_extraction_selection(payload)
-    when 'select_transaction_from_extraction'
+    when ChatConstants::PendingAction::SELECT_TRANSACTION_FROM_EXTRACTION
       return handle_transaction_extraction_selection(payload)
-    when 'confirm_update'
+    when ChatConstants::PendingAction::CONFIRM_UPDATE
       return handle_update_confirmation(payload)
-    when 'clarify_update_changes'
+    when ChatConstants::PendingAction::CLARIFY_UPDATE_CHANGES
       return handle_update_changes_clarification(payload)
-    when 'clarify_update_target'
+    when ChatConstants::PendingAction::CLARIFY_UPDATE_TARGET
       return handle_update_target_clarification(payload)
-    when 'clarify_recurring_scope'
+    when ChatConstants::PendingAction::CLARIFY_RECURRING_SCOPE
       return handle_recurring_scope_clarification(payload)
-    when 'clarify_list_query'
+    when ChatConstants::PendingAction::CLARIFY_LIST_QUERY
       return handle_list_query_clarification(payload)
-    when 'clarify_memory_fields'
+    when ChatConstants::PendingAction::CLARIFY_MEMORY_FIELDS
       return handle_memory_correction(payload)
-    when 'confirm_memory'
+    when ChatConstants::PendingAction::CONFIRM_MEMORY
       return handle_memory_confirmation(payload)
     else
       clear_thread_state
-      build_response("Let’s start over. What would you like to do?")
+      build_response("Let's start over. What would you like to do?")
     end
   end
 
