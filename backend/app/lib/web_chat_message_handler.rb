@@ -172,12 +172,14 @@ class WebChatMessageHandler
 
   def ask_image_intent
     set_pending_action(ChatConstants::PendingAction::CLARIFY_IMAGE_INTENT, { 'image_message_id' => @message.id })
-    build_response("Is this image for a calendar event or a transaction?")
+    clarification = generate_intent_clarification(is_followup: false)
+    build_response(clarification)
   end
 
   def ask_intent_clarification
     set_pending_action(ChatConstants::PendingAction::CLARIFY_INTENT, { 'image_message_id' => image_attached? ? @message.id : nil })
-    build_response("Do you want me to add or update a calendar event, delete an event, add a transaction, or save a memory?")
+    clarification = generate_intent_clarification(is_followup: false)
+    build_response(clarification)
   end
 
   def handle_pending_action

@@ -149,6 +149,17 @@ class GeminiClient
     { text: parse_text_response(response), usage: response['usageMetadata'] || {} }
   end
 
+  def generate_intent_clarification(text:, has_image:, context: nil, image_base64: nil, mime_type: 'image/png', is_followup: false)
+    parts = []
+    if image_base64
+      parts << { inlineData: { mimeType: mime_type, data: image_base64 } }
+    end
+    parts << { text: intent_clarification_prompt(text, has_image: has_image, context: context, is_followup: is_followup) }
+
+    response = make_request(parts: parts, model: DEFAULT_INTENT_MODEL)
+    { text: parse_text_response(response), usage: response['usageMetadata'] || {} }
+  end
+
   private
 
   def make_request(parts:, model:)
@@ -485,6 +496,43 @@ class GeminiClient
     PROMPT
   end
 
+  def intent_clarification_prompt(text, has_image:, context: nil, is_followup: false)
+    context_block = format_context_block(context)
+    followup_note = is_followup ? "The user has already been asked once but their response was still unclear. Be more specific in your question." : ""
+    image_note = has_image ? "The user attached an image." : ""
+
+    <<~PROMPT
+      Today is #{today_in_timezone} (Timezone: #{timezone_label}).
+
+      #{context_block}You are a helpful assistant that manages calendars, transactions, and memories.
+
+      The user sent this message but the intent is unclear:
+      "#{text}"
+
+      #{image_note}
+      #{followup_note}
+
+      Generate a short, friendly clarification question to understand what the user wants.
+
+      Available actions:
+      - Add a calendar event (dates, appointments, meetings, reminders)
+      - Update or reschedule an existing event
+      - Delete/cancel an event
+      - List upcoming events
+      - Log a transaction/expense/payment
+      - Save a memory/note
+
+      Rules:
+      - Keep the question concise (1-2 sentences max)
+      - Reference specific words from the user's message to show you understood
+      - If the user mentioned something specific (like "dentist" or a dollar amount), use that in your question
+      - Offer 2-3 relevant options based on what they said
+      - Don't be robotic - sound natural and helpful
+
+      Return ONLY the clarification question text, nothing else.
+    PROMPT
+  end
+
   def event_correction_prompt(event, correction_text)
     <<~PROMPT
       Today is #{today_in_timezone} (Timezone: #{timezone_label}).
@@ -593,18 +641,28 @@ class GeminiClient
     <<~PROMPT
       Today is #{today_in_timezone} (Timezone: #{timezone_label}).
 
-      #{context_block}Extract the calendar event the user is referring to. Return JSON:
+      #{context_block}Extract the calendar event query from the user's message. Return JSON:
       {
-        "title": "Event title or keywords",
-        "date": "YYYY-MM-DD",
-        "start_time": "HH:MM",
+        "title": "Event title or keywords (empty if not searching by title)",
+        "date": "YYYY-MM-DD (empty if not searching by date)",
+        "start_time": "HH:MM (empty if not specified)",
+        "raw_time_query": "original time phrase from user",
+        "query_type": "date_only|title_search|combined|general",
         "confidence": "low|medium|high"
       }
+
+      Query types:
+      - "date_only": User asking about a specific date/time without a title (e.g., "what am I doing tomorrow?", "what's on my calendar Friday?")
+      - "title_search": User searching for a specific event by name (e.g., "when is my dentist appointment?", "do I have any meetings?")
+      - "combined": Both date and title specified (e.g., "do I have a dentist appointment tomorrow?")
+      - "general": General schedule query with no specifics (e.g., "what's next?", "what's coming up?")
 
       Rules:
       - If the user says "today", "tonight", "this morning", "this afternoon", or "this evening", set "date" to today.
       - If the user says "tomorrow", set "date" to tomorrow.
       - If the user gives only a weekday ("Friday"), choose the next occurrence of that weekday.
+      - "raw_time_query" should contain the user's original time phrase (e.g., "tomorrow", "this Friday", "today", "next week"). If the user didn't mention a time, leave it empty.
+      - For "date_only" queries, leave "title" empty - do NOT extract keywords like "doing" or "scheduled".
 
       If you cannot determine any details, return:
       {

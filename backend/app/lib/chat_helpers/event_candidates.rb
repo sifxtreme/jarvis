@@ -82,8 +82,7 @@ module ChatHelpers
       [events, title, date]
     end
 
-    def handle_list_empty_results(query, title:, date:)
-      set_pending_action(ChatConstants::PendingAction::CLARIFY_LIST_QUERY, { 'query' => query })
+    def handle_list_empty_results(query, title:, date:, raw_time_query: nil, query_type: nil)
       log_action(
         @message,
         calendar_event_id: nil,
@@ -92,17 +91,66 @@ module ChatHelpers
         action_type: ChatConstants::ActionType::LIST_EVENTS,
         metadata: { query: query, result_count: 0 }
       )
-      if title.empty? && date.empty?
-        return build_response("No events today. Want me to check what's next on your calendar?")
-      end
-      build_response("I couldn't find any upcoming events that match. Want me to search a different title?")
-    end
 
-    def handle_list_empty_followup(title:, date:)
-      if title.present? || date.present?
-        return build_response('Still nothing. Try a more specific title or date.')
+      case query_type
+      when 'date_only'
+        time_label = raw_time_query.presence || 'that day'
+        return build_response("You have nothing scheduled for #{time_label}.")
+      when 'title_search'
+        set_pending_action(ChatConstants::PendingAction::CLARIFY_LIST_QUERY, { 'query' => query })
+        return build_response("I couldn't find any events matching \"#{title}\". Want me to search a different title?")
+      when 'combined'
+        time_label = raw_time_query.presence || 'that day'
+        return build_response("No \"#{title}\" events found for #{time_label}.")
+      when 'general'
+        return build_response("No upcoming events. Want me to check a specific date?")
       end
+
+      # Fallback to field-based logic if query_type not set
+      if date.present?
+        time_label = raw_time_query.presence || 'that day'
+        return build_response("You have nothing scheduled for #{time_label}.")
+      end
+
+      if title.present?
+        set_pending_action(ChatConstants::PendingAction::CLARIFY_LIST_QUERY, { 'query' => query })
+        return build_response("I couldn't find any events matching \"#{title}\". Want me to search a different title?")
+      end
+
       build_response("No events today. Want me to check what's next on your calendar?")
     end
+
+    def handle_list_empty_followup(title:, date:, raw_time_query: nil, query_type: nil)
+      case query_type
+      when 'date_only'
+        time_label = raw_time_query.presence || 'that day'
+        clear_thread_state
+        return build_response("You have nothing scheduled for #{time_label}.")
+      when 'title_search'
+        return build_response("Still no events matching \"#{title}\". Try a different search?")
+      when 'combined'
+        time_label = raw_time_query.presence || 'that day'
+        clear_thread_state
+        return build_response("No \"#{title}\" events found for #{time_label}.")
+      when 'general'
+        clear_thread_state
+        return build_response("No upcoming events. Want me to check a specific date?")
+      end
+
+      # Fallback to field-based logic
+      if date.present?
+        time_label = raw_time_query.presence || 'that day'
+        clear_thread_state
+        return build_response("You have nothing scheduled for #{time_label}.")
+      end
+
+      if title.present?
+        return build_response("Still no events matching \"#{title}\". Try a different search?")
+      end
+
+      clear_thread_state
+      build_response("No events today. Want me to check what's next on your calendar?")
+    end
+
   end
 end

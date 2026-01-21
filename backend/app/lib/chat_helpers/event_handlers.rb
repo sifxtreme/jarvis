@@ -40,9 +40,11 @@ module ChatHelpers
         )
       end
 
+      raw_time_query = data['raw_time_query'].to_s.strip.presence
+      query_type = data['query_type'].to_s.strip.presence
       events, title, date = list_events_for_query(data)
       if events.empty?
-        return handle_list_empty_results(data, title: title, date: date)
+        return handle_list_empty_results(data, title: title, date: date, raw_time_query: raw_time_query, query_type: query_type)
       end
 
       lines = events.map { |event| format_event_brief(event) }
@@ -75,9 +77,11 @@ module ChatHelpers
         )
       end
 
+      raw_time_query = data['raw_time_query'].to_s.strip.presence
+      query_type = data['query_type'].to_s.strip.presence
       events, title, date = list_events_for_query(data)
       if events.empty?
-        return handle_list_empty_followup(title: title, date: date)
+        return handle_list_empty_followup(title: title, date: date, raw_time_query: raw_time_query, query_type: query_type)
       end
 
       clear_thread_state

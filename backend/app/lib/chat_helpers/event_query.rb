@@ -1,16 +1,13 @@
 module ChatHelpers
   module EventQuery
     def fallback_list_title(title)
-      return title unless title.to_s.strip.empty?
-
-      tokens = extract_query_tokens(@text)
-      tokens.join(' ')
+      title
     end
 
     def extract_query_tokens(text)
       cleaned = text.to_s.downcase
       cleaned = cleaned.gsub(/[^a-z0-9\s]/, ' ')
-      cleaned = cleaned.gsub(/\b(when|what|next|upcoming|event|events|find|show|list|the|a|an|is|are|me|please|for|today|tonight|tomorrow|this|morning|afternoon|evening)\b/, ' ')
+      cleaned = cleaned.gsub(/\b(when|what|next|upcoming|event|events|find|show|list|the|a|an|is|are|am|i|we|us|you|your|my|me|please|for|today|tonight|tomorrow|this|morning|afternoon|evening|on|do|doing|did|go|going|plan|plans|schedule|agenda|up|anything|something)\b/, ' ')
       tokens = cleaned.split(/\s+/).reject(&:empty?)
       tokens.map { |token| normalize_token(token) }.uniq
     end
