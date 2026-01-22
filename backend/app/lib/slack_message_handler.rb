@@ -487,7 +487,7 @@ class SlackMessageHandler
   def event_time(result)
     return nil if result.start&.date
 
-    result.start&.date_time&.strftime('%H:%M')
+    result.start&.date_time&.strftime('%-I:%M %p')
   end
 
   def format_event_brief(event)

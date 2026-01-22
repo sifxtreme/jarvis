@@ -487,14 +487,14 @@ class WebChatMessageHandler
   def event_time(result)
     return nil if result.start&.date
 
-    result.start&.date_time&.strftime('%H:%M')
+    result.start&.date_time&.strftime('%-I:%M %p')
   end
 
   def event_time_range(result)
     return 'All day' if result.start&.date
 
-    start_time = result.start&.date_time&.strftime('%H:%M')
-    end_time = result.end&.date_time&.strftime('%H:%M')
+    start_time = result.start&.date_time&.strftime('%-I:%M %p')
+    end_time = result.end&.date_time&.strftime('%-I:%M %p')
     return start_time if start_time && end_time.to_s.empty?
 
     [start_time, end_time].compact.join(' - ')
@@ -507,8 +507,8 @@ class WebChatMessageHandler
   def event_record_time_range(record)
     return 'All day' if record.start_at&.to_time&.hour == 0 && record.end_at&.to_time&.hour == 0
 
-    start_time = record.start_at&.strftime('%H:%M')
-    end_time = record.end_at&.strftime('%H:%M')
+    start_time = record.start_at&.strftime('%-I:%M %p')
+    end_time = record.end_at&.strftime('%-I:%M %p')
     return start_time if start_time && end_time.to_s.empty?
 
     [start_time, end_time].compact.join(' - ')

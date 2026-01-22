@@ -169,7 +169,7 @@ class SlackDailyDigest
     return [] if events.empty?
 
     lines = events.map do |event|
-      time = event.start_at ? event.start_at.strftime('%H:%M') : 'All day'
+      time = event.start_at ? event.start_at.strftime('%l:%M %p').strip : 'All day'
       "• `#{time}` *#{event.title}*"
     end
 
@@ -216,42 +216,26 @@ class SlackDailyDigest
                       .order(:start_at)
     return [] if blocks.empty?
 
-    connections = CalendarConnection.where(user: users)
-    connection_by_calendar = connections.index_by(&:calendar_id)
-    user_calendar_ids = connections.select { |c| c.user_id == user.id }.map(&:calendar_id)
-    spouse_calendar_ids = connections.reject { |c| c.user_id == user.id }.map(&:calendar_id)
     user_emails = [user.email, user.slack_email].compact
     spouse_emails = users.reject { |u| u.id == user.id }.flat_map { |u| [u.email, u.slack_email] }.compact
 
-    grouped = blocks.group_by(&:user_id)
     lines = []
-    users.each do |target|
-      next unless grouped[target.id]
-
-      grouped[target.id].each do |block|
-        start_time = block.start_at.strftime('%H:%M')
-        end_time = block.end_at.strftime('%H:%M')
-        label = calendar_label(
-          block.calendar_id,
-          connection_by_calendar,
-          user_emails: user_emails,
-          spouse_emails: spouse_emails,
-          user_calendar_ids: user_calendar_ids,
-          spouse_calendar_ids: spouse_calendar_ids
-        )
-        lines << "• #{start_time}-#{end_time} — #{label}"
-      end
+    blocks.each do |block|
+      start_time = block.start_at.strftime('%l:%M %p').strip
+      end_time = block.end_at.strftime('%l:%M %p').strip
+      label = calendar_label(
+        block.calendar_id,
+        user_emails: user_emails,
+        spouse_emails: spouse_emails
+      )
+      lines << "• #{start_time}-#{end_time} — #{label}"
     end
     lines
   end
 
-  def calendar_label(calendar_id, connection_by_calendar, user_emails:, spouse_emails:, user_calendar_ids:, spouse_calendar_ids:)
-    return 'You' if calendar_id.present? && (user_emails.include?(calendar_id) || user_calendar_ids.include?(calendar_id))
-    return 'Spouse' if calendar_id.present? && (spouse_emails.include?(calendar_id) || spouse_calendar_ids.include?(calendar_id))
-
-    connection = connection_by_calendar[calendar_id]
-    return 'You' if connection && user_calendar_ids.include?(connection.calendar_id)
-    return 'Spouse' if connection && spouse_calendar_ids.include?(connection.calendar_id)
+  def calendar_label(calendar_id, user_emails:, spouse_emails:)
+    return 'You' if calendar_id.present? && user_emails.include?(calendar_id)
+    return 'Spouse' if calendar_id.present? && spouse_emails.include?(calendar_id)
 
     calendar_id.to_s
   end

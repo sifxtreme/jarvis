@@ -36,7 +36,7 @@ module ChatHelpers
       [
         "Title: #{event.title}",
         (event.start_at ? "Date: #{event.start_at.to_date}" : nil),
-        (event.start_at ? "Time: #{event.start_at.strftime('%H:%M')}" : nil)
+        (event.start_at ? "Time: #{event.start_at.strftime('%-I:%M %p')}" : nil)
       ].compact.join("\n")
     end
 
@@ -55,13 +55,13 @@ module ChatHelpers
       lines << "Title: #{changes['title'] || event_record.title}"
       date = changes['date'] || event_record.start_at&.to_date
       lines << "Date: #{date}" if date
-      time = changes['start_time'] || event_record.start_at&.strftime('%H:%M')
+      time = changes['start_time'] || event_record.start_at&.strftime('%-I:%M %p')
       end_time = changes['end_time']
       if end_time.to_s.empty? && changes['duration_minutes'].present? && date && time
         base_time = Time.zone.parse("#{date} #{time}")
-        end_time = (base_time + changes['duration_minutes'].to_i.minutes).strftime('%H:%M') if base_time
+        end_time = (base_time + changes['duration_minutes'].to_i.minutes).strftime('%-I:%M %p') if base_time
       end
-      end_time = event_record.end_at&.strftime('%H:%M') if end_time.to_s.empty?
+      end_time = event_record.end_at&.strftime('%-I:%M %p') if end_time.to_s.empty?
       time_range = [time, end_time].compact.join(' - ')
       lines << "Time: #{time_range}" if time_range.present?
       if changes['recurrence_clear']
