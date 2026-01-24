@@ -352,19 +352,26 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
       }
     } catch (error) {
       logger.error("Chat", "Failed to send chat message", error);
+      // User message was saved to backend even on error, so keep it (just remove pending flag)
+      // Show the backend error as the assistant reply
+      const axiosError = error as { response?: { data?: { error?: string } } };
+      const errorText = axiosError.response?.data?.error || "Sorry, something went wrong. Try again.";
       setMessages((prev) => {
-        const withoutPending = prev.filter(
-          (message) => message.id !== pendingUserId && message.id !== pendingAssistantId
-        );
-        return [
-          ...withoutPending,
-          {
-            id: `error-${Date.now()}`,
-            role: "assistant",
-            text: "Sorry, I couldn't send that message. Try again.",
-            createdAt: new Date().toISOString(),
-          },
-        ];
+        return prev.map((message) => {
+          if (message.id === pendingUserId) {
+            // Keep user message, just remove pending state
+            return { ...message, pending: false };
+          }
+          if (message.id === pendingAssistantId) {
+            // Replace pending assistant with error message
+            return {
+              ...message,
+              text: errorText,
+              pending: false,
+            };
+          }
+          return message;
+        });
       });
     } finally {
       if (pendingImageUrl) {
