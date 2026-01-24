@@ -131,28 +131,28 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
     });
 
   return (
-    <div className="h-full font-mono">
+    <div className="h-full font-mono overflow-hidden">
       <ScrollArea className="h-full">
-        <div className="space-y-4 p-4">
-          <Card>
+        <div className="space-y-4 p-2 md:p-4 overflow-hidden">
+          <Card className="overflow-hidden">
             <CardHeader className="py-2 px-3">
               <CardTitle className="text-lg">
                 {query ? `Filtered Stats` : `Monthly Summary`}
               </CardTitle>
             </CardHeader>
-            <CardContent className="py-2">
-              <div className="grid grid-cols-3 gap-2">
-                <div>
+            <CardContent className="py-2 px-3">
+              <div className="grid grid-cols-3 gap-1">
+                <div className="min-w-0">
                   <div className="text-xs text-muted-foreground">Income</div>
-                  <div className="text-lg font-bold">{formatCurrency(totalEarned)}</div>
+                  <div className="text-base font-bold truncate">{formatCurrency(totalEarned)}</div>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="text-xs text-muted-foreground">Spent</div>
-                  <div className="text-lg font-bold">{formatCurrency(totalSpent)}</div>
+                  <div className="text-base font-bold truncate">{formatCurrency(totalSpent)}</div>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="text-xs text-muted-foreground">Remaining</div>
-                  <div className={`text-lg font-bold ${totalEarned - totalSpent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  <div className={`text-base font-bold truncate ${totalEarned - totalSpent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                     {formatCurrency(totalEarned - totalSpent)}
                   </div>
                 </div>
@@ -264,71 +264,73 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
           </Dialog>
 
           <div className="space-y-2">
-            <Card>
+            <Card className="overflow-hidden">
               <CardHeader className="py-2 px-3">
                 <CardTitle className="text-sm">
                   Budget vs. Actual
                 </CardTitle>
               </CardHeader>
               <CardContent className="py-0 px-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="py-1 text-xs font-medium cursor-pointer" onClick={() => handleSort('category')}>
-                        Category
-                      </TableHead>
-                      <TableHead className="py-1 text-xs text-right cursor-pointer" onClick={() => handleSort('amount')}>
-                        Actual
-                      </TableHead>
-                      <TableHead className="py-1 text-xs text-right cursor-pointer" onClick={() => handleSort('budgetAmount')}>
-                        Budget
-                      </TableHead>
-                      <TableHead className="py-1 text-xs text-right cursor-pointer" onClick={() => handleSort('difference')}>
-                        Diff
-                      </TableHead>
-                      <TableHead className="py-1 text-xs text-right cursor-pointer" onClick={() => handleSort('percentage')}>
-                        %
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedCategories.map(({ category, amount, budgetAmount, difference, percentage, transactions }) => {
-                      const hasExpenses = amount > 0;
-                      const isOverBudget = percentage > 100;
-                      const rowClassName = !hasExpenses
-                        ? 'text-gray-400'
-                        : isOverBudget
-                          ? 'text-red-700'
-                          : 'text-green-700';
+                <div className="w-full overflow-x-auto">
+                  <Table className="w-full table-fixed">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="py-1 text-xs font-medium cursor-pointer w-[30%]" onClick={() => handleSort('category')}>
+                          Category
+                        </TableHead>
+                        <TableHead className="py-1 text-xs text-right cursor-pointer w-[17%]" onClick={() => handleSort('amount')}>
+                          Actual
+                        </TableHead>
+                        <TableHead className="py-1 text-xs text-right cursor-pointer w-[17%]" onClick={() => handleSort('budgetAmount')}>
+                          Budget
+                        </TableHead>
+                        <TableHead className="py-1 text-xs text-right cursor-pointer w-[17%]" onClick={() => handleSort('difference')}>
+                          Diff
+                        </TableHead>
+                        <TableHead className="py-1 text-xs text-right cursor-pointer w-[19%]" onClick={() => handleSort('percentage')}>
+                          %
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sortedCategories.map(({ category, amount, budgetAmount, difference, percentage, transactions }) => {
+                        const hasExpenses = amount > 0;
+                        const isOverBudget = percentage > 100;
+                        const rowClassName = !hasExpenses
+                          ? 'text-gray-400'
+                          : isOverBudget
+                            ? 'text-red-700'
+                            : 'text-green-700';
 
-                      return (
-                        <TableRow
-                          key={category}
-                          className={`${rowClassName} cursor-pointer hover:bg-muted/50`}
-                          onClick={() => {
-                            setSelectedTransactions(transactions);
-                            setSelectedCategory(category);
-                            setIsModalOpen(true);
-                          }}
-                        >
-                          <TableCell className="py-1 text-xs font-medium font-mono">{category}</TableCell>
-                          <TableCell className="py-1 text-xs text-right font-mono">
-                            {formatCurrencyDollars(amount)}
-                          </TableCell>
-                          <TableCell className="py-1 text-xs text-right font-mono">
-                            {formatCurrencyDollars(budgetAmount)}
-                          </TableCell>
-                          <TableCell className="py-1 text-xs text-right font-mono">
-                            {formatCurrencyDollars(difference)}
-                          </TableCell>
-                          <TableCell className="py-1 text-xs text-right font-mono">
-                            {percentage.toFixed(0)}%
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                        return (
+                          <TableRow
+                            key={category}
+                            className={`${rowClassName} cursor-pointer hover:bg-muted/50`}
+                            onClick={() => {
+                              setSelectedTransactions(transactions);
+                              setSelectedCategory(category);
+                              setIsModalOpen(true);
+                            }}
+                          >
+                            <TableCell className="py-1 text-xs font-medium font-mono truncate">{category}</TableCell>
+                            <TableCell className="py-1 text-xs text-right font-mono">
+                              {formatCurrencyDollars(amount)}
+                            </TableCell>
+                            <TableCell className="py-1 text-xs text-right font-mono">
+                              {formatCurrencyDollars(budgetAmount)}
+                            </TableCell>
+                            <TableCell className="py-1 text-xs text-right font-mono">
+                              {formatCurrencyDollars(difference)}
+                            </TableCell>
+                            <TableCell className="py-1 text-xs text-right font-mono">
+                              {percentage.toFixed(0)}%
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </div>

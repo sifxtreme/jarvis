@@ -132,7 +132,7 @@ export default function TransactionsPage() {
                             Budget
                           </Button>
                         </SheetTrigger>
-                        <SheetContent side="bottom" className="h-[85vh]">
+                        <SheetContent side="bottom" className="h-[85vh] p-2 pt-8 overflow-hidden">
                           <TransactionStats
                             transactions={transactions}
                             budgets={budgets}
@@ -147,7 +147,7 @@ export default function TransactionsPage() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-auto px-4 pb-4">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 pb-4">
               {/* Recurring Status Card */}
               {filters.year && filters.month && (
                 <RecurringStatusCard

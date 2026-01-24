@@ -899,7 +899,7 @@ export default function TransactionTable({
       </div>
 
       {/* Mobile view */}
-      <div className="md:hidden">
+      <div className="md:hidden w-full overflow-hidden">
         <Button
           onClick={() => setIsCreating(true)}
           className="w-full mb-4"
@@ -910,21 +910,21 @@ export default function TransactionTable({
           <Card
             key={transaction.id}
             className={cn(
-              "p-4 mb-4 transition-colors",
+              "p-4 mb-4 transition-colors overflow-hidden",
               editingTransaction?.id === transaction.id
                 ? "bg-yellow-50 dark:bg-yellow-900/20"
                 : ""
             )}
           >
-            <div className="flex justify-between items-start mb-2">
-              <div>
+            <div className="flex justify-between items-start mb-2 gap-2">
+              <div className="min-w-0 flex-1">
                 <div className="font-mono font-medium">
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 min-w-0">
                     {(() => {
                       const merchantIcon = getMerchantIcon(transaction.plaid_name, transaction.merchant_name);
                       if (merchantIcon) {
                         return (
-                          <div className="mr-1">
+                          <div className="mr-1 shrink-0">
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger>
@@ -940,16 +940,18 @@ export default function TransactionTable({
                       }
                       return null;
                     })()}
-                    <InlineEdit
-                      value={transaction.merchant_name || transaction.plaid_name || ""}
-                      onSave={(val) => handleQuickEdit(transaction, 'merchant_name', val)}
-                      className={!transaction.merchant_name ? "text-muted-foreground italic" : ""}
-                    />
+                    <div className="truncate min-w-0">
+                      <InlineEdit
+                        value={transaction.merchant_name || transaction.plaid_name || ""}
+                        onSave={(val) => handleQuickEdit(transaction, 'merchant_name', val)}
+                        className={!transaction.merchant_name ? "text-muted-foreground italic" : ""}
+                      />
+                    </div>
                   </div>
                 </div>
                 <div className="font-mono text-sm text-muted-foreground">{formatDate(transaction.transacted_at)}</div>
               </div>
-              <div className="text-right">
+              <div className="text-right shrink-0">
                 <div className="font-mono font-medium flex justify-end">
                   <InlineEdit
                     value={transaction.amount}
@@ -964,9 +966,9 @@ export default function TransactionTable({
               </div>
             </div>
 
-            <div className="flex items-center justify-between mt-4">
+            <div className="flex items-center justify-between mt-4 gap-2">
               <div className={cn(
-                "font-mono text-sm w-full mr-4",
+                "font-mono text-sm min-w-0 flex-1",
                 transaction.category &&
                   !transaction.category.toLowerCase().includes('income') &&
                   budgetedCategories.size > 0 &&
@@ -977,29 +979,33 @@ export default function TransactionTable({
                  !transaction.category.toLowerCase().includes('income') &&
                  budgetedCategories.size > 0 &&
                  !budgetedCategories.has(transaction.category) ? (
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 min-w-0">
                     <AlertCircle className="h-3 w-3 shrink-0" />
-                    <InlineEdit
-                      value={transaction.category}
-                      onSave={(val) => handleQuickEdit(transaction, 'category', val)}
-                    />
+                    <div className="truncate min-w-0">
+                      <InlineEdit
+                        value={transaction.category}
+                        onSave={(val) => handleQuickEdit(transaction, 'category', val)}
+                      />
+                    </div>
                   </div>
                 ) : (
-                  <InlineEdit
-                    value={transaction.category || ""}
-                    onSave={(val) => handleQuickEdit(transaction, 'category', val)}
-                    className={!transaction.category ? "text-muted-foreground italic" : ""}
-                  />
+                  <div className="truncate min-w-0">
+                    <InlineEdit
+                      value={transaction.category || ""}
+                      onSave={(val) => handleQuickEdit(transaction, 'category', val)}
+                      className={!transaction.category ? "text-muted-foreground italic" : ""}
+                    />
+                  </div>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 shrink-0">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setDuplicatingTransaction(transaction);
                   }}
                   disabled={!!transaction.amortized_months?.length}
-                  className={`p-2 hover:bg-muted rounded-full flex items-center justify-center ${transaction.amortized_months?.length ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`p-1.5 hover:bg-muted rounded-full flex items-center justify-center ${transaction.amortized_months?.length ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <Copy className={`h-4 w-4 ${transaction.amortized_months?.length ? 'text-gray-400' : 'text-purple-500'}`} />
                 </button>
@@ -1009,7 +1015,7 @@ export default function TransactionTable({
                     setSplittingTransaction(transaction);
                   }}
                   disabled={!!transaction.amortized_months?.length}
-                  className={`p-2 hover:bg-muted rounded-full flex items-center justify-center ${transaction.amortized_months?.length ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`p-1.5 hover:bg-muted rounded-full flex items-center justify-center ${transaction.amortized_months?.length ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <Scissors className={`h-4 w-4 ${transaction.amortized_months?.length ? 'text-gray-400' : 'text-orange-500'}`} />
                 </button>
@@ -1019,7 +1025,7 @@ export default function TransactionTable({
                     setEditingTransaction(transaction);
                   }}
                   disabled={!!transaction.amortized_months?.length}
-                  className={`p-2 hover:bg-muted rounded-full flex items-center justify-center ${transaction.amortized_months?.length ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`p-1.5 hover:bg-muted rounded-full flex items-center justify-center ${transaction.amortized_months?.length ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <PencilIcon className={`h-4 w-4 ${transaction.amortized_months?.length ? 'text-gray-400' : 'text-blue-500'}`} />
                 </button>
@@ -1028,18 +1034,32 @@ export default function TransactionTable({
                     e.stopPropagation();
                     handleViewRawData(transaction);
                   }}
-                  className="p-2 hover:bg-muted rounded-full flex items-center justify-center"
+                  className="p-1.5 hover:bg-muted rounded-full flex items-center justify-center"
                 >
                   <Code className="h-4 w-4 text-slate-500" />
                 </button>
-                <button className="p-2 hover:bg-muted rounded-full flex items-center justify-center">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    updateTransactionFlags(transaction, { hidden: !transaction.hidden });
+                  }}
+                  disabled={actionLoadingId === transaction.id}
+                  className="p-1.5 hover:bg-muted rounded-full flex items-center justify-center"
+                >
                   {transaction.hidden ? (
                     <EyeOff className="h-4 w-4 text-gray-500" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
                   ) : (
                     <Eye className="h-4 w-4 text-gray-400" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
                   )}
                 </button>
-                <button className="p-2 hover:bg-muted rounded-full flex items-center justify-center">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    updateTransactionFlags(transaction, { reviewed: !transaction.reviewed });
+                  }}
+                  disabled={actionLoadingId === transaction.id}
+                  className="p-1.5 hover:bg-muted rounded-full flex items-center justify-center"
+                >
                   {transaction.reviewed ? (
                     <CheckCircle className="h-4 w-4 text-green-500" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
                   ) : (
