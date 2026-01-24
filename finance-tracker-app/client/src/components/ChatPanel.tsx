@@ -406,7 +406,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex min-h-0 h-full flex-col">
       <div ref={scrollRef} onScroll={handleScroll} className="relative flex-1 overflow-auto px-4 py-3">
         {isLoading ? (
           <div className="flex h-full flex-col items-center justify-center text-sm text-muted-foreground">

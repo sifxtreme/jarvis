@@ -9,7 +9,7 @@ export default function ChatPage() {
           <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Jarvis Assistant</div>
           <div className="text-[11px] text-muted-foreground">Ask me anything.</div>
         </div>
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-hidden">
           <ChatPanel />
         </div>
       </Card>
