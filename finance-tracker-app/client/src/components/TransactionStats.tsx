@@ -57,8 +57,8 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
       <div className="space-y-4 p-4">
         <Card className="animate-pulse">
           <CardHeader className="py-2 px-3">
-            <div className="h-3 w-1/2 bg-gray-200 rounded" />
-            <div className="h-5 w-3/4 bg-gray-300 rounded mt-1" />
+            <div className="h-3 w-1/2 bg-gray-200 dark:bg-gray-700 rounded" />
+            <div className="h-5 w-3/4 bg-gray-300 dark:bg-gray-600 rounded mt-1" />
           </CardHeader>
         </Card>
 
@@ -67,8 +67,8 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
             <div className="space-y-2">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="space-y-1">
-                  <div className="h-3 w-1/3 bg-gray-200 rounded" />
-                  <div className="h-2 w-full bg-gray-100 rounded" />
+                  <div className="h-3 w-1/3 bg-gray-200 dark:bg-gray-700 rounded" />
+                  <div className="h-2 w-full bg-gray-100 dark:bg-gray-800 rounded" />
                 </div>
               ))}
             </div>
@@ -253,7 +253,7 @@ export default function TransactionStats({ transactions, budgets, isLoading, que
                         <div className="font-mono">{formatDate(transaction.transacted_at)}</div>
                         <div className="font-mono">
                           {transaction.original_category && selectedCategory === 'Other'
-                            ? <span className="text-xs rounded bg-gray-100 px-1.5 py-0.5">{transaction.original_category}</span>
+                            ? <span className="text-xs rounded bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5">{transaction.original_category}</span>
                             : transaction.category}
                         </div>
                       </div>

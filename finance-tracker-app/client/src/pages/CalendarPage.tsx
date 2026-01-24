@@ -806,7 +806,7 @@ export default function CalendarPage() {
                       className={cn(
                         "flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition whitespace-nowrap md:px-3 md:text-xs",
                           personalActive
-                            ? "border-slate-300 bg-slate-900 text-white"
+                            ? "border-slate-300 bg-slate-900 text-white dark:border-slate-600 dark:bg-slate-100 dark:text-slate-900"
                             : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300"
                         )}
                       >
@@ -842,7 +842,7 @@ export default function CalendarPage() {
                       className={cn(
                         "flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition whitespace-nowrap md:px-3 md:text-xs",
                           workActive
-                            ? "border-slate-300 bg-slate-900 text-white"
+                            ? "border-slate-300 bg-slate-900 text-white dark:border-slate-600 dark:bg-slate-100 dark:text-slate-900"
                             : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300"
                         )}
                       >
@@ -894,7 +894,7 @@ export default function CalendarPage() {
         </div>
 
         {!geo && (
-          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-200/60 bg-amber-50/60 px-4 py-2 text-xs text-amber-900">
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-200/60 bg-amber-50/60 px-4 py-2 text-xs text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200">
             <span>
               {geoDenied
                 ? "Location access is blocked. Enable it to show dawn, sunrise, and sunset lines."
@@ -1165,9 +1165,9 @@ export default function CalendarPage() {
                               nowMinutes >= visibleRange.startHour * 60 &&
                               nowMinutes <= visibleRange.endHour * 60 && (
                                 <div className="group absolute left-0 right-0" style={{ top: nowTop }}>
-                                  <div className="absolute left-4 h-3 w-3 -translate-y-1/2 rounded-full bg-red-500" />
-                                  <div className="absolute left-4 right-4 h-px -translate-y-1/2 bg-red-500/80" />
-                                  <div className="absolute left-8 -translate-y-1/2 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-red-600 opacity-0 shadow-sm transition group-hover:opacity-100 dark:bg-slate-950 dark:text-red-400">
+                                  <div className="absolute left-0 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500" />
+                                  <div className="absolute left-0 right-0 h-px -translate-y-1/2 bg-red-500/80" />
+                                  <div className="absolute left-4 -translate-y-1/2 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-red-600 opacity-0 shadow-sm transition group-hover:opacity-100 dark:bg-slate-950 dark:text-red-400">
                                     {format(now, "h:mm a")}
                                   </div>
                                 </div>

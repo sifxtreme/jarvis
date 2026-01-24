@@ -8,13 +8,14 @@ import FilterControls from "@/components/FilterControls";
 import SheetFilterControls from "@/components/SheetFilterControls";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { FilterIcon, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { FilterIcon, PanelRightClose, PanelRightOpen, PieChart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSearchParams } from 'react-router-dom'
 import { StateCard } from "@/components/StateCard";
 
 export default function TransactionsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isBudgetOpen, setIsBudgetOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams()
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(true);
   const [quickAddTransaction, setQuickAddTransaction] = useState<Partial<Transaction> | null>(null);
@@ -121,6 +122,26 @@ export default function TransactionsPage() {
                         </div>
                       </SheetContent>
                     </Sheet>
+
+                    {/* Mobile budget sheet */}
+                    {!!filters?.year && !!filters?.month && (
+                      <Sheet open={isBudgetOpen} onOpenChange={setIsBudgetOpen}>
+                        <SheetTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <PieChart className="h-4 w-4 mr-2" />
+                            Budget
+                          </Button>
+                        </SheetTrigger>
+                        <SheetContent side="bottom" className="h-[85vh]">
+                          <TransactionStats
+                            transactions={transactions}
+                            budgets={budgets}
+                            isLoading={isLoading}
+                            query={filters?.query}
+                          />
+                        </SheetContent>
+                      </Sheet>
+                    )}
                   </div>
                 </div>
               </div>

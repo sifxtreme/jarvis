@@ -263,7 +263,7 @@ const getMerchantIcon = (plaidName: string | null, merchantName: string | null):
 
   // Uber
   if (/\buber\b/i.test(name)) {
-    return { icon: <FaUber className="h-4 w-4 text-black" />, label: 'Uber' };
+    return { icon: <FaUber className="h-4 w-4 text-black dark:text-white" />, label: 'Uber' };
   }
 
   // Target
@@ -941,8 +941,9 @@ export default function TransactionTable({
                       return null;
                     })()}
                     <InlineEdit
-                      value={transaction.merchant_name || ""}
+                      value={transaction.merchant_name || transaction.plaid_name || ""}
                       onSave={(val) => handleQuickEdit(transaction, 'merchant_name', val)}
+                      className={!transaction.merchant_name ? "text-muted-foreground italic" : ""}
                     />
                   </div>
                 </div>
