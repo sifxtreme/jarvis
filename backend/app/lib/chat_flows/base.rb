@@ -26,7 +26,7 @@ module ChatFlows
       raise NotImplementedError
     end
 
-    def extract(_image_message_id: nil)
+    def extract(image_message_id: nil) # rubocop:disable Lint/UnusedMethodArgument
       raise NotImplementedError
     end
 

@@ -25,7 +25,7 @@ module ChatFlows
     end
 
     # Extract update intent: changes + target
-    def extract(_image_message_id: nil)
+    def extract(image_message_id: nil) # rubocop:disable Lint/UnusedMethodArgument
       result = handler.send(:gemini).extract_event_update_from_text(
         handler.text,
         context: handler.send(:recent_context_text)

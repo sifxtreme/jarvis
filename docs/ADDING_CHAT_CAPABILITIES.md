@@ -176,7 +176,7 @@ module ChatFlows
       'reminder'
     end
 
-    def extract(_image_message_id: nil)
+    def extract(image_message_id: nil) # rubocop:disable Lint/UnusedMethodArgument
       handler.extract_reminder_from_text
     end
 

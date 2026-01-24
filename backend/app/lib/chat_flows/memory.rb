@@ -35,7 +35,7 @@ module ChatFlows
       nil
     end
 
-    def extract(_image_message_id: nil)
+    def extract(image_message_id: nil) # rubocop:disable Lint/UnusedMethodArgument
       handler.extract_memory_from_text
     end
 
