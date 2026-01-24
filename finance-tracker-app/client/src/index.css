@@ -80,3 +80,17 @@
     font-feature-settings: "tnum" 1;
   }
 }
+
+@layer utilities {
+  /* Diagonal stripes pattern for disabled fields */
+  .bg-stripes {
+    opacity: 0.3;
+    background-image: repeating-linear-gradient(
+      45deg,
+      #888,
+      #888 5px,
+      transparent 5px,
+      transparent 15px
+    );
+  }
+}

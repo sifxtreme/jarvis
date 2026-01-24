@@ -3,22 +3,9 @@ import { Transaction } from "../lib/api";
 import { Cross2Icon } from '@radix-ui/react-icons';
 import { useState, useEffect, useRef } from 'react';
 import { getBudgets } from '../lib/api';
+import { logger } from '../lib/logger';
 import { FaCcAmex, FaCcVisa, FaUniversity, FaCreditCard } from 'react-icons/fa';
 import { Wallet, Send, DollarSign } from 'lucide-react';
-
-// CSS for diagonal stripes
-const diagonalStripesStyle = `
-  .bg-stripes {
-    opacity: 0.3;
-    background-image: repeating-linear-gradient(
-      45deg,
-      #888,
-      #888 5px,
-      transparent 5px,
-      transparent 15px
-    );
-  }
-`;
 
 interface TransactionModalProps {
   open: boolean;
@@ -91,7 +78,7 @@ export function TransactionModal({
           const categoryNames = budgets.map(budget => budget.name);
           setCategories(categoryNames);
         } catch (error) {
-          console.error('Failed to fetch categories:', error);
+          logger.error('Transaction', 'Failed to fetch categories:', error);
         }
       };
 
@@ -153,7 +140,6 @@ export function TransactionModal({
 
   // Handle category suggestion selection
   const handleCategorySelect = (category: string) => {
-    console.log("Selected category:", category); // Add logging for debugging
     // Ensure the category is properly trimmed and set
     setCategoryInput(category.trim());
     setShowCategorySuggestions(false);
@@ -266,7 +252,6 @@ export function TransactionModal({
 
   return (
     <Dialog.Root open={open} onOpenChange={onClose}>
-      <style dangerouslySetInnerHTML={{ __html: diagonalStripesStyle }} />
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <Dialog.Content className="fixed left-[50%] top-[50%] max-h-[85vh] w-[90vw] max-w-[600px] translate-x-[-50%] translate-y-[-50%] rounded-[6px] bg-background text-foreground p-[25px] overflow-y-auto shadow-[hsl(206_22%_7%_/_35%)_0px_10px_38px_-10px,_hsl(206_22%_7%_/_20%)_0px_10px_20px_-15px] focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]">
@@ -389,9 +374,10 @@ export function TransactionModal({
                   {showCategorySuggestions && filteredCategories.length > 0 && (
                     <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-popover border rounded shadow-lg z-10 category-dropdown dark:bg-slate-950 dark:border-slate-700">
                       {filteredCategories.map((category, index) => (
-                        <div
+                        <button
                           key={index}
-                          className={`p-3 cursor-pointer border-b border-border last:border-b-0 ${selectedCategoryIndex === index
+                          type="button"
+                          className={`w-full text-left p-3 cursor-pointer border-b border-border last:border-b-0 ${selectedCategoryIndex === index
                             ? 'bg-accent font-medium'
                             : 'hover:bg-muted'
                             }`}
@@ -400,11 +386,9 @@ export function TransactionModal({
                             e.stopPropagation();
                             handleCategorySelect(category);
                           }}
-                          role="button"
-                          tabIndex={0}
                         >
                           {category}
-                        </div>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -432,9 +416,10 @@ export function TransactionModal({
                   {showSourceSuggestions && filteredSources.length > 0 && (
                     <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-popover border rounded shadow-lg z-10 source-dropdown dark:bg-slate-950 dark:border-slate-700">
                       {filteredSources.map((source, index) => (
-                        <div
+                        <button
                           key={index}
-                          className={`p-3 cursor-pointer border-b border-border last:border-b-0 ${selectedSourceIndex === index
+                          type="button"
+                          className={`w-full text-left p-3 cursor-pointer border-b border-border last:border-b-0 ${selectedSourceIndex === index
                             ? 'bg-accent font-medium'
                             : 'hover:bg-muted'
                             }`}
@@ -443,14 +428,12 @@ export function TransactionModal({
                             e.stopPropagation();
                             handleSourceSelect(source.name);
                           }}
-                          role="button"
-                          tabIndex={0}
                         >
                           <div className="flex items-center">
                             {source.icon}
                             <span className="ml-2">{source.name}</span>
                           </div>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   )}

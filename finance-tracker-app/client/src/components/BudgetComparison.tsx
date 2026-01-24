@@ -7,12 +7,9 @@ import {
   TableHeader,
   TableRow,
 } from "../components/ui";
-import { Budget, Transaction } from "../lib/api";
 import { formatCurrency } from "../lib/utils";
 
 interface BudgetComparisonProps {
-  budgets: Budget[];
-  transactions: Transaction[];
   isLoading: boolean;
 }
 
@@ -53,9 +50,7 @@ const MOCK_DATA = {
   } as Record<string, Record<string, number>>
 };
 
-export default function BudgetComparison({ budgets, transactions, isLoading }: BudgetComparisonProps) {
-  void budgets;
-  void transactions;
+export default function BudgetComparison({ isLoading }: BudgetComparisonProps) {
   if (isLoading) {
     return (
       <Card className="animate-pulse">

@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { ImagePlus, Send, X } from "lucide-react";
 import { API_BASE_URL, createChatMessage, getChatMessages, type ChatMessage as ChatMessageDTO } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
+import { logger } from "@/lib/logger";
 
 type ChatMessage = {
   id: number | string;
@@ -171,7 +172,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
         setHasMore(Boolean(response.has_more));
         setBeforeId(response.next_before_id ?? null);
       } catch (error) {
-        console.error("Failed to load chat messages", error);
+        logger.error("Chat", "Failed to load chat messages", error);
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -212,7 +213,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
   };
 
   const { getRootProps, getInputProps, open, isDragActive } = useDropzone({
-    onDrop: async (acceptedFiles) => {
+    onDrop: async (acceptedFiles: File[]) => {
       if (isPreparingImage) return;
       const file = acceptedFiles[0];
       if (!file) return;
@@ -280,7 +281,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
       
       // Note: Scroll restoration happens in useLayoutEffect
     } catch (error) {
-      console.error("Failed to load older chat messages", error);
+      logger.error("Chat", "Failed to load older chat messages", error);
       scrollSnapshotRef.current = null; // Clear snapshot on error
     } finally {
       setIsLoadingMore(false);
@@ -350,7 +351,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
         onEventCreated?.();
       }
     } catch (error) {
-      console.error("Failed to send chat message", error);
+      logger.error("Chat", "Failed to send chat message", error);
       setMessages((prev) => {
         const withoutPending = prev.filter(
           (message) => message.id !== pendingUserId && message.id !== pendingAssistantId
@@ -409,8 +410,17 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
     <div className="flex min-h-0 h-full flex-col">
       <div ref={scrollRef} onScroll={handleScroll} className="relative flex-1 overflow-auto px-4 py-3">
         {isLoading ? (
-          <div className="flex h-full flex-col items-center justify-center text-sm text-muted-foreground">
-            Loading chat…
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1">
+              {["0ms", "150ms", "300ms"].map((delay) => (
+                <span
+                  key={delay}
+                  className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce"
+                  style={{ animationDelay: delay }}
+                />
+              ))}
+            </div>
+            <span>Loading chat…</span>
           </div>
         ) : messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center p-8 text-center text-muted-foreground">

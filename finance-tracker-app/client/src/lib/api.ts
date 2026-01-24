@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { toast } from '@/hooks/use-toast';
 import { create } from 'zustand';
+import { logger } from './logger';
 
 // Define constants first
 export const API_BASE_URL = 'https://sifxtre.me/api';
@@ -30,12 +31,12 @@ export const getAuthToken = (): string | null => {
 
 export const setAuthToken = (token: string): void => {
   localStorage.setItem(AUTH_TOKEN_KEY, token);
-  console.info('[AUTH] Stored JWT in localStorage.');
+  logger.info('AUTH', 'Stored JWT in localStorage.');
 };
 
 export const clearAuthToken = (): void => {
   localStorage.removeItem(AUTH_TOKEN_KEY);
-  console.info('[AUTH] Cleared JWT from localStorage.');
+  logger.info('AUTH', 'Cleared JWT from localStorage.');
 };
 
 // Create an axios instance
@@ -127,7 +128,7 @@ export const verifyAuthentication = async (): Promise<boolean> => {
       return false;
     }
     // For other errors, assume the API is down but the key might be valid
-    console.error('Error verifying authentication:', error);
+    logger.error('AUTH', 'Error verifying authentication:', error);
     return true;
   }
 };
@@ -172,7 +173,7 @@ export const getTellerEnrollment = async (): Promise<TellerEnrollment | null> =>
     const response = await axiosInstance.get('/teller/enrollment');
     return response.data?.enrollment || null;
   } catch (error) {
-    console.error('Failed to load Teller enrollment:', error);
+    logger.error('API', 'Failed to load Teller enrollment:', error);
     return null;
   }
 };
@@ -191,12 +192,12 @@ export const getTellerHealth = async (): Promise<TellerHealthStatus[]> => {
 };
 
 export const createSession = async (idToken: string): Promise<void> => {
-  console.info('[AUTH] Creating session via Google token.');
+  logger.info('AUTH', 'Creating session via Google token.');
   const response = await axiosInstance.post<{ token: string }>('/auth/session', { id_token: idToken });
   if (response.data?.token) {
     setAuthToken(response.data.token);
   } else {
-    console.warn('[AUTH] Session response missing token.');
+    logger.warn('AUTH', 'Session response missing token.');
   }
 };
 
@@ -375,19 +376,19 @@ export const getTransactions = async (filters: TransactionFilters): Promise<Tran
     const response = await axiosInstance.get<APIResponse<Transaction>>('/financial_transactions', { params });
 
     if (!response.data) {
-      console.error('[API] No data in response');
+      logger.error('API', 'No data in response');
       throw new Error('No data received from server');
     }
 
     const { results, error } = response.data;
 
     if (error) {
-      console.error('[API] Server returned error:', error);
+      logger.error('API', 'Server returned error:', error);
       throw new Error(error);
     }
 
     if (!Array.isArray(results)) {
-      console.error('[API] Invalid response structure:', response.data);
+      logger.error('API', 'Invalid response structure:', response.data);
       throw new Error('Invalid response format: results is not an array');
     }
 
@@ -403,14 +404,14 @@ export const getTransactions = async (filters: TransactionFilters): Promise<Tran
         if (typeof transaction.id !== 'number') issues.push(`id: ${transaction.id} (${typeof transaction.id})`);
         if (typeof transaction.amount !== 'number') issues.push(`amount: ${transaction.amount} (${typeof transaction.amount})`);
         if (typeof transaction.transacted_at !== 'string') issues.push(`transacted_at: ${transaction.transacted_at} (${typeof transaction.transacted_at})`);
-        console.error(`[API] Invalid transaction - ${issues.join(', ')} | name: ${transaction.plaid_name || transaction.merchant_name || 'unknown'}`);
+        logger.error('API', `Invalid transaction - ${issues.join(', ')} | name: ${transaction.plaid_name || transaction.merchant_name || 'unknown'}`);
       }
       return isValid;
     });
 
     return validTransactions;
   } catch (error: unknown) {
-    console.error('[API] Error details:', error);
+    logger.error('API', 'Error details:', error);
     const errorMessage = getErrorMessage(error, 'Failed to fetch transactions');
     throw new Error(`Failed to fetch transactions: ${errorMessage}`);
   }
@@ -427,7 +428,7 @@ export const getBudgets = async (filters: BudgetFilters): Promise<Budget[]> => {
 
     return response.data;
   } catch (error: unknown) {
-    console.error('[API] Budget error details:', error);
+    logger.error('API', 'Budget error details:', error);
     const errorMessage = getErrorMessage(error, 'Failed to fetch budgets');
     throw new Error(`Failed to fetch budgets: ${errorMessage}`);
   }
@@ -575,7 +576,7 @@ export const getTrends = async (filters: TrendsFilters = {}): Promise<TrendsData
     const response = await axiosInstance.get<TrendsData>('/financial_transactions/trends', { params });
     return response.data;
   } catch (error: unknown) {
-    console.error('[API] Trends error details:', error);
+    logger.error('API', 'Trends error details:', error);
     const errorMessage = getErrorMessage(error, 'Failed to fetch trends');
     throw new Error(`Failed to fetch trends: ${errorMessage}`);
   }
@@ -601,7 +602,7 @@ export const getMerchantTrends = async (filters: MerchantTrendsFilters): Promise
       }
     );
   } catch (error: unknown) {
-    console.error('[API] Merchant trends error details:', error);
+    logger.error('API', 'Merchant trends error details:', error);
     const errorMessage = getErrorMessage(error, 'Failed to fetch merchant trends');
     throw new Error(`Failed to fetch merchant trends: ${errorMessage}`);
   }
@@ -621,7 +622,7 @@ export const getMerchantSuggestions = async (filters: MerchantSuggestionsFilters
     const response = await axiosInstance.get<MerchantSuggestionsData>('/financial_transactions', { params });
     return response.data;
   } catch (error: unknown) {
-    console.error('[API] Merchant suggestions error details:', error);
+    logger.error('API', 'Merchant suggestions error details:', error);
     const errorMessage = getErrorMessage(error, 'Failed to fetch merchant suggestions');
     throw new Error(`Failed to fetch merchant suggestions: ${errorMessage}`);
   }
@@ -644,7 +645,7 @@ export const getMerchantTransactions = async (filters: MerchantTransactionsFilte
     if (error) throw new Error(error);
     return Array.isArray(results) ? results : [];
   } catch (error: unknown) {
-    console.error('[API] Merchant transactions error details:', error);
+    logger.error('API', 'Merchant transactions error details:', error);
     const errorMessage = getErrorMessage(error, 'Failed to fetch merchant transactions');
     throw new Error(`Failed to fetch merchant transactions: ${errorMessage}`);
   }
@@ -690,7 +691,7 @@ export const getRecurringStatus = async (filters: RecurringStatusFilters = {}): 
     const response = await axiosInstance.get<RecurringStatusData>('/financial_transactions/recurring_status', { params });
     return response.data;
   } catch (error: unknown) {
-    console.error('[API] Recurring status error:', error);
+    logger.error('API', 'Recurring status error:', error);
     const errorMessage = getErrorMessage(error, 'Failed to fetch recurring status');
     throw new Error(`Failed to fetch recurring status: ${errorMessage}`);
   }
