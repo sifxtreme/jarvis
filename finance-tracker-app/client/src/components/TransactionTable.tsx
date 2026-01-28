@@ -720,11 +720,30 @@ export default function TransactionTable({
                       }
                       return null;
                     })()}
-                    <InlineEdit
-                      value={transaction.merchant_name || transaction.plaid_name || ""}
-                      onSave={(val) => handleQuickEdit(transaction, 'merchant_name', val)}
-                      className={!transaction.merchant_name ? "text-muted-foreground italic" : ""}
-                    />
+                    {transaction.plaid_name && transaction.plaid_name !== transaction.merchant_name ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div>
+                              <InlineEdit
+                                value={transaction.merchant_name || transaction.plaid_name || ""}
+                                onSave={(val) => handleQuickEdit(transaction, 'merchant_name', val)}
+                                className={!transaction.merchant_name ? "text-muted-foreground italic" : ""}
+                              />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="font-mono text-xs">{transaction.plaid_name}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : (
+                      <InlineEdit
+                        value={transaction.merchant_name || transaction.plaid_name || ""}
+                        onSave={(val) => handleQuickEdit(transaction, 'merchant_name', val)}
+                        className={!transaction.merchant_name ? "text-muted-foreground italic" : ""}
+                      />
+                    )}
                   </div>
                 </TableCell>
                 <TableCell className={cn(
@@ -941,11 +960,30 @@ export default function TransactionTable({
                       return null;
                     })()}
                     <div className="truncate min-w-0">
-                      <InlineEdit
-                        value={transaction.merchant_name || transaction.plaid_name || ""}
-                        onSave={(val) => handleQuickEdit(transaction, 'merchant_name', val)}
-                        className={!transaction.merchant_name ? "text-muted-foreground italic" : ""}
-                      />
+                      {transaction.plaid_name && transaction.plaid_name !== transaction.merchant_name ? (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div>
+                                <InlineEdit
+                                  value={transaction.merchant_name || transaction.plaid_name || ""}
+                                  onSave={(val) => handleQuickEdit(transaction, 'merchant_name', val)}
+                                  className={!transaction.merchant_name ? "text-muted-foreground italic" : ""}
+                                />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="font-mono text-xs">{transaction.plaid_name}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : (
+                        <InlineEdit
+                          value={transaction.merchant_name || transaction.plaid_name || ""}
+                          onSave={(val) => handleQuickEdit(transaction, 'merchant_name', val)}
+                          className={!transaction.merchant_name ? "text-muted-foreground italic" : ""}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
