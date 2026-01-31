@@ -21,6 +21,8 @@ module ChatHelpers
       case intent
       when ChatConstants::Intent::CREATE_TRANSACTION
         handle_create_transaction(image_message_id: image_message_id)
+      when ChatConstants::Intent::SEARCH_TRANSACTION
+        handle_search_transaction
       when ChatConstants::Intent::CREATE_MEMORY
         handle_create_memory
       when ChatConstants::Intent::SEARCH_MEMORY

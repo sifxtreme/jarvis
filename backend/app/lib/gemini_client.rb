@@ -114,6 +114,13 @@ class GeminiClient
     parse_json_response(response)
   end
 
+  def extract_transaction_query_from_text(text, context: nil)
+    parts = [{ text: transaction_query_prompt(text, context: context) }]
+
+    response = make_request(parts: parts, model: DEFAULT_INTENT_MODEL)
+    parse_json_response(response)
+  end
+
   def extract_recurring_scope_from_text(text, context: nil)
     parts = [{ text: recurring_scope_prompt(text, context: context) }]
 
@@ -351,7 +358,7 @@ class GeminiClient
       #{context_block}You are classifying the user's intent for a chat assistant that manages calendars and finances.
       Return JSON only:
       {
-        "intent": "create_event" | "update_event" | "delete_event" | "create_transaction" | "create_memory" | "search_memory" | "list_events" | "digest" | "help",
+        "intent": "create_event" | "update_event" | "delete_event" | "create_transaction" | "search_transaction" | "create_memory" | "search_memory" | "list_events" | "digest" | "help",
         "time_window": "today|this_week|next_week|this_month|custom|unspecified",
         "raw_time_query": "original time phrase if present",
         "confidence": "low|medium|high"
@@ -366,6 +373,7 @@ class GeminiClient
       - If the user wants to change or move an existing event, use "update_event".
       - If the user wants to cancel or delete an existing event, use "delete_event".
       - If the user is describing a spend or income transaction, use "create_transaction".
+      - If the user wants to know about past spending, transactions, costs, or "how much did I spend", use "search_transaction".
       - If the user says "remember", "note", or wants to store a preference, use "create_memory".
       - If the user asks "do you remember", "what do we know", or asks a general question about preferences, use "search_memory".
       - If the user asks "what's coming up", "what's on the calendar", or similar, use "list_events".
@@ -376,6 +384,9 @@ class GeminiClient
       Examples:
       Text: "add this transaction - it's my mortgage"
       Intent: "create_transaction"
+
+      Text: "how much did I spend on groceries last week?"
+      Intent: "search_transaction"
 
       Text: "save this receipt for taxes"
       Intent: "create_memory"
@@ -633,6 +644,40 @@ class GeminiClient
 
       Memories:
       #{memory_lines}
+    PROMPT
+  end
+
+  def transaction_query_prompt(text, context: nil)
+    context_block = format_context_block(context)
+    <<~PROMPT
+      Today is #{today_in_timezone} (Timezone: #{timezone_label}).
+
+      #{context_block}Extract the transaction search criteria from the user's message. Return JSON:
+      {
+        "merchant": "Merchant name or keywords",
+        "category": "Category name or keywords",
+        "start_date": "YYYY-MM-DD",
+        "end_date": "YYYY-MM-DD",
+        "min_amount": 10.00,
+        "max_amount": 100.00,
+        "limit": 10,
+        "confidence": "low|medium|high"
+      }
+
+      Rules:
+      - If user says "last week", set start/end date accordingly.
+      - If user says "this month", set start/end date accordingly.
+      - If user asks "how much did I spend", looking for a sum, extract the criteria to filter by.
+      - If user asks for "transactions from Amazon", set merchant to "Amazon".
+
+      If you cannot determine any details, return:
+      {
+        "error": "no_transaction_query",
+        "message": "Missing search details."
+      }
+
+      Text:
+      "#{text}"
     PROMPT
   end
 

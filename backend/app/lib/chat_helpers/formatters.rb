@@ -89,6 +89,15 @@ module ChatHelpers
       lines.join("\n")
     end
 
+    def format_transaction_record(transaction)
+      parts = []
+      parts << transaction.transacted_at.strftime('%b %d') if transaction.transacted_at
+      parts << transaction.merchant_name
+      parts << "$#{transaction.amount}"
+      parts << "(#{transaction.category})" if transaction.category.present?
+      parts.join(" - ")
+    end
+
     def format_memory(memory)
       lines = []
       lines << "Content: #{memory['content']}" if memory['content'].present?

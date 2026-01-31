@@ -79,6 +79,8 @@ class WebChatMessageHandler
       handle_delete_event
     when ChatConstants::Intent::CREATE_TRANSACTION
       handle_create_transaction
+    when ChatConstants::Intent::SEARCH_TRANSACTION
+      handle_search_transaction
     when ChatConstants::Intent::CREATE_MEMORY
       handle_create_memory
     when ChatConstants::Intent::SEARCH_MEMORY

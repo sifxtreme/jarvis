@@ -4,6 +4,54 @@ module ChatHelpers
       flow_engine.handle_create(:transaction, image_message_id: image_message_id)
     end
 
+    def handle_search_transaction
+      query = extract_transaction_query
+      return build_response("I couldn't understand what transactions you're looking for.") if query.key?('error')
+
+      scope = FinancialTransaction.where(hidden: false)
+
+      if query['merchant'].present?
+        scope = scope.where("merchant_name ILIKE ?", "%#{query['merchant']}%")
+      end
+
+      if query['category'].present?
+        scope = scope.where("category ILIKE ?", "%#{query['category']}%")
+      end
+
+      if query['start_date'].present?
+        scope = scope.where("transacted_at >= ?", Date.parse(query['start_date']).beginning_of_day)
+      end
+
+      if query['end_date'].present?
+        scope = scope.where("transacted_at <= ?", Date.parse(query['end_date']).end_of_day)
+      end
+
+      if query['min_amount'].present?
+        scope = scope.where("amount >= ?", query['min_amount'])
+      end
+
+      if query['max_amount'].present?
+        scope = scope.where("amount <= ?", query['max_amount'])
+      end
+
+      limit = query['limit'] || 5
+      transactions = scope.order(transacted_at: :desc).limit(limit)
+
+      if transactions.empty?
+        return build_response("I couldn't find any matching transactions.")
+      end
+
+      total = scope.sum(:amount)
+      formatted = transactions.map { |t| format_transaction_record(t) }.join("\n")
+
+      response_text = "Found #{scope.count} transactions (Total: $#{total})\n\n#{formatted}"
+      if scope.count > limit
+        response_text += "\n\n(Showing top #{limit})"
+      end
+
+      build_response(response_text)
+    end
+
     def handle_transaction_extraction_selection(payload)
       transactions = extracted_transactions(payload['transactions'])
       if transactions.empty?
