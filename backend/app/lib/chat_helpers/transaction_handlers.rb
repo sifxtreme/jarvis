@@ -9,36 +9,47 @@ module ChatHelpers
       return build_response("I couldn't understand what transactions you're looking for.") if query.key?('error')
 
       scope = FinancialTransaction.where(hidden: false)
+      criteria_desc = []
 
       if query['merchant'].present?
-        scope = scope.where("merchant_name ILIKE ?", "%#{query['merchant']}%")
+        term = query['merchant']
+        scope = scope.where("merchant_name ILIKE :term OR plaid_name ILIKE :term", term: "%#{term}%")
+        criteria_desc << "merchant '#{term}'"
       end
 
       if query['category'].present?
         scope = scope.where("category ILIKE ?", "%#{query['category']}%")
+        criteria_desc << "category '#{query['category']}'"
       end
 
       if query['start_date'].present?
-        scope = scope.where("transacted_at >= ?", Date.parse(query['start_date']).beginning_of_day)
+        date = Date.parse(query['start_date'])
+        scope = scope.where("transacted_at >= ?", date.beginning_of_day)
+        criteria_desc << "after #{date.strftime('%b %d')}"
       end
 
       if query['end_date'].present?
-        scope = scope.where("transacted_at <= ?", Date.parse(query['end_date']).end_of_day)
+        date = Date.parse(query['end_date'])
+        scope = scope.where("transacted_at <= ?", date.end_of_day)
+        criteria_desc << "before #{date.strftime('%b %d')}"
       end
 
       if query['min_amount'].present?
         scope = scope.where("amount >= ?", query['min_amount'])
+        criteria_desc << "over $#{query['min_amount']}"
       end
 
       if query['max_amount'].present?
         scope = scope.where("amount <= ?", query['max_amount'])
+        criteria_desc << "under $#{query['max_amount']}"
       end
 
       limit = query['limit'] || 5
       transactions = scope.order(transacted_at: :desc).limit(limit)
 
       if transactions.empty?
-        return build_response("I couldn't find any matching transactions.")
+        desc = criteria_desc.any? ? criteria_desc.join(", ") : "all transactions"
+        return build_response("I couldn't find any transactions matching: #{desc}.")
       end
 
       total = scope.sum(:amount)

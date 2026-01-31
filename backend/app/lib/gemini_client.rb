@@ -376,6 +376,7 @@ class GeminiClient
       - If the user wants to know about past spending, transactions, costs, or "how much did I spend", use "search_transaction".
       - If the user says "remember", "note", or wants to store a preference, use "create_memory".
       - If the user asks "do you remember", "what do we know", or asks a general question about preferences, use "search_memory".
+      - NEVER use "search_memory" for questions about spending, costs, prices, or transactions. Use "search_transaction" instead.
       - If the user asks "what's coming up", "what's on the calendar", or similar, use "list_events".
       - If the user asks for a summary (daily/weekly), use "digest".
       - If the user asks how to use the bot, use "help".
