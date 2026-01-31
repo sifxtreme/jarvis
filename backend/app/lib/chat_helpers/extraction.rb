@@ -75,9 +75,9 @@ module ChatHelpers
     def extract_transaction_query
       query = gemini.extract_transaction_query_from_text(@text, context: recent_context_text)
       log_ai_result(query, request_kind: 'transaction_query', model: gemini_intent_model)
-      query
+      query[:event]
     rescue StandardError => e
-      { text: "Transaction query error: #{e.message}" }
+      { 'error' => 'extraction_error', 'message' => "Transaction query error: #{e.message}" }
     end
 
     def extract_from_image
