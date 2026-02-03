@@ -105,6 +105,7 @@ module ChatConstants
     CREATE_TRANSACTION = 'create_transaction'
     CREATE_MEMORY = 'create_memory'
     SEARCH_MEMORY = 'search_memory'
+    SEARCH_TRANSACTION = 'search_transaction'
     DIGEST = 'digest'
     HELP = 'help'
     AMBIGUOUS = 'ambiguous'
