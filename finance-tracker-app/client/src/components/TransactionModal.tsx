@@ -302,7 +302,7 @@ export function TransactionModal({
                     id="transacted_at"
                     type="date"
                     name="transacted_at"
-                    defaultValue={isDuplicating ? today : (transaction?.transacted_at.split('T')[0] || today)}
+                    defaultValue={transaction?.transacted_at?.split('T')[0] || today}
                     className="w-full p-2 border rounded font-mono bg-background text-foreground dark:bg-slate-950 dark:border-slate-700 dark:text-slate-100"
                   />
                 </div>
