@@ -19,9 +19,9 @@ Scan QR code with iPhone camera. Requires **Expo Go** app from App Store.
 
 ### Standalone Build (own icon/name)
 ```bash
-npx expo run:ios --device
+cd mobile-app && npx expo run:ios --device
 ```
-Requires Xcode (full app, not just CLI tools) + iPhone connected via USB. Free Apple ID = 7-day app expiry before re-build needed.
+Requires Xcode (full app, not just CLI tools) + iPhone connected via USB. Free Apple ID = 7-day app expiry, re-run the same command to refresh. First build will prompt for Apple ID sign-in in Xcode. On iPhone: **Settings > General > VPN & Device Management > [your Apple ID] > Trust** to allow the app to run.
 
 ## Auth
 
@@ -46,7 +46,7 @@ Backend changes for mobile auth are in `backend/app/controllers/google_calendar_
 |-----|-------------|
 | Transactions | List, create (FAB), edit, filter by month/year/search, recurring status card with quick-add |
 | Calendar | Day view, multi-user filter chips, event dedup by `event_uid`, inline title edit via long-press |
-| Chat | Messages with image upload (gallery/camera), optimistic rendering, infinite scroll |
+| Chat | Messages with image upload (gallery/camera), optimistic rendering, infinite scroll, conversation reset button |
 | Budget | Budget vs actual by category with progress bars, month navigation |
 | Trends | Yearly summaries with YoY comparison, monthly spending bars, top categories/merchants, merchant search |
 
@@ -89,9 +89,19 @@ src/components/RecurringStatusCard.tsx   — Missing recurring transactions with
 - npm peer dep conflicts with react 19 — use `--legacy-peer-deps` for non-expo packages
 - QR code only renders in interactive terminal — `npx expo start` must be run directly, not via background process
 
+## Chat Bot Fixes (deployed)
+
+The chat bot had a loop bug where it would repeat "Reply with the event numbers to add, or say 'all'" endlessly if the user replied with anything other than numbers. Fixed with 4 layers:
+
+1. **Cancel detection** — "stop", "cancel", "nevermind", etc. now immediately clear pending state
+2. **30-minute TTL** — stale pending actions auto-expire, so coming back later starts fresh
+3. **Better prompts** — selection prompts now mention "cancel" as an escape option
+4. **Reset button** — both web and mobile chat have a reset button to manually clear conversation state (`DELETE /chat/thread`)
+
+Backend files changed: `web_chat_message_handler.rb`, `gemini_client.rb`, `chat_helpers/state.rb`, `chat_helpers/event_handlers.rb`, `chat_helpers/transaction_handlers.rb`, `chat_messages_controller.rb`, `routes.rb`
+
 ## TODO
 
-- [ ] Install full Xcode and build standalone app (`npx expo run:ios --device`)
+- [ ] Build standalone app: plug iPhone in via USB, run `cd mobile-app && npx expo run:ios --device` (Xcode is installed)
 - [ ] Replace default icon (`assets/icon.png`) with custom Jarvis icon (1024x1024 PNG)
 - [ ] Test Google Sign-In flow end-to-end on device
-- [ ] Consider AltStore for auto-refreshing free provisioning (avoids 7-day expiry)
