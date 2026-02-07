@@ -1,6 +1,8 @@
 require 'cgi'
 
 class GoogleCalendarAuthController < ActionController::API
+  include JwtAuth
+
   def callback
     auth = request.env['omniauth.auth']
     email = auth.dig('info', 'email')
@@ -25,6 +27,11 @@ class GoogleCalendarAuthController < ActionController::API
     )
 
     sync_calendar_list(user)
+
+    if request.env['omniauth.origin'] == 'mobile'
+      jwt = issue_jwt(email)
+      return redirect_to "jarvis://auth?token=#{jwt[:token]}", allow_other_host: true
+    end
 
     redirect_to "#{frontend_url}?calendar_connected=1"
   rescue StandardError => e

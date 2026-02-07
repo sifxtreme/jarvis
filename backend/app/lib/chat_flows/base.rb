@@ -94,7 +94,7 @@ module ChatFlows
       false
     end
 
-    def extra_prompt(_stage:, _payload:, _missing_fields:)
+    def extra_prompt(stage:, payload:, missing_fields:)
       nil
     end
 

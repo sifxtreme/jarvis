@@ -370,13 +370,14 @@ class GeminiClient
       - If the user is sending an event (title/date/time/location), use "create_event".
       - If the image is a receipt, statement, or payment screenshot, use "create_transaction".
       - If the image is a note/photo to remember, use "create_memory".
-      - If the user wants to change or move an existing event, use "update_event".
+      - If the user wants to change or move an existing event, use "update_event". Only use this when the user is directly requesting a change (e.g., "move my dentist to Friday", "change the meeting to 3pm"). Do NOT use "update_event" for forwarded notifications or automated messages about rescheduled appointments — those are new event info and should use "create_event".
       - If the user wants to cancel or delete an existing event, use "delete_event".
       - If the user is describing a spend or income transaction, use "create_transaction".
       - If the user wants to know about past spending, transactions, costs, or "how much did I spend", use "search_transaction".
       - If the user says "remember", "note", or wants to store a preference, use "create_memory".
       - If the user asks "do you remember", "what do we know", or asks a general question about preferences, use "search_memory".
       - NEVER use "search_memory" for questions about spending, costs, prices, or transactions. Use "search_transaction" instead.
+      - If the user asks "when was the last time" or "last time" about a service, activity, or purchase (e.g. haircuts, oil change, groceries, dining, dentist), use "search_transaction" — these are things you pay for.
       - If the user asks "what's coming up", "what's on the calendar", or similar, use "list_events".
       - If the user asks for a summary (daily/weekly), use "digest".
       - If the user asks how to use the bot, use "help".
@@ -397,6 +398,18 @@ class GeminiClient
 
       Text: "add this event to my calendar"
       Intent: "create_event"
+
+      Text: "when's the last time the kids got haircuts"
+      Intent: "search_transaction"
+
+      Text: "last time we went to the dentist"
+      Intent: "search_transaction"
+
+      Text: "Hi Asif, Dental Smiles has rescheduled your appointment to 2/17 at 2:00 PM PST."
+      Intent: "create_event"
+
+      Text: "move my dentist to Friday"
+      Intent: "update_event"
 
       User text:
       "#{text}"
@@ -670,12 +683,18 @@ class GeminiClient
       - If user says "this month", set start/end date accordingly.
       - If user asks "how much did I spend", looking for a sum, extract the criteria to filter by.
       - If user asks for "transactions from Amazon", set merchant to "Amazon".
+      - If the user mentions a service, activity, or product (e.g. "haircuts", "oil change", "groceries"), use it as the merchant field for keyword matching.
+      - NEVER return an error if there are any usable keywords in the query. Always attempt a best-effort extraction.
 
       If you cannot determine any details, return:
       {
         "error": "no_transaction_query",
         "message": "Missing search details."
       }
+
+      Examples:
+      Text: "when the kids got haircuts" → {"merchant": "haircut", "confidence": "medium"}
+      Text: "last oil change" → {"merchant": "oil change", "confidence": "medium"}
 
       Text:
       "#{text}"

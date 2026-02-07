@@ -43,7 +43,14 @@ export default function SheetFilterControls({ onSearch, initialFilters, classNam
           placeholder="Search..."
           className="w-full"
           value={filters.query ?? ''}
-          onChange={(e) => handleFilterChange({ query: e.target.value })}
+          onChange={(e) => {
+            const query = e.target.value;
+            if (query && filters.year !== undefined) {
+              handleFilterChange({ query, year: undefined, month: undefined });
+            } else {
+              handleFilterChange({ query });
+            }
+          }}
         />
       </div>
 
@@ -89,9 +96,11 @@ export default function SheetFilterControls({ onSearch, initialFilters, classNam
               size="icon"
               onClick={() => {
                 const m = filters.month ?? currentMonth;
-                handleFilterChange({
-                  month: m === 1 ? 12 : m - 1
-                });
+                if (m === 1) {
+                  handleFilterChange({ month: 12, year: (filters.year ?? currentYear) - 1 });
+                } else {
+                  handleFilterChange({ month: m - 1 });
+                }
               }}
             >
               <ChevronLeft className="h-4 w-4" />
@@ -114,9 +123,11 @@ export default function SheetFilterControls({ onSearch, initialFilters, classNam
               size="icon"
               onClick={() => {
                 const m = filters.month ?? currentMonth;
-                handleFilterChange({
-                  month: m === 12 ? 1 : m + 1
-                });
+                if (m === 12) {
+                  handleFilterChange({ month: 1, year: (filters.year ?? currentYear) + 1 });
+                } else {
+                  handleFilterChange({ month: m + 1 });
+                }
               }}
             >
               <ChevronRight className="h-4 w-4" />

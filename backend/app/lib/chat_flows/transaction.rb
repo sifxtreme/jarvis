@@ -81,7 +81,7 @@ module ChatFlows
       true
     end
 
-    def extra_prompt(_stage:, _payload:, _missing_fields:)
+    def extra_prompt(stage:, payload:, missing_fields:)
       "Valid sources: #{TransactionSources.prompt_list}"
     end
   end
