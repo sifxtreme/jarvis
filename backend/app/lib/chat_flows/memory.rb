@@ -81,7 +81,7 @@ module ChatFlows
       ChatConstants::PendingAction::CONFIRM_MEMORY
     end
 
-    def extra_prompt(stage:, _payload:, missing_fields:)
+    def extra_prompt(stage:, payload:, missing_fields:)
       return nil unless handler.image_attached?
       return nil unless missing_fields.include?('content')
 
