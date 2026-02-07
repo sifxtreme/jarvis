@@ -45,7 +45,7 @@ const darkColors = {
   mutedForeground: '#94a3b8',
   accent: '#1e293b',
   accentForeground: '#f8fafc',
-  destructive: '#7f1d1d',
+  destructive: '#ef4444',
   destructiveForeground: '#f8fafc',
   border: '#1e293b',
   input: '#1e293b',

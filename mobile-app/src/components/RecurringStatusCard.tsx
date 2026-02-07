@@ -136,7 +136,7 @@ export default function RecurringStatusCard({ year, month, onQuickAdd }: Props) 
 }
 
 const styles = StyleSheet.create({
-  card: { marginHorizontal: 16, marginTop: 12, borderRadius: 12, borderLeftWidth: 4, overflow: 'hidden' },
+  card: { marginHorizontal: 16, marginTop: 12, borderRadius: 8, borderLeftWidth: 4, overflow: 'hidden' },
   header: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 8 },
   headerText: { fontSize: 14, fontWeight: '600', flex: 1 },
   badge: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },

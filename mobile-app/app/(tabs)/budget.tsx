@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
   navBtn: { padding: 8 },
   monthCenter: { flex: 1, alignItems: 'center' },
   monthText: { fontSize: 17, fontWeight: '700' },
-  summary: { margin: 16, borderRadius: 12, padding: 16, gap: 8 },
+  summary: { margin: 16, borderRadius: 8, padding: 16, gap: 8 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
   summaryRowLast: { paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.08)' },
   summaryLabel: { fontSize: 14 },
