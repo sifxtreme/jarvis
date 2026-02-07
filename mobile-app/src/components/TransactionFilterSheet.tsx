@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
   title: { fontSize: 18, fontWeight: '700' },
   body: { padding: 16, gap: 16 },
-  input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 },
+  input: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14 },
   label: { fontSize: 13, fontWeight: '600', marginTop: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   chevron: { padding: 10, borderWidth: 1, borderRadius: 8 },
@@ -136,6 +136,6 @@ const styles = StyleSheet.create({
   yearText: { fontSize: 16, fontWeight: '600' },
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
   toggleLabel: { fontSize: 15 },
-  applyButton: { margin: 16, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+  applyButton: { margin: 16, borderRadius: 6, paddingVertical: 14, alignItems: 'center' },
   applyText: { fontSize: 16, fontWeight: '600' },
 });

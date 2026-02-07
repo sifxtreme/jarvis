@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
   },
   googleButton: {
     backgroundColor: '#3b82f6',
-    borderRadius: 10,
+    borderRadius: 6,
     paddingVertical: 14,
     alignItems: 'center',
   },
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
   },
   tokenButton: {
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 6,
     paddingVertical: 14,
     alignItems: 'center',
   },

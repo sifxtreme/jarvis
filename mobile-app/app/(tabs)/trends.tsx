@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   yoyText: { fontSize: 12, fontWeight: '600', marginTop: 4 },
   section: { margin: 16, marginBottom: 0, padding: 16, borderWidth: 1, borderRadius: 8 },
   sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12 },
-  searchInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15 },
+  searchInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14 },
   merchantTotal: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
   noResults: { textAlign: 'center', marginTop: 16, fontSize: 14 },
 });
