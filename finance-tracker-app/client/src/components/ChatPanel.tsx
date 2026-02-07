@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { ImagePlus, Send, X } from "lucide-react";
-import { API_BASE_URL, createChatMessage, getChatMessages, type ChatMessage as ChatMessageDTO } from "@/lib/api";
+import { ImagePlus, RotateCcw, Send, X } from "lucide-react";
+import { API_BASE_URL, createChatMessage, getChatMessages, resetChatThread, type ChatMessage as ChatMessageDTO } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import { logger } from "@/lib/logger";
 
@@ -413,6 +413,15 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
     scrollToBottom(false);
   };
 
+  const handleResetThread = async () => {
+    try {
+      await resetChatThread();
+      toast({ title: "Conversation reset", description: "Starting fresh." });
+    } catch {
+      toast({ title: "Reset failed", variant: "destructive" });
+    }
+  };
+
   return (
     <div className="flex min-h-0 h-full flex-col">
       <div ref={scrollRef} onScroll={handleScroll} className="relative flex-1 overflow-auto px-4 py-3">
@@ -636,6 +645,15 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps) {
                 <span>Enter to send, Shift+Enter for new line</span>
               )}
             </div>
+            <button
+              type="button"
+              onClick={handleResetThread}
+              className="flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+              title="Reset conversation state"
+            >
+              <RotateCcw className="h-3 w-3" />
+              <span>Reset</span>
+            </button>
           </div>
         </form>
       </div>

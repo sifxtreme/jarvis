@@ -400,6 +400,10 @@ export const createChatMessage = async (
   return response.data;
 };
 
+export const resetChatThread = async (): Promise<void> => {
+  await axiosInstance.delete('/chat/thread');
+};
+
 export const getTrends = async (filters: TrendsFilters = {}): Promise<TrendsData> => {
   const params = new URLSearchParams();
   if (filters.year) params.append('year', filters.year.toString());

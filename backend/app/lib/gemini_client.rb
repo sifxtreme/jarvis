@@ -431,6 +431,7 @@ class GeminiClient
       }
 
       Rules:
+      - If the user says "stop", "cancel", "nevermind", "forget it", "skip", "no thanks", "start over", or similar cancellation phrases, choose "new_intent" with intent null.
       - If the user's message directly answers the pending question, choose "continue".
       - If the user's message clearly starts a different task, choose "new_intent" and set intent.
       - If unsure, choose "continue".

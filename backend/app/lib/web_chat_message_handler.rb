@@ -46,6 +46,7 @@ class WebChatMessageHandler
   CALENDAR_WINDOW_PAST_DAYS = 30
   MAX_GEMINI_DIMENSION = 1568
   IDEMPOTENCY_WINDOW_SECONDS = 120
+  PENDING_ACTION_TTL_SECONDS = 30 * 60 # 30 minutes
 
   def initialize(user:, message:, text:, image: nil, thread:)
     @user = user
@@ -115,7 +116,18 @@ class WebChatMessageHandler
   end
 
   def pending_action?
-    thread_state['pending_action'].present?
+    return false unless thread_state['pending_action'].present?
+
+    # Auto-expire stale pending actions after 30 minutes
+    if thread_state['pending_action_at'].present?
+      set_at = Time.zone.parse(thread_state['pending_action_at']) rescue nil
+      if set_at && set_at < Time.zone.now - PENDING_ACTION_TTL_SECONDS
+        clear_thread_state
+        return false
+      end
+    end
+
+    true
   end
 
   def should_override_pending_action?
@@ -187,6 +199,11 @@ class WebChatMessageHandler
   def handle_pending_action
     action = thread_state['pending_action']
     payload = thread_state['payload'] || {}
+
+    if cancel?
+      clear_thread_state
+      return build_response("No problem, I've cancelled that. What would you like to do?")
+    end
 
     case action
     when ChatConstants::PendingAction::CLARIFY_IMAGE_INTENT, ChatConstants::PendingAction::CLARIFY_INTENT
@@ -428,6 +445,10 @@ class WebChatMessageHandler
 
   def affirmative?
     @text.match?(/\b(yes|yep|yeah|sure|do it|ok|okay|confirm)\b/i)
+  end
+
+  def cancel?
+    @text.match?(/\b(stop|cancel|nevermind|never mind|forget it|skip|abort|quit|no thanks|nah|start over|new conversation|reset)\b/i)
   end
 
   def image_attached?

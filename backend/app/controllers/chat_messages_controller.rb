@@ -134,6 +134,17 @@ class ChatMessagesController < ApplicationController
     }, status: :internal_server_error
   end
 
+  def reset_thread
+    user = current_user
+    return render json: { error: 'Unauthorized' }, status: :unauthorized unless user
+
+    thread_id = "web-#{user.id}"
+    thread = ChatThread.find_by(user: user, transport: 'web', thread_id: thread_id)
+    thread&.update!(state: {})
+
+    render json: { ok: true }
+  end
+
   private
 
   def serialize(message)

@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { getChatMessages, createChatMessage, type ChatMessage } from '../../src/lib/api';
+import { getChatMessages, createChatMessage, resetChatThread, type ChatMessage } from '../../src/lib/api';
 import { useColors } from '../../src/lib/theme';
 import { EventEmitter } from '../../src/lib/events';
 import { format, parseISO } from 'date-fns';
@@ -47,6 +47,24 @@ export default function ChatScreen() {
   const [nextBeforeId, setNextBeforeId] = useState<number | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+
+  const handleResetThread = async () => {
+    Alert.alert('Reset Conversation', 'This will clear the current conversation state. Continue?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Reset',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await resetChatThread();
+            Alert.alert('Done', 'Conversation state reset.');
+          } catch {
+            Alert.alert('Error', 'Failed to reset conversation.');
+          }
+        },
+      },
+    ]);
+  };
 
   const loadMessages = useCallback(async (beforeId?: number) => {
     try {
@@ -176,6 +194,9 @@ export default function ChatScreen() {
 
       {/* Input Bar */}
       <View style={[styles.inputBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+        <TouchableOpacity onPress={handleResetThread} style={styles.attachButton}>
+          <Ionicons name="refresh-outline" size={22} color={colors.mutedForeground} />
+        </TouchableOpacity>
         <TouchableOpacity onPress={pickImage} style={styles.attachButton}>
           <Ionicons name="image-outline" size={24} color={colors.primary} />
         </TouchableOpacity>

@@ -66,18 +66,17 @@ module ChatHelpers
     def handle_transaction_extraction_selection(payload)
       transactions = extracted_transactions(payload['transactions'])
       if transactions.empty?
-        return build_response("Reply with the transaction numbers to add, or say \"all\".")
+        clear_thread_state
+        return build_response("I couldn't find the transactions anymore. Please send them again.")
       end
 
       indices = selection_indices_from_text(transactions.length)
-      if indices.nil?
-        return build_response("Reply with the transaction numbers to add, or say \"all\".")
+      if indices.nil? || (indices.is_a?(Array) && indices.empty?)
+        return build_response("I didn't catch which transactions you want. Reply with numbers (e.g., 1,2), say \"all\", or \"cancel\" to skip.")
       end
 
       if indices == :all
         selected = transactions
-      elsif indices.empty?
-        return build_response("Reply with the transaction numbers to add, or say \"all\".")
       else
         selected = indices.map { |idx| transactions[idx] }.compact
       end

@@ -18,6 +18,7 @@ Rails.application.routes.draw do
 
   get 'chat/messages', to: 'chat_messages#index'
   post 'chat/messages', to: 'chat_messages#create'
+  delete 'chat/thread', to: 'chat_messages#reset_thread'
 
   resources :memories, only: [:index, :create, :destroy]
   resources :user_locations, only: [:index, :create, :update, :destroy]

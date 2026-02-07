@@ -17,7 +17,7 @@ module ChatHelpers
     end
 
     def set_pending_action(action, payload = {})
-      merge_thread_state('pending_action' => action, 'payload' => payload)
+      merge_thread_state('pending_action' => action, 'payload' => payload, 'pending_action_at' => Time.zone.now.iso8601)
     end
 
     def remember_last_event(event_id)

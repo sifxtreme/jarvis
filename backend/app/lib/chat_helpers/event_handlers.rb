@@ -102,18 +102,17 @@ module ChatHelpers
     def handle_event_extraction_selection(payload)
       events = extracted_events(payload['events'])
       if events.empty?
-        return build_response("Reply with the event numbers to add, or say \"all\".")
+        clear_thread_state
+        return build_response("I couldn't find the events anymore. Please send them again.")
       end
 
       indices = selection_indices_from_text(events.length)
-      if indices.nil?
-        return build_response("Reply with the event numbers to add, or say \"all\".")
+      if indices.nil? || (indices.is_a?(Array) && indices.empty?)
+        return build_response("I didn't catch which events you want. Reply with numbers (e.g., 1,2), say \"all\", or \"cancel\" to skip.")
       end
 
       if indices == :all
         selected = events
-      elsif indices.empty?
-        return build_response("Reply with the event numbers to add, or say \"all\".")
       else
         selected = indices.map { |idx| events[idx] }.compact
       end

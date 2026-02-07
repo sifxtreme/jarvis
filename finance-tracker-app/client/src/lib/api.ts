@@ -363,6 +363,10 @@ export const createChatMessage = async (
   return response.data;
 };
 
+export const resetChatThread = async (): Promise<void> => {
+  await axiosInstance.delete('/chat/thread');
+};
+
 export const getTransactions = async (filters: TransactionFilters): Promise<Transaction[]> => {
   const params = new URLSearchParams();
 
