@@ -1,7 +1,7 @@
 cd ~/jarvis
 git pull origin master
 cd backend
-sudo docker build . -t jarvis-rails
+sudo docker build --build-arg GIT_SHA=$(git rev-parse --short HEAD) . -t jarvis-rails
 cd ..
 # Start dependencies first to avoid migrate race conditions.
 sudo docker-compose up -d db redis
