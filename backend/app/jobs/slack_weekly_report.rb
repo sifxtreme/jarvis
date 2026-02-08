@@ -122,19 +122,29 @@ class SlackWeeklyReport
       day_label = day.strftime('%A, %b %d')
       lines = ["*#{day_label}*"]
 
-      if your_day.any?
-        your_day.each do |event|
-          time = format_event_time(event)
+      spouse_name = other_users.first&.email&.split('@')&.first&.capitalize || "Spouse"
+
+      # Deduplicate: match by title + start_at (rounded to minute)
+      spouse_keys = spouse_day.map { |e| [e.title&.strip&.downcase, e.start_at&.change(sec: 0)] }.to_set
+      your_keys = your_day.map { |e| [e.title&.strip&.downcase, e.start_at&.change(sec: 0)] }.to_set
+
+      your_day.each do |event|
+        key = [event.title&.strip&.downcase, event.start_at&.change(sec: 0)]
+        time = format_event_time(event)
+        if spouse_keys.include?(key)
+          lines << "  `#{time}` #{event.title} _(both)_"
+        else
           lines << "  `#{time}` #{event.title}"
         end
       end
 
-      if spouse_day.any?
-        spouse_name = other_users.first&.email&.split('@')&.first&.capitalize || "Spouse"
-        spouse_day.each do |event|
-          time = format_event_time(event)
-          lines << "  `#{time}` #{event.title} _(#{spouse_name})_"
-        end
+      # Only show spouse events that aren't duplicates
+      spouse_day.each do |event|
+        key = [event.title&.strip&.downcase, event.start_at&.change(sec: 0)]
+        next if your_keys.include?(key)
+
+        time = format_event_time(event)
+        lines << "  `#{time}` #{event.title} _(#{spouse_name})_"
       end
 
       blocks << {
