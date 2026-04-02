@@ -130,6 +130,7 @@ class FinancialTransactionsController < ApplicationController
     f.transacted_at = get_date(data['transacted_at'])
     f.source = data['source']
     f.hidden = data['hidden'] || false
+    f.amortized_months = data['amortized_months'] if data.key?('amortized_months')
     f.reviewed = true
     f.save!
 
@@ -151,6 +152,7 @@ class FinancialTransactionsController < ApplicationController
     f.transacted_at = get_date(data['transacted_at']) if data.key?('transacted_at')
     f.source = data['source'] if data.key?('source')
     f.hidden = data.key?('hidden') ? data['hidden'] : f.hidden
+    f.amortized_months = data['amortized_months'] if data.key?('amortized_months')
     f.reviewed = true
     f.save!
 
