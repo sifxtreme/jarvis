@@ -133,7 +133,8 @@ export default function TellerRepairPage() {
     }
 
     setRepairingId(connection.bank_connection_id);
-    showStatus(`Opening Teller Connect for ${connection.name}…`, "info");
+    const displayName = humanizeName(connection.name);
+    showStatus(`Opening Teller Connect for ${displayName}…`, "info");
 
     try {
       const tellerConnect = window.TellerConnect.setup({
@@ -149,7 +150,7 @@ export default function TellerRepairPage() {
               effectiveAppId,
             );
             setAccessToken(enrollment.accessToken);
-            showStatus(`${result.name} repaired — token saved. Next sync should go green.`, "success");
+            showStatus(`${humanizeName(result.name)} repaired — token saved. Next sync should go green.`, "success");
             await reloadHealth();
           } catch (e) {
             const message = (e as { response?: { data?: { error?: string } }; message?: string });
@@ -319,6 +320,46 @@ export default function TellerRepairPage() {
     return null;
   };
 
+  const humanizeName = (raw: string): string =>
+    raw
+      .split(/[_\s]+/)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+
+  // Teller wraps its API error JSON inside our "Error: <json>" string. Strip
+  // the wrapper and map known codes to human strings; fall back to the raw
+  // message if anything's unexpected.
+  const formatTellerError = (raw?: string | null): string | null => {
+    if (!raw) return null;
+    const stripped = raw.replace(/^\s*Error:\s*/i, "").trim();
+    try {
+      const parsed = JSON.parse(stripped);
+      const code: string | undefined = parsed?.error?.code;
+      const message: string | undefined = parsed?.error?.message;
+      if (code === "enrollment.disconnected.enrollment_inactive") {
+        return "Bank requires re-authentication (enrollment expired)";
+      }
+      if (code?.startsWith("enrollment.disconnected")) {
+        return message ? `${message} (${code})` : code;
+      }
+      return message || code || stripped;
+    } catch {
+      return stripped;
+    }
+  };
+
+  const describeReason = (connection: TellerHealthStatus): string => {
+    const friendlyError = formatTellerError(connection.error);
+    if (friendlyError) return friendlyError;
+    if (connection.reason === "stale") {
+      return connection.latest_transaction_date
+        ? `No new transactions since ${connection.latest_transaction_date}`
+        : "No recent transactions";
+    }
+    return connection.status;
+  };
+
   return (
     <div className="h-full overflow-auto p-4 md:p-6">
       <div className="max-w-2xl mx-auto">
@@ -333,17 +374,16 @@ export default function TellerRepairPage() {
                 {unhealthyConnections.map((connection) => {
                   const canOneClick = Boolean(connection.enrollment_id && (connection.application_id || appId));
                   const isRepairing = repairingId === connection.bank_connection_id;
+                  const displayName = humanizeName(connection.name);
                   return (
                     <li
                       key={connection.bank_connection_id}
                       className="rounded-md border border-red-200/70 px-3 py-2 dark:border-red-800/50 flex items-start gap-3"
                     >
-                      <div className="flex-1">
-                        <div className="font-medium">{connection.name}</div>
-                        <div className="text-xs text-red-900/70 dark:text-red-100/70">
-                          Status: {connection.status}
-                          {connection.latest_transaction_date ? ` · Last txn: ${connection.latest_transaction_date}` : " · No recent transactions"}
-                          {connection.error ? ` · Error: ${connection.error}` : ""}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium">{displayName}</div>
+                        <div className="text-xs text-red-900/70 dark:text-red-100/70 break-words">
+                          {describeReason(connection)}
                         </div>
                         {!connection.enrollment_id && (
                           <div className="text-xs text-red-900/70 dark:text-red-100/70 mt-1">
@@ -357,7 +397,7 @@ export default function TellerRepairPage() {
                         disabled={!scriptLoaded || !canOneClick || isRepairing}
                       >
                         <Wrench className="h-4 w-4 mr-2" />
-                        {isRepairing ? "Repairing…" : `Repair ${connection.name}`}
+                        {isRepairing ? "Repairing…" : "Repair"}
                       </Button>
                     </li>
                   );
