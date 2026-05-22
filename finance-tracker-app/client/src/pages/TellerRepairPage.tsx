@@ -5,7 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { AlertCircle, CheckCircle, Info, Wrench, Plus, Search } from "lucide-react";
-import { API_BASE_URL, getTellerEnrollment, saveTellerEnrollment, getTellerHealth, type TellerHealthStatus } from "@/lib/api";
+import {
+  API_BASE_URL,
+  getTellerEnrollment,
+  saveTellerEnrollment,
+  getTellerHealth,
+  repairTellerConnection,
+  type TellerHealthStatus,
+} from "@/lib/api";
 
 declare global {
   interface Window {
@@ -44,8 +51,8 @@ export default function TellerRepairPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const [unhealthyConnections, setUnhealthyConnections] = useState<TellerHealthStatus[]>([]);
+  const [repairingId, setRepairingId] = useState<number | null>(null);
 
-  // Load Teller Connect script
   useEffect(() => {
     if (window.TellerConnect) {
       setScriptLoaded(true);
@@ -58,13 +65,8 @@ export default function TellerRepairPage() {
     script.onload = () => setScriptLoaded(true);
     script.onerror = () => setStatus({ message: "Failed to load Teller Connect", type: "error" });
     document.body.appendChild(script);
-
-    return () => {
-      // Don't remove - might be needed for future opens
-    };
   }, []);
 
-  // Sync accessToken to lookupToken
   useEffect(() => {
     if (accessToken) {
       setLookupToken(accessToken);
@@ -85,6 +87,11 @@ export default function TellerRepairPage() {
     };
   }, []);
 
+  const reloadHealth = async () => {
+    const unhealthy = await getTellerHealth();
+    setUnhealthyConnections(unhealthy);
+  };
+
   useEffect(() => {
     let mounted = true;
     const loadHealth = async () => {
@@ -102,6 +109,78 @@ export default function TellerRepairPage() {
     setStatus({ message, type });
   };
 
+  // One-click repair from the unhealthy banner.
+  // Uses the connection's own enrollment_id + application_id, then writes the
+  // new access token to bank_connections.token via /teller/connections/:id/repair.
+  const repairConnection = (connection: TellerHealthStatus) => {
+    const effectiveAppId = connection.application_id || appId;
+    const effectiveEnrollmentId = connection.enrollment_id || undefined;
+
+    if (!effectiveAppId) {
+      showStatus("No Application ID known yet — fill it in below first.", "error");
+      return;
+    }
+    if (!effectiveEnrollmentId) {
+      showStatus(
+        `No enrollment_id stored for ${connection.name}. Look it up at teller.io/dashboard → Activity, paste it in the manual form below.`,
+        "error",
+      );
+      return;
+    }
+    if (!scriptLoaded || !window.TellerConnect) {
+      showStatus("Teller Connect not loaded yet", "error");
+      return;
+    }
+
+    setRepairingId(connection.bank_connection_id);
+    showStatus(`Opening Teller Connect for ${connection.name}…`, "info");
+
+    try {
+      const tellerConnect = window.TellerConnect.setup({
+        applicationId: effectiveAppId,
+        enrollmentId: effectiveEnrollmentId,
+        environment: "development",
+        onSuccess: async (enrollment) => {
+          try {
+            const result = await repairTellerConnection(
+              connection.bank_connection_id,
+              enrollment.accessToken,
+              enrollment.enrollment?.id || effectiveEnrollmentId,
+              effectiveAppId,
+            );
+            setAccessToken(enrollment.accessToken);
+            showStatus(`${result.name} repaired — token saved. Next sync should go green.`, "success");
+            await reloadHealth();
+          } catch (e) {
+            const message = (e as { response?: { data?: { error?: string } }; message?: string });
+            showStatus(
+              "Token saved locally but server rejected it: " +
+                (message.response?.data?.error || message.message || "Unknown error"),
+              "error",
+            );
+          } finally {
+            setRepairingId(null);
+          }
+        },
+        onExit: () => {
+          showStatus("Teller Connect closed.", "info");
+          setRepairingId(null);
+        },
+        onFailure: (failure) => {
+          showStatus("Error: " + (failure.message || "Unknown error"), "error");
+          setRepairingId(null);
+        },
+      });
+
+      tellerConnect.open();
+    } catch (e) {
+      showStatus("Error: " + (e as Error).message, "error");
+      setRepairingId(null);
+    }
+  };
+
+  // Manual fallback: same as before, for cases where the connection-linked path
+  // can't be used (no enrollment_id stored, brand-new enrollment, etc.).
   const repairEnrollment = () => {
     if (!appId || !enrollmentId) {
       showStatus("Please enter both Application ID and Enrollment ID", "error");
@@ -135,7 +214,10 @@ export default function TellerRepairPage() {
           saveTellerEnrollment(appId, enrollmentId).catch((e) => {
             console.error("Failed to save Teller enrollment:", e);
           });
-          showStatus("Enrollment repaired! Copy the access token above.", "success");
+          showStatus(
+            "Enrollment repaired. Copy the access token below — manual flow doesn't know which bank to attach it to.",
+            "success",
+          );
         },
         onExit: () => {
           showStatus("Teller Connect closed.", "info");
@@ -246,21 +328,40 @@ export default function TellerRepairPage() {
         {unhealthyConnections.length > 0 && (
           <Card className="mb-6 border-l-4 border-l-red-500 bg-red-50/60 dark:border-l-red-400 dark:bg-red-900/20 dark:border-slate-700">
             <CardContent className="pt-4">
-              <h3 className="font-semibold text-red-800 mb-2 dark:text-red-200">Teller connection needs attention</h3>
-              <p className="text-sm text-red-900/80 dark:text-red-100/80 mb-3">
-                Recent syncs look unhealthy. Repair the enrollment below to restore updates.
-              </p>
+              <h3 className="font-semibold text-red-800 mb-2 dark:text-red-200">Teller connections needing attention</h3>
               <ul className="space-y-2 text-sm text-red-900 dark:text-red-100">
-                {unhealthyConnections.map((connection) => (
-                  <li key={connection.bank_connection_id} className="rounded-md border border-red-200/70 px-3 py-2 dark:border-red-800/50">
-                    <div className="font-medium">{connection.name}</div>
-                    <div className="text-xs text-red-900/70 dark:text-red-100/70">
-                      Status: {connection.status}
-                      {connection.latest_transaction_date ? ` · Last txn: ${connection.latest_transaction_date}` : " · No recent transactions"}
-                      {connection.error ? ` · Error: ${connection.error}` : ""}
-                    </div>
-                  </li>
-                ))}
+                {unhealthyConnections.map((connection) => {
+                  const canOneClick = Boolean(connection.enrollment_id && (connection.application_id || appId));
+                  const isRepairing = repairingId === connection.bank_connection_id;
+                  return (
+                    <li
+                      key={connection.bank_connection_id}
+                      className="rounded-md border border-red-200/70 px-3 py-2 dark:border-red-800/50 flex items-start gap-3"
+                    >
+                      <div className="flex-1">
+                        <div className="font-medium">{connection.name}</div>
+                        <div className="text-xs text-red-900/70 dark:text-red-100/70">
+                          Status: {connection.status}
+                          {connection.latest_transaction_date ? ` · Last txn: ${connection.latest_transaction_date}` : " · No recent transactions"}
+                          {connection.error ? ` · Error: ${connection.error}` : ""}
+                        </div>
+                        {!connection.enrollment_id && (
+                          <div className="text-xs text-red-900/70 dark:text-red-100/70 mt-1">
+                            No enrollment_id stored — use the manual form below.
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => repairConnection(connection)}
+                        disabled={!scriptLoaded || !canOneClick || isRepairing}
+                      >
+                        <Wrench className="h-4 w-4 mr-2" />
+                        {isRepairing ? "Repairing…" : `Repair ${connection.name}`}
+                      </Button>
+                    </li>
+                  );
+                })}
               </ul>
             </CardContent>
           </Card>
@@ -269,12 +370,11 @@ export default function TellerRepairPage() {
         {/* Instructions */}
         <Card className="mb-6 border-l-4 border-l-yellow-500 bg-yellow-50/50 dark:border-l-yellow-400 dark:bg-slate-900/60 dark:border-slate-700">
           <CardContent className="pt-4">
-            <h3 className="font-semibold text-yellow-800 mb-2 dark:text-yellow-200">How to find your credentials:</h3>
+            <h3 className="font-semibold text-yellow-800 mb-2 dark:text-yellow-200">Manual fallback — only if the Repair button above can't help:</h3>
             <ol className="list-decimal list-inside space-y-1 text-sm text-yellow-900 dark:text-yellow-100">
-              <li>Go to <a href="https://teller.io/dashboard" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline dark:text-blue-300">teller.io/dashboard</a></li>
-              <li>Your <strong>Application ID</strong> is shown at the top (starts with <code className="bg-yellow-200 px-1 rounded dark:bg-yellow-400/20 dark:text-yellow-100">app_</code>)</li>
-              <li>Click on <strong>Enrollments</strong> in the sidebar</li>
-              <li>Find your enrollment and copy the <strong>Enrollment ID</strong> (starts with <code className="bg-yellow-200 px-1 rounded dark:bg-yellow-400/20 dark:text-yellow-100">enr_</code>)</li>
+              <li>Go to <a href="https://teller.io/dashboard/activity" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline dark:text-blue-300">teller.io/dashboard/activity</a></li>
+              <li>Search by account_id (from bank_connections) to find the enrollment.</li>
+              <li>Paste the <code className="bg-yellow-200 px-1 rounded dark:bg-yellow-400/20 dark:text-yellow-100">app_</code> and <code className="bg-yellow-200 px-1 rounded dark:bg-yellow-400/20 dark:text-yellow-100">enr_</code> IDs below.</li>
             </ol>
           </CardContent>
         </Card>
@@ -284,7 +384,7 @@ export default function TellerRepairPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Wrench className="h-5 w-5" />
-              Repair or Create Enrollment
+              Manual repair / new enrollment
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -342,7 +442,7 @@ export default function TellerRepairPage() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-2">
-              After repairing or creating an enrollment, copy the new access token:
+              The one-click Repair button above writes this token to bank_connections automatically. Shown here for the manual flow.
             </p>
             <Input
               value={accessToken}
@@ -351,9 +451,6 @@ export default function TellerRepairPage() {
               className="font-mono"
               readOnly
             />
-            <p className="text-xs text-muted-foreground mt-2">
-              Update this token in: <code className="bg-muted px-1 rounded dark:bg-slate-800 dark:text-slate-200">backend/app/lib/teller/api.rb</code>
-            </p>
           </CardContent>
         </Card>
 

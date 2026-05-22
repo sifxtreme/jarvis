@@ -157,6 +157,8 @@ export type TellerEnrollment = {
 export type TellerHealthStatus = {
   bank_connection_id: number;
   name: string;
+  enrollment_id?: string | null;
+  application_id?: string | null;
   status: string;
   latest_transaction_date?: string;
   fetched_count: number;
@@ -166,6 +168,13 @@ export type TellerHealthStatus = {
   last_synced_at?: string;
   error?: string;
   reason: 'error' | 'stale' | 'missing';
+};
+
+export type TellerRepairResult = {
+  bank_connection_id: number;
+  name: string;
+  enrollment_id: string | null;
+  account_id: string;
 };
 
 export const getTellerEnrollment = async (): Promise<TellerEnrollment | null> => {
@@ -189,6 +198,20 @@ export const saveTellerEnrollment = async (applicationId: string, enrollmentId: 
 export const getTellerHealth = async (): Promise<TellerHealthStatus[]> => {
   const response = await axiosInstance.get('/teller/health');
   return response.data?.unhealthy || [];
+};
+
+export const repairTellerConnection = async (
+  bankConnectionId: number,
+  accessToken: string,
+  enrollmentId?: string,
+  applicationId?: string,
+): Promise<TellerRepairResult> => {
+  const response = await axiosInstance.post(`/teller/connections/${bankConnectionId}/repair`, {
+    access_token: accessToken,
+    enrollment_id: enrollmentId,
+    application_id: applicationId,
+  });
+  return response.data;
 };
 
 export const createSession = async (idToken: string): Promise<void> => {
