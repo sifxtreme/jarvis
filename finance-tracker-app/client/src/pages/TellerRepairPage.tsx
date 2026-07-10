@@ -26,6 +26,7 @@ interface TellerConnectConfig {
   applicationId: string;
   enrollmentId?: string;
   environment: string;
+  products: string[];
   onSuccess: (enrollment: { accessToken: string; enrollment?: { id: string } }) => void;
   onExit: () => void;
   onFailure: (failure: { message?: string }) => void;
@@ -141,6 +142,7 @@ export default function TellerRepairPage() {
         applicationId: effectiveAppId,
         enrollmentId: effectiveEnrollmentId,
         environment: "development",
+        products: ["transactions", "balance"],
         onSuccess: async (enrollment) => {
           try {
             const result = await repairTellerConnection(
@@ -210,6 +212,7 @@ export default function TellerRepairPage() {
         applicationId: appId,
         enrollmentId: enrollmentId,
         environment: "development",
+        products: ["transactions", "balance"],
         onSuccess: (enrollment) => {
           setAccessToken(enrollment.accessToken);
           saveTellerEnrollment(appId, enrollmentId).catch((e) => {
@@ -256,6 +259,7 @@ export default function TellerRepairPage() {
       const tellerConnect = window.TellerConnect.setup({
         applicationId: appId,
         environment: "development",
+        products: ["transactions", "balance"],
         onSuccess: (enrollment) => {
           setAccessToken(enrollment.accessToken);
           const newEnrollmentId = enrollment.enrollment?.id;
