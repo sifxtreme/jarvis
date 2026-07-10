@@ -214,6 +214,24 @@ export const repairTellerConnection = async (
   return response.data;
 };
 
+export type PlaidConnectionResult = {
+  bank_connection_id: number;
+  name: string;
+  provider: string;
+  account_id: string | null;
+  is_active: boolean;
+};
+
+export const createPlaidLinkToken = async (): Promise<string | null> => {
+  const response = await axiosInstance.post('/plaid/link_token', {});
+  return response.data?.link_token || null;
+};
+
+export const exchangePlaidPublicToken = async (publicToken: string): Promise<PlaidConnectionResult> => {
+  const response = await axiosInstance.post('/plaid/exchange', { public_token: publicToken });
+  return response.data;
+};
+
 export const createSession = async (idToken: string): Promise<void> => {
   logger.info('AUTH', 'Creating session via Google token.');
   const response = await axiosInstance.post<{ token: string }>('/auth/session', { id_token: idToken });

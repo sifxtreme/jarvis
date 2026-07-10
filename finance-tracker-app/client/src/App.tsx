@@ -4,6 +4,7 @@ import TransactionsPage from './pages/TransactionsPage';
 import YearlyBudgetPage from './pages/YearlyBudgetPage';
 import TrendsPage from './pages/TrendsPage';
 import TellerRepairPage from './pages/TellerRepairPage';
+import PlaidConnectPage from './pages/PlaidConnectPage';
 import CalendarPage from './pages/CalendarPage';
 import ChatPage from './pages/ChatPage';
 import { AuthModal } from '@/components/AuthModal';
@@ -39,6 +40,7 @@ function App() {
       "/trends": "Trends",
       "/yearly-budget": "Yearly Budget",
       "/teller-repair": "Teller Repair",
+      "/plaid-connect": "Connect Amex",
     };
     const suffix = titleMap[location.pathname] || "Dashboard";
     document.title = `Jarvis — ${suffix}`;
@@ -80,6 +82,7 @@ function App() {
               <Route path="/yearly-budget" element={<YearlyBudgetPage />} />
               <Route path="/trends" element={<TrendsPage />} />
               <Route path="/teller-repair" element={<TellerRepairPage />} />
+              <Route path="/plaid-connect" element={<PlaidConnectPage />} />
             </Routes>
           </div>
           <ChatWidget />
