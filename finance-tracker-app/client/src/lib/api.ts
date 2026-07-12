@@ -416,6 +416,11 @@ export const getTransactions = async (filters: TransactionFilters): Promise<Tran
   if (filters.show_hidden !== undefined) params.append('show_hidden', filters.show_hidden.toString());
   if (filters.show_needs_review !== undefined) params.append('show_needs_review', filters.show_needs_review.toString());
   if (filters.query) params.append('query', filters.query);
+  // Pull raw_data so the row hover-card can surface Plaid's enrichment: location,
+  // online-vs-in-store, Plaid's own category, merchant logo/website, authorized-vs-
+  // posted dates. Costs ~2KB/row; worth it for being able to identify a charge at a
+  // glance instead of opening a modal.
+  params.append('include_raw_data', 'true');
 
   try {
     const response = await axiosInstance.get<APIResponse<Transaction>>('/financial_transactions', { params });

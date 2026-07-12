@@ -42,6 +42,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TransactionModal } from "./TransactionModal";
 import { SplitTransactionModal } from "./SplitTransactionModal";
+import { TransactionDetailsHover } from "./TransactionDetailsHover";
 import {
   Dialog,
   DialogContent,
@@ -720,30 +721,19 @@ export default function TransactionTable({
                       }
                       return null;
                     })()}
-                    {transaction.plaid_name && transaction.plaid_name !== transaction.merchant_name ? (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div>
-                              <InlineEdit
-                                value={transaction.merchant_name || transaction.plaid_name || ""}
-                                onSave={(val) => handleQuickEdit(transaction, 'merchant_name', val)}
-                                className={!transaction.merchant_name ? "text-muted-foreground italic" : ""}
-                              />
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="font-mono text-xs">{transaction.plaid_name}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    ) : (
-                      <InlineEdit
-                        value={transaction.merchant_name || transaction.plaid_name || ""}
-                        onSave={(val) => handleQuickEdit(transaction, 'merchant_name', val)}
-                        className={!transaction.merchant_name ? "text-muted-foreground italic" : ""}
-                      />
-                    )}
+                    {/* Rich hover: raw descriptor + location, in-store vs online, Plaid's
+                        category, logo/website, authorized-vs-posted. Replaces the old
+                        tooltip that only showed the raw name, and now applies to EVERY
+                        row (Teller rows degrade gracefully to what they carry). */}
+                    <TransactionDetailsHover transaction={transaction}>
+                      <div>
+                        <InlineEdit
+                          value={transaction.merchant_name || transaction.plaid_name || ""}
+                          onSave={(val) => handleQuickEdit(transaction, 'merchant_name', val)}
+                          className={!transaction.merchant_name ? "text-muted-foreground italic" : ""}
+                        />
+                      </div>
+                    </TransactionDetailsHover>
                   </div>
                 </TableCell>
                 <TableCell className={cn(
