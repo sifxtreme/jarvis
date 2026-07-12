@@ -49,6 +49,7 @@ class Finances::Predictions
     'TRAVEL_OTHER_TRAVEL'                           => 'Travel'
   }.freeze
 
+  TRAINING_WINDOW = 24.months  # learn only from recent history (see #curated)
   MIN_KEY_LENGTH = 4       # don't prefix-match on tiny keys
   MAJORITY = 0.5           # a learned prediction needs >50% agreement
   MIN_VOTES = 2            # ...and must be backed by >=2 transactions.
@@ -198,10 +199,19 @@ class Finances::Predictions
     index
   end
 
-  # The training set: transactions the user has actually named/curated.
+  # The training set: transactions the user has actually named/curated, restricted
+  # to a recency window.
+  #
+  # Why the window: merchant->category mappings are stable (Sprouts is always
+  # Groceries), but ONE-TIME EVENT labels are not. A 2024 "Ramadan Party 2024" tag
+  # on a Lakewood charge was still being applied to new Lakewood charges in 2026 —
+  # and it survived the MIN_VOTES guard because he'd tagged it more than once.
+  # Letting the training set age out fixes that class of bug generally, without
+  # losing any of the stable merchant signal.
   def curated
     @curated ||= FinancialTransaction.where(hidden: false)
                                      .where.not(merchant_name: nil)
+                                     .where('transacted_at >= ?', TRAINING_WINDOW.ago)
                                      .select(:plaid_name, :merchant_name, :category, :raw_data)
                                      .to_a
   end
