@@ -1,5 +1,7 @@
 class FinancialTransactionsController < ApplicationController
 
+  include Utils
+
   def index
     year = params[:year]
     month = params[:month]
@@ -220,14 +222,14 @@ class FinancialTransactionsController < ApplicationController
       .where('amount != 0')
       .where('LOWER(source) IN (?)', manual_sources)
 
-    # Group by merchant identifier
-    grouped = historical.group_by { |t| merchant_key(t) }
+    # Group by NORMALIZED merchant identifier (see recurring_merchant_key)
+    grouped = historical.group_by { |t| recurring_merchant_key(t) }
 
     # Find recurring patterns (9+ months out of 12)
     recurring_patterns = []
 
-    grouped.each do |merchant_key, transactions|
-      next if merchant_key.blank?
+    grouped.each do |key, transactions|
+      next if key.blank?
 
       # Count unique months
       months = transactions.map { |t| t.transacted_at.strftime('%Y-%m') }.uniq
@@ -238,6 +240,12 @@ class FinancialTransactionsController < ApplicationController
       latest_transaction = transactions.max_by(&:transacted_at)
 
       typical_day = median(days).round
+      # The LATEST day this bill has ever posted. "Overdue" is measured against
+      # THIS, not the median. An erratic bill (the Capital One auto-loan posts
+      # anywhere from day 1 to 30) would otherwise be flagged overdue the moment
+      # today passed its median day — every single month, forever. Only cry wolf
+      # once we're past the latest it has ever actually landed.
+      latest_day = days.max
       typical_amount = latest_transaction.amount.to_f.abs.round(2)
 
       # Get most common source and category
@@ -253,11 +261,13 @@ class FinancialTransactionsController < ApplicationController
       is_income = typical_category&.downcase&.include?('income') || latest_transaction.amount.to_f < 0
 
       recurring_patterns << {
-        merchant_key: merchant_key,
+        merchant_key: key,
         display_name: display_name,
         plaid_name: sample.plaid_name,
         merchant_name: sample.merchant_name,
         typical_day: typical_day,
+        latest_day: latest_day,
+        day_range: [days.min, days.max],
         typical_amount: typical_amount,
         source: typical_source,
         category: typical_category,
@@ -272,7 +282,7 @@ class FinancialTransactionsController < ApplicationController
       .where('extract(year from transacted_at) = ? AND extract(month from transacted_at) = ?', year, month)
       .where(hidden: false)
 
-    current_month_keys = current_month_transactions.map { |t| merchant_key(t) }.compact.uniq
+    current_month_keys = current_month_transactions.map { |t| recurring_merchant_key(t) }.compact.uniq
 
     # Categorize as missing or present
     missing = []
@@ -284,11 +294,21 @@ class FinancialTransactionsController < ApplicationController
       if is_present
         present << pattern
       else
-        # Calculate status based on typical day vs current day
-        if current_day > pattern[:typical_day]
-          days_overdue = current_day - pattern[:typical_day]
+        # Overdue is measured against the LATEST day this bill has ever posted
+        # (capped to this month's length), NOT its median day. Between the typical
+        # day and that cap the bill is merely "due_soon" — still inside its normal
+        # historical window. That's what stops erratic bills from false-alarming
+        # every month the instant today passes their median.
+        days_in_month = Date.new(year, month, -1).day
+        overdue_after = [pattern[:latest_day], days_in_month].min
+
+        if current_day > overdue_after
           pattern[:status] = 'overdue'
-          pattern[:days_difference] = days_overdue
+          pattern[:days_difference] = current_day - overdue_after
+        elsif current_day >= pattern[:typical_day]
+          # Past its usual day, but still within the range it has historically landed.
+          pattern[:status] = 'due_soon'
+          pattern[:days_difference] = overdue_after - current_day
         else
           days_until = pattern[:typical_day] - current_day
           pattern[:status] = days_until <= 3 ? 'due_soon' : 'upcoming'
@@ -689,9 +709,16 @@ class FinancialTransactionsController < ApplicationController
     Date.today
   end
 
-  def merchant_key(transaction)
-    # Use merchant_name as the primary key, fall back to plaid_name
-    transaction.merchant_name.presence || transaction.plaid_name.presence
+  # Canonical key for grouping one recurring bill across months.
+  #
+  # This used to key on the RAW merchant_name, so a bill filed under two spellings
+  # ("Tesla" vs "Tesla (Capital One Auto)") split into two keys — each then fell
+  # under the 9-month threshold, AND the current month's key failed to match the
+  # historical one, false-flagging a bill that had actually been paid as "missing".
+  # Normalizing through Utils#merchant_key collapses the spellings onto one key.
+  def recurring_merchant_key(transaction)
+    raw = transaction.merchant_name.presence || transaction.plaid_name.presence
+    merchant_key(raw).presence || raw&.downcase&.strip.presence
   end
 
   def median(array)
