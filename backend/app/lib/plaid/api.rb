@@ -87,7 +87,13 @@ class Plaid::API
         end
 
         f.transacted_at = trx['date']
-        f.plaid_name = trx['merchant_name'].presence || trx['name']
+        # plaid_name = the RAW bank descriptor, always. This column has always meant
+        # "what the bank actually sent" (Teller stored "AMAZON MARKETPLACE
+        # NAMZN.COM/BILL WA" here). Storing Plaid's *cleaned* merchant_name here
+        # instead destroyed the audit trail and hid the raw string from the UI.
+        # The clean name belongs in merchant_name — the predictor sets it from
+        # raw_data['merchant_name'].
+        f.plaid_name = trx['name'].presence || trx['merchant_name']
         f.amount = trx['amount'].to_f
         f.source = bank.name
         f.raw_data = trx

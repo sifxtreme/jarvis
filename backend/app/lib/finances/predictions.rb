@@ -214,8 +214,25 @@ class Finances::Predictions
     raw(txn)['merchant_entity_id'].presence
   end
 
+  # Plaid's clean merchant name, with one repair.
+  #
+  # Amex jams the merchant name into the city and then truncates the descriptor:
+  #   "WB STUDIO ENT" + "NEW YORK"  ->  "AplPay WB STUDIO ENTNEW"   (YORK cut off)
+  # Plaid then splits THAT at the wrong point, yielding merchant_name
+  # "Wb Studio Entnew" with city "York". The city coming back as literally "York"
+  # (never "New York") is the tell — and it makes this safe to key on: we only strip
+  # a trailing "new" when Plaid ALSO reports the city as "York". Hits NYC merchants
+  # only (La Cabra East, Artichoke, Apollo Bagels, Wintex Cotton...).
   def plaid_merchant_name(txn)
-    raw(txn)['merchant_name'].presence
+    name = raw(txn)['merchant_name'].presence
+    return nil if name.blank?
+
+    city = raw(txn).dig('location', 'city').to_s
+    if city.casecmp('york').zero? && name.match?(/new\z/i)
+      return name.sub(/new\z/i, '').strip.presence || name
+    end
+
+    name
   end
 
   def pfc_detailed(txn)
