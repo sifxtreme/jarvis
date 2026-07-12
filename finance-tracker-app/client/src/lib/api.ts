@@ -227,8 +227,14 @@ export const createPlaidLinkToken = async (): Promise<string | null> => {
   return response.data?.link_token || null;
 };
 
-export const exchangePlaidPublicToken = async (publicToken: string): Promise<PlaidConnectionResult> => {
-  const response = await axiosInstance.post('/plaid/exchange', { public_token: publicToken });
+// `name` picks which bank_connection this link creates/updates. It is NOT optional in
+// spirit — it used to be hardcoded server-side to 'amex', which meant linking a second
+// bank would silently clobber the working Amex connection.
+export const exchangePlaidPublicToken = async (
+  publicToken: string,
+  name: string,
+): Promise<PlaidConnectionResult> => {
+  const response = await axiosInstance.post('/plaid/exchange', { public_token: publicToken, name });
   return response.data;
 };
 

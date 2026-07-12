@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { AlertCircle, CheckCircle, Info, CreditCard } from "lucide-react";
 import {
@@ -25,21 +26,28 @@ interface PlaidLinkConfig {
 
 type StatusType = 'success' | 'error' | 'info' | null;
 
+// Must match PlaidController::LINKABLE_NAMES. The `name` decides which
+// bank_connection row this link writes to — pick the wrong one and you overwrite a
+// working connection, so it's an explicit choice, never a default.
+const BANKS = [
+  { value: 'amex', label: 'American Express' },
+  { value: 'hafsa_chase', label: "Chase (Hafsa)" },
+];
+
 export default function PlaidConnectPage() {
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const [linkToken, setLinkToken] = useState<string | null>(null);
+  const [bank, setBank] = useState<string>('hafsa_chase');
   const [connecting, setConnecting] = useState(false);
   const [status, setStatus] = useState<{ message: string; type: StatusType }>({ message: "", type: null });
 
   const showStatus = (message: string, type: StatusType) => setStatus({ message, type });
 
-  // Load the Plaid Link script (mirrors TellerRepairPage's Teller Connect load).
   useEffect(() => {
     if (window.Plaid) {
       setScriptLoaded(true);
       return;
     }
-
     const script = document.createElement("script");
     script.src = "https://cdn.plaid.com/link/v2/stable/link-initialize.js";
     script.async = true;
@@ -48,50 +56,38 @@ export default function PlaidConnectPage() {
     document.body.appendChild(script);
   }, []);
 
-  // Fetch a link_token from the backend on mount.
   useEffect(() => {
     let mounted = true;
-    const loadLinkToken = async () => {
+    (async () => {
       try {
         const token = await createPlaidLinkToken();
         if (!mounted) return;
-        if (token) {
-          setLinkToken(token);
-        } else {
-          showStatus("Could not get a Plaid link token from the server.", "error");
-        }
+        if (token) setLinkToken(token);
+        else showStatus("Could not get a Plaid link token from the server.", "error");
       } catch (e) {
-        if (!mounted) return;
-        showStatus("Failed to get Plaid link token: " + (e as Error).message, "error");
+        if (mounted) showStatus("Failed to get Plaid link token: " + (e as Error).message, "error");
       }
-    };
-    loadLinkToken();
-    return () => {
-      mounted = false;
-    };
+    })();
+    return () => { mounted = false; };
   }, []);
 
   const openPlaid = useCallback(() => {
-    if (!scriptLoaded || !window.Plaid) {
-      showStatus("Plaid Link not loaded yet", "error");
-      return;
-    }
-    if (!linkToken) {
-      showStatus("No link token yet — try again in a moment.", "error");
-      return;
-    }
+    if (!scriptLoaded || !window.Plaid) return showStatus("Plaid Link not loaded yet", "error");
+    if (!linkToken) return showStatus("No link token yet — try again in a moment.", "error");
 
+    const bankLabel = BANKS.find((b) => b.value === bank)?.label ?? bank;
     setConnecting(true);
-    showStatus("Opening Plaid Link for American Express…", "info");
+    showStatus(`Opening Plaid Link for ${bankLabel}…`, "info");
 
     try {
       const handler = window.Plaid.create({
         token: linkToken,
         onSuccess: async (publicToken) => {
           try {
-            const result: PlaidConnectionResult = await exchangePlaidPublicToken(publicToken);
+            const result: PlaidConnectionResult = await exchangePlaidPublicToken(publicToken, bank);
             showStatus(
-              `American Express connected (bank_connection #${result.bank_connection_id}). First sync backfills posted history.`,
+              `${bankLabel} connected (bank_connection #${result.bank_connection_id}). ` +
+                `The next sync backfills from where the old provider left off.`,
               "success",
             );
           } catch (e) {
@@ -111,13 +107,12 @@ export default function PlaidConnectPage() {
           setConnecting(false);
         },
       });
-
       handler.open();
     } catch (e) {
       showStatus("Error: " + (e as Error).message, "error");
       setConnecting(false);
     }
-  }, [scriptLoaded, linkToken]);
+  }, [scriptLoaded, linkToken, bank]);
 
   const StatusIcon = ({ type }: { type: StatusType }) => {
     if (type === "success") return <CheckCircle className="h-4 w-4 text-green-600" />;
@@ -126,34 +121,50 @@ export default function PlaidConnectPage() {
     return null;
   };
 
+  const bankLabel = BANKS.find((b) => b.value === bank)?.label ?? bank;
+
   return (
     <div className="h-full overflow-auto p-4 md:p-6">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold mb-2">Connect American Express</h1>
+        <h1 className="text-2xl font-bold mb-2">Connect a bank via Plaid</h1>
         <p className="text-muted-foreground mb-6">
-          Link Amex via Plaid's official OAuth. Replaces the Teller screen-scrape connection.
+          Plaid's official OAuth. Replaces Teller, which silently served stale data twice.
         </p>
 
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CreditCard className="h-5 w-5" />
-              American Express (Plaid OAuth)
+              Link an account
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="bank">Which account?</Label>
+              <select
+                id="bank"
+                value={bank}
+                onChange={(e) => setBank(e.target.value)}
+                disabled={connecting}
+                className="mt-1 w-full h-10 rounded-md border bg-background px-3 text-sm"
+              >
+                {BANKS.map((b) => (
+                  <option key={b.value} value={b.value}>{b.label}</option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                This decides which connection is written. Picking the wrong one overwrites a working link.
+              </p>
+            </div>
+
             <p className="text-sm text-muted-foreground">
-              Click below, then sign in to American Express in the Plaid window. The first sync
-              backfills posted transactions automatically; syncs run every 3 hours after that.
+              Sign in to <strong>{bankLabel}</strong> in the Plaid window. The first sync picks up from where the
+              previous provider stopped — it will not duplicate what's already recorded. Syncs run every 3 hours.
             </p>
 
-            <Button
-              onClick={openPlaid}
-              className="w-full"
-              disabled={!scriptLoaded || !linkToken || connecting}
-            >
+            <Button onClick={openPlaid} className="w-full" disabled={!scriptLoaded || !linkToken || connecting}>
               <CreditCard className="h-4 w-4 mr-2" />
-              {connecting ? "Connecting…" : "Connect American Express"}
+              {connecting ? "Connecting…" : `Connect ${bankLabel}`}
             </Button>
 
             {status.type && (
