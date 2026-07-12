@@ -101,7 +101,26 @@ class Finances::Predictions
 
   TRAINING_WINDOW = 24.months  # learn only from recent history (see #curated)
   MIN_KEY_LENGTH = 4       # don't prefix-match on tiny keys
-  MAJORITY = 0.5           # a learned prediction needs >50% agreement
+  MAJORITY = 0.5           # a learned CATEGORY needs >50% agreement
+
+  # A learned NAME needs a far higher bar than a category, because they are not the
+  # same kind of thing:
+  #   - a merchant's CATEGORY is stable  (Fandango is always Fun)
+  #   - a merchant's NAME is often WHAT YOU BOUGHT THAT DAY (a different movie, a
+  #     different book, a different Amazon item)
+  #
+  # Treating them identically is what produced every name bug so far:
+  #   FANDANGO.COM   -> "Dog Man Snacks"      (one Feb-2025 movie outing, 2 of 3 votes)
+  #   Amazon Kindle  -> "Simple and Sinister" (one book, stamped on 5 different books)
+  #   LAKEWOOD, CA   -> "Ramadan Party 2024"  (one 2024 event)
+  # Each cleared MIN_VOTES and the 50% majority. A one-off event name only has to
+  # appear twice to win a 3-transaction history.
+  #
+  # So: only propagate a name when the merchant's history is near-UNANIMOUS about it.
+  # "Sprouts" is always "Sprouts" (100%) and still propagates. "Dog Man Snacks" at
+  # 67% does not.
+  NAME_MAJORITY = 0.8
+  NAME_MIN_VOTES = 3
   MIN_VOTES = 2            # ...and must be backed by >=2 transactions.
                            # A one-off label must never propagate: a single historical
                            # "LAKEWOOD, CA" tagged "Ramadan Party 2024" was being applied
@@ -257,17 +276,17 @@ class Finances::Predictions
     return nil if matches.empty?
 
     merged_category = merge_votes(matches.values.map { |v| v[:category_votes] })
-    merged_name     = merge_votes(matches.values.map { |v| v[:name_votes] })
+    merged_name     = merge_votes(matches.values.map { |v| v[:name_votes] }, name: true)
     return nil if merged_category.nil? && merged_name.nil?
 
     { category: merged_category, merchant_name: merged_name }
   end
 
-  def merge_votes(vote_hashes)
+  def merge_votes(vote_hashes, name: false)
     totals = vote_hashes.each_with_object(Hash.new(0)) do |votes, acc|
       votes.each { |value, count| acc[value] += count if value.present? }
     end
-    majority(totals)
+    name ? name_majority(totals) : majority(totals)
   end
 
   def majority(votes)
@@ -278,6 +297,17 @@ class Finances::Predictions
     return nil if count < MIN_VOTES
 
     count.to_f / total > MAJORITY ? value : nil
+  end
+
+  # Names get a stricter bar than categories — see NAME_MAJORITY.
+  def name_majority(votes)
+    total = votes.values.sum
+    return nil if total.zero?
+
+    value, count = votes.max_by { |_, c| c }
+    return nil if count < NAME_MIN_VOTES
+
+    count.to_f / total >= NAME_MAJORITY ? value : nil
   end
 
   def by_key
@@ -302,7 +332,7 @@ class Finances::Predictions
 
     index.each_value do |entry|
       entry[:category] = majority(entry[:category_votes])
-      entry[:merchant_name] = majority(entry[:name_votes])
+      entry[:merchant_name] = name_majority(entry[:name_votes])
     end
 
     index
