@@ -142,9 +142,39 @@ class Finances::Predictions
     end
   end
 
+  # A descriptor that is JUST a city is NOT a merchant, and must never be used as a
+  # learning key.
+  #
+  # Square (and others) pass through only the location when the seller hasn't set a
+  # business name. A $209.92 TNT Fireworks purchase arrived as literally
+  # "LAKEWOOD, CA" — Plaid's merchant_name was null, and its classifier guessed
+  # RENT_AND_UTILITIES (because "CITY OF LAKEWOOD" looks like a utility bill).
+  #
+  # Keying on that collides every merchant in the town:
+  #   H MART - LAKEWOOD       -> Groceries
+  #   CHARO CHICKEN LAKEWOOD  -> Eating Out
+  #   CITY OF LAKEWOOD        -> Bills
+  #   LAKEWOOD, CA            -> a Ramadan party / movie snacks / fireworks
+  # all normalize to "lakewood". THIS is the actual root of both the
+  # "Ramadan Party 2024" and "Dog Man Snacks" bugs — not the individual labels.
+  #
+  # Such a transaction is unidentifiable from bank data alone (the only place
+  # "TNT Fireworks" exists is the digital receipt). So: predict nothing, and learn
+  # nothing from it. A blank the user resolves beats a confident collision.
+  def location_only?(txn)
+    key = merchant_key(txn.plaid_name)
+    return false if key.blank?
+
+    city = merchant_key(raw(txn).dig('location', 'city'))
+    city.present? && key == city
+  end
+
   # Returns {merchant_name:, category:, source:} for a transaction.
   # Tiers, highest confidence first. Learned history ALWAYS beats Plaid's guess.
   def predict(txn)
+    # The descriptor is just a city — there is no merchant here to reason about.
+    return { merchant_name: nil, category: nil, source: 'location-only' } if location_only?(txn)
+
     key = merchant_key(txn.plaid_name)
     entity = entity_id_for(txn)
 
@@ -360,6 +390,10 @@ class Finances::Predictions
                                      .where('transacted_at >= ?', TRAINING_WINDOW.ago)
                                      .select(:plaid_name, :merchant_name, :category, :raw_data)
                                      .to_a
+                                     # ...and never LEARN from a city-only descriptor either.
+                                     # Otherwise "lakewood" keeps accumulating labels from
+                                     # every unrelated Square merchant in that town.
+                                     .reject { |t| location_only?(t) }
   end
 
 end
