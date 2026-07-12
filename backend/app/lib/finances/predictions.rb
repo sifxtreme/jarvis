@@ -77,6 +77,28 @@ class Finances::Predictions
     'Charity'              => ['irusa', 'kinderusa', 'launchgood']
   }.freeze
 
+  # Merchants whose merchant_name is ITEM-SPECIFIC — a different product every time.
+  # Their CATEGORY is perfectly learnable (Kindle is always Hafsa's books), but their
+  # NAME must NEVER be propagated. Majority-vote will otherwise latch onto one
+  # arbitrary item and stamp it on everything.
+  #
+  # Real damage (2026-07-12): the key "amazon kindle" learned merchant_name
+  # "Simple and Sinister" (one book Asif happened to have labeled twice), then wrote
+  # that SAME title onto 5 different Kindle purchases at 5 different prices — which
+  # were 5 different books (the Kingmaker Chronicles + Blood and Ash series).
+  #
+  # Item names for these merchants come from the item-lookup pipeline or Amazon's
+  # digital-orders page. NEVER from a guess. Listed explicitly — no prefix matching,
+  # because "amazon web services" (AWS), "amazon prime" and "amazon fresh" DO have
+  # stable names and must keep learning them.
+  ITEM_SPECIFIC_MERCHANTS = [
+    'amazon',
+    'amazon marketplace',
+    'amazon kindle',
+    'kindle',
+    'kindle svcs'
+  ].freeze
+
   TRAINING_WINDOW = 24.months  # learn only from recent history (see #curated)
   MIN_KEY_LENGTH = 4       # don't prefix-match on tiny keys
   MAJORITY = 0.5           # a learned prediction needs >50% agreement
@@ -163,12 +185,23 @@ class Finances::Predictions
     nil
   end
 
+  # Learned CATEGORY always applies. Learned NAME does not — for item-specific
+  # merchants (Amazon, Kindle) the name is per-product, so we hand back the generic
+  # merchant name and let the item-lookup pipeline resolve the real one. Propagating
+  # a learned name there is how every Kindle purchase became "Simple and Sinister".
   def result(learned, txn, source)
-    {
-      merchant_name: learned[:merchant_name] || plaid_merchant_name(txn),
-      category: learned[:category],
-      source: source
-    }
+    generic = plaid_merchant_name(txn)
+    name = if item_specific?(merchant_key(txn.plaid_name))
+             generic
+           else
+             learned[:merchant_name] || generic
+           end
+
+    { merchant_name: name, category: learned[:category], source: source }
+  end
+
+  def item_specific?(key)
+    key.present? && ITEM_SPECIFIC_MERCHANTS.include?(key)
   end
 
   # ---- Plaid raw_data accessors (nil-safe for Teller rows) ----
