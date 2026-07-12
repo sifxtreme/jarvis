@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-SSH_KEY=~/Downloads/jarvis.pem
+SSH_KEY=~/Downloads/creds/jarvis.pem
 SSH_HOST=ubuntu@sifxtre.me
 
 echo "Deploying Jarvis..."
