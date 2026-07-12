@@ -49,6 +49,34 @@ class Finances::Predictions
     'TRAVEL_OTHER_TRAVEL'                           => 'Travel'
   }.freeze
 
+  # Vetted keyword rules — the LOWEST-confidence tier, below Plaid's classifier.
+  # This is where the old node `auto-categorize` engine's useful logic now lives:
+  # one resolver owns the write, System B survives only as a governed tier.
+  #
+  # It earns its place for a specific reason: TELLER rows (Chase) carry NO
+  # personal_finance_category at all, so the Plaid-classifier tier simply does not
+  # exist for them. Learned history is otherwise their only signal. This fills that.
+  #
+  # The three things that made the old engine dangerous are structurally impossible
+  # here:
+  #   - matching is WHOLE-TOKEN against merchant_key, never substring (that's the
+  #     "Bug Zapper Racket" -> 'racket' -> kids-category class of bug)
+  #   - merchant_key already strips trailing state codes, so "HOMEDEPOT.COM ... GA"
+  #     can never again match "Gas"
+  #   - there is deliberately NO blanket Amazon rule. Amazon is ambiguous by nature
+  #     and belongs to the item-lookup pipeline, not to a guess.
+  KEYWORD_RULES = {
+    'Groceries'            => ['costco', 'sprouts', 'ralphs', 'vons', 'albertsons', 'safeway',
+                               'aldi', 'trader joes', 'whole foods', 'h mart', 'harvest fresh'],
+    'Eating Out'           => ['starbucks', 'doordash', 'grubhub', 'chipotle', 'mcdonalds',
+                               'dominos', 'uber eats'],
+    'Gas'                  => ['shell', 'chevron', 'arco', 'mobil', 'exxon'],
+    'Parking'              => ['parking'],
+    'Dues & Subscriptions' => ['netflix', 'spotify', 'hulu'],
+    'Home'                 => ['lowes', 'ikea', 'home depot'],
+    'Charity'              => ['irusa', 'kinderusa', 'launchgood']
+  }.freeze
+
   TRAINING_WINDOW = 24.months  # learn only from recent history (see #curated)
   MIN_KEY_LENGTH = 4       # don't prefix-match on tiny keys
   MAJORITY = 0.5           # a learned prediction needs >50% agreement
@@ -103,12 +131,37 @@ class Finances::Predictions
       return { merchant_name: plaid_merchant_name(txn), category: pfc, source: 'plaid:pfc' }
     end
 
-    # 5. Nothing confident. Still hand back Plaid's clean merchant name if we have
+    # 5. Vetted keyword rules (whole-token). Lowest-confidence tier — and the only
+    #    category signal that exists at all for Teller/Chase rows, which carry no
+    #    personal_finance_category.
+    if key && (kw = keyword_category(key))
+      return { merchant_name: plaid_merchant_name(txn), category: kw, source: 'keyword' }
+    end
+
+    # 6. Nothing confident. Still hand back Plaid's clean merchant name if we have
     #    one — a named-but-uncategorized row is far easier to review than a raw blob.
     { merchant_name: plaid_merchant_name(txn), category: nil, source: 'unmatched' }
   end
 
   private
+
+  # Whole-token (and whole-phrase) keyword match against the canonical merchant key.
+  # Never a substring match — that is the guardrail, not an implementation detail.
+  def keyword_category(key)
+    tokens = key.split
+    KEYWORD_RULES.each do |category, keywords|
+      keywords.each do |kw|
+        kw_tokens = kw.split
+        matched = if kw_tokens.size == 1
+                    tokens.include?(kw)
+                  else
+                    tokens.each_cons(kw_tokens.size).any? { |slice| slice == kw_tokens }
+                  end
+        return category if matched
+      end
+    end
+    nil
+  end
 
   def result(learned, txn, source)
     {
@@ -199,17 +252,24 @@ class Finances::Predictions
     index
   end
 
-  # The training set: transactions the user has actually named/curated, restricted
-  # to a recency window.
+  # The training set. TWO filters, both load-bearing:
   #
-  # Why the window: merchant->category mappings are stable (Sprouts is always
-  # Groceries), but ONE-TIME EVENT labels are not. A 2024 "Ramadan Party 2024" tag
-  # on a Lakewood charge was still being applied to new Lakewood charges in 2026 —
-  # and it survived the MIN_VOTES guard because he'd tagged it more than once.
-  # Letting the training set age out fixes that class of bug generally, without
-  # losing any of the stable merchant signal.
+  # 1. reviewed: true — HUMAN-CONFIRMED LABELS ONLY. Without this the predictor
+  #    trains on its own output: it writes merchant_name/category on unreviewed
+  #    rows, those rows then look like "curated" history, and one bad prediction
+  #    becomes its own supporting evidence. That feedback loop only gets worse as
+  #    coverage rises (this pass took merchant_name from 34% -> 92%, so the training
+  #    set would have become mostly self-written). Learn only from what Asif has
+  #    actually confirmed. 15,995 of 16,383 named rows are reviewed, so this costs
+  #    almost no signal and permanently closes the loop.
+  #
+  # 2. TRAINING_WINDOW — merchant->category mappings are stable (Sprouts is always
+  #    Groceries), but ONE-TIME EVENT labels are not. A 2024 "Ramadan Party 2024"
+  #    tag on a Lakewood charge was still driving 2026 predictions, and it survived
+  #    MIN_VOTES because it had been tagged more than once. Letting the training set
+  #    age out kills that class of bug. 24mo measured best on precision AND recall.
   def curated
-    @curated ||= FinancialTransaction.where(hidden: false)
+    @curated ||= FinancialTransaction.where(hidden: false, reviewed: true)
                                      .where.not(merchant_name: nil)
                                      .where('transacted_at >= ?', TRAINING_WINDOW.ago)
                                      .select(:plaid_name, :merchant_name, :category, :raw_data)
