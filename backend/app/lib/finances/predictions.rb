@@ -51,6 +51,11 @@ class Finances::Predictions
 
   MIN_KEY_LENGTH = 4       # don't prefix-match on tiny keys
   MAJORITY = 0.5           # a learned prediction needs >50% agreement
+  MIN_VOTES = 2            # ...and must be backed by >=2 transactions.
+                           # A one-off label must never propagate: a single historical
+                           # "LAKEWOOD, CA" tagged "Ramadan Party 2024" was being applied
+                           # to every future Lakewood charge. Predict from patterns seen
+                           # twice, not from a single quirky tag.
 
   def predict_new_transactions
     FinancialTransaction.where(reviewed: false, merchant_name: nil, category: nil).each do |f|
@@ -160,6 +165,8 @@ class Finances::Predictions
     return nil if total.zero?
 
     value, count = votes.max_by { |_, c| c }
+    return nil if count < MIN_VOTES
+
     count.to_f / total > MAJORITY ? value : nil
   end
 
