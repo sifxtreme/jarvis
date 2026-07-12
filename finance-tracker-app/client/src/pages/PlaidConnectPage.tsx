@@ -20,6 +20,9 @@ declare global {
 
 interface PlaidLinkConfig {
   token: string;
+  // Set ONLY when resuming after an OAuth redirect. Tells Link "we're coming back
+  // from the bank, pick up where we left off" — without it the flow dead-ends.
+  receivedRedirectUri?: string;
   onSuccess: (publicToken: string, metadata: unknown) => void;
   onExit: (error: unknown, metadata: unknown) => void;
   // Fires at EVERY step of the Link flow (OPEN, SELECT_INSTITUTION, OPEN_OAUTH,
@@ -49,11 +52,15 @@ const BANKS = [
   { value: 'hafsa_chase', label: "Chase (Hafsa)" },
 ];
 
+// Survives the OAuth redirect (the page fully reloads, so React state does not).
+const OAUTH_STASH = 'jarvis.plaid.oauth';
+
 export default function PlaidConnectPage() {
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [bank, setBank] = useState<string>('hafsa_chase');
   const [connecting, setConnecting] = useState(false);
+  const [resuming, setResuming] = useState(false);
   const [status, setStatus] = useState<{ message: string; type: StatusType }>({ message: "", type: null });
   const [logs, setLogs] = useState<string[]>([]);
 
@@ -79,8 +86,34 @@ export default function PlaidConnectPage() {
     document.body.appendChild(script);
   }, []);
 
+  // With a redirect_uri configured, an OAuth bank sends the user BACK to this page as
+  // a full page load — every bit of React state is gone. To resume we must reuse the
+  // SAME link_token (a fresh one would be a different Link session and the OAuth
+  // handoff would be orphaned), so it's stashed before we hand off.
   useEffect(() => {
     let mounted = true;
+
+    const oauthStateId = new URLSearchParams(window.location.search).get("oauth_state_id");
+    if (oauthStateId) {
+      // We're coming back from the bank. Do NOT mint a new token.
+      try {
+        const saved = JSON.parse(localStorage.getItem(OAUTH_STASH) || "null");
+        if (saved?.token) {
+          setLinkToken(saved.token);
+          if (saved.bank) setBank(saved.bank);
+          setResuming(true);
+          log(`OAuth return detected (oauth_state_id=${oauthStateId}) — resuming Link`);
+        } else {
+          showStatus("Came back from the bank but the Link session was lost. Start over.", "error");
+          log("OAuth return but no stashed link_token — cannot resume");
+        }
+      } catch {
+        showStatus("Could not restore the Link session. Start over.", "error");
+      }
+      return () => { mounted = false; };
+    }
+
+    // Normal entry — mint a fresh link_token.
     (async () => {
       try {
         const token = await createPlaidLinkToken();
@@ -92,21 +125,30 @@ export default function PlaidConnectPage() {
       }
     })();
     return () => { mounted = false; };
-  }, []);
+  }, [log]);
 
-  const openPlaid = useCallback(() => {
+  const openPlaid = useCallback((receivedRedirectUri?: string) => {
     if (!scriptLoaded || !window.Plaid) return showStatus("Plaid Link not loaded yet", "error");
     if (!linkToken) return showStatus("No link token yet — try again in a moment.", "error");
 
     const bankLabel = BANKS.find((b) => b.value === bank)?.label ?? bank;
     setConnecting(true);
-    setLogs([]);
+    if (!receivedRedirectUri) setLogs([]);
     showStatus(`Opening Plaid Link for ${bankLabel}…`, "info");
-    log(`open → bank=${bank}`);
+
+    if (receivedRedirectUri) {
+      log(`resume → bank=${bank} (receivedRedirectUri)`);
+    } else {
+      // Stash BEFORE the handoff: an OAuth bank reloads this page, wiping React state.
+      // The resumed session must reuse the SAME link_token or the handoff is orphaned.
+      localStorage.setItem(OAUTH_STASH, JSON.stringify({ token: linkToken, bank }));
+      log(`open → bank=${bank}`);
+    }
 
     try {
       const handler = window.Plaid.create({
         token: linkToken,
+        ...(receivedRedirectUri ? { receivedRedirectUri } : {}),
 
         // Every step of the flow. This is what makes a failure inside the bank's own
         // OAuth page visible instead of a silent dead end.
@@ -126,6 +168,7 @@ export default function PlaidConnectPage() {
 
         onSuccess: async (publicToken) => {
           log("SUCCESS → exchanging public_token…");
+          localStorage.removeItem(OAUTH_STASH);
           try {
             const result: PlaidConnectionResult = await exchangePlaidPublicToken(publicToken, bank);
             log(`exchange OK → bank_connection #${result.bank_connection_id} acct=${result.account_id}`);
@@ -172,6 +215,14 @@ export default function PlaidConnectPage() {
       setConnecting(false);
     }
   }, [scriptLoaded, linkToken, bank, log]);
+
+  // Auto-resume once the script + restored token are both ready after an OAuth return.
+  useEffect(() => {
+    if (resuming && scriptLoaded && linkToken && !connecting) {
+      openPlaid(window.location.href);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resuming, scriptLoaded, linkToken]);
 
   const StatusIcon = ({ type }: { type: StatusType }) => {
     if (type === "success") return <CheckCircle className="h-4 w-4 text-green-600" />;
@@ -221,7 +272,9 @@ export default function PlaidConnectPage() {
               previous provider stopped — it will not duplicate what's already recorded. Syncs run every 3 hours.
             </p>
 
-            <Button onClick={openPlaid} className="w-full" disabled={!scriptLoaded || !linkToken || connecting}>
+            {/* Arrow fn, NOT `onClick={openPlaid}` — that would pass the MouseEvent
+                straight into the receivedRedirectUri param and fake an OAuth resume. */}
+            <Button onClick={() => openPlaid()} className="w-full" disabled={!scriptLoaded || !linkToken || connecting}>
               <CreditCard className="h-4 w-4 mr-2" />
               {connecting ? "Connecting…" : `Connect ${bankLabel}`}
             </Button>

@@ -144,15 +144,29 @@ class Plaid::API
     post('/accounts/get', { access_token: access_token })
   end
 
-  # Create a short-lived link_token used to initialize Plaid Link in the browser
+  # Create a short-lived link_token used to initialize Plaid Link in the browser.
+  #
+  # redirect_uri is what makes OAuth banks work properly on desktop web. Without it,
+  # Plaid falls back to a popup handoff — Amex tolerated that, but CHASE routed to
+  # its /mobile/authorize endpoint from a desktop browser and returned a bare 500.
+  # With a registered redirect_uri, Link does a real web OAuth redirect instead.
+  #
+  # Env-gated on purpose: sending a redirect_uri that is NOT registered in the Plaid
+  # dashboard makes /link/token/create fail outright, which would break every bank
+  # including the working Amex link. No env var => previous behaviour, unchanged.
   def create_link_token(user_id)
-    post('/link/token/create', {
+    body = {
       client_name: 'Jarvis',
       language: 'en',
       country_codes: ['US'],
       user: { client_user_id: user_id.to_s },
       products: ['transactions']
-    })
+    }
+
+    redirect_uri = ENV['PLAID_REDIRECT_URI'].presence
+    body[:redirect_uri] = redirect_uri if redirect_uri
+
+    post('/link/token/create', body)
   end
 
   # Exchange a public_token (from Link onSuccess) for a permanent access_token
