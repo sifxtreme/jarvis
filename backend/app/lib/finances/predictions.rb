@@ -195,9 +195,15 @@ class Finances::Predictions
   # Aggregates every match so "amazon" pools ALL amazon history, then takes the
   # majority. Returns nil if no category clears the majority threshold.
   def prefix_lookup(key)
-    matches = by_key.select do |k, _|
-      k == key || k.start_with?("#{key} ") || key.start_with?("#{k} ")
-    end
+    # DIRECTIONAL ON PURPOSE. Only the lookup key may be a prefix of learned keys:
+    #   new "amazon" pools learned "amazon marketplace" / "amazon kindle"   <- wanted
+    # The reverse is NOT allowed:
+    #   learned "tesla" (the car loan) absorbing new "tesla insurance company"
+    # ...which is a DIFFERENT merchant that merely shares a brand prefix. A holdout
+    # backtest caught exactly that: "Tesla Insurance Company" was being predicted
+    # "Tesla" when Asif labels it "Car Insurance". A generic brand must never swallow
+    # a more specific sub-brand.
+    matches = by_key.select { |k, _| k == key || k.start_with?("#{key} ") }
     return nil if matches.empty?
 
     merged_category = merge_votes(matches.values.map { |v| v[:category_votes] })
