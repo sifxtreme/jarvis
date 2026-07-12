@@ -26,7 +26,18 @@ module Utils
 
     key = name.to_s.downcase.strip
     key = key.sub(PAYMENT_PREFIXES, '')            # AplPay / SQ* / TST* / PayPal*
-    key = key.gsub(%r{\b[\w.-]+\.(com|org|net|co|io|gov)\b\S*}, ' ') # domains + amzn.com/bill
+
+    # Strip the TLD and anything after it, but KEEP the name in front of the dot.
+    #   "fandango.com 866-..."      -> "fandango ..."
+    #   "amazon.com amzn.com/bill"  -> "amazon amzn"
+    #   "madewell.com 866-544-1937" -> "madewell"
+    #
+    # This used to remove the WHOLE domain token (`\b[\w.-]+\.(com|...)`), which ate
+    # the merchant name itself: "FANDANGO.COM 866-857-5191 CA" collapsed all the way
+    # down to the key "ca", so every .COM merchant with a trailing state code merged
+    # into one bucket. That's how a Fandango charge started predicting "Netflix".
+    key = key.gsub(/\.(com|org|net|co|io|gov)\b\S*/, ' ')
+
     key = key.gsub(/\d+/, ' ')                     # store / ref numbers
     key = key.gsub(/[^a-z\s]/, ' ')                # punctuation: * # / etc
     key = key.squeeze(' ').strip
