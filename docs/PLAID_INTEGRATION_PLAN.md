@@ -1,11 +1,44 @@
-# Plaid Integration Plan (Amex via OAuth)
+# Plaid Integration (Amex via OAuth)
 
-**Status:** Ready to execute. Trigger = tomorrow's Teller retry fails.
+**Status: ✅ LIVE (2026-07-12). Amex syncs via Plaid OAuth. Teller-Amex retired.**
 **Goal:** Replace the Teller screen-scrape connection for **Amex only** with Plaid's
 first-party **OAuth** connection (Amex Account Financials API). Automatic 3-hour sync,
 no re-auth churn. **Chase stays on Teller** (it works).
 
-**Date drafted:** 2026-07-09
+**Drafted:** 2026-07-09 · **Deployed:** 2026-07-10 (backend commit `69eeab2`, frontend via Netlify)
+
+---
+
+## CURRENT STATUS & RESUME CHECKLIST (2026-07-10)
+
+### Done
+- Code **built, reviewed, deployed**. Sign passthrough / dedup / pending-filter / cursor all verified. Migration `transactions_cursor` applied on the box.
+- **Plaid account:** org `LifesForLearning`, `client_id=576f0d2866710877408d058c`, env **production**. Amex = `ins_10` (oauth). App profile completed (name, website `https://finances.sifxtre.me`, reason, icon `docs/jarvis-icon.png`) → this **triggered** OAuth registration.
+- **Env on box** `~/jarvis/jarvis.env`: `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV=production`, `RAILS_LOG_TO_STDOUT=true`.
+- Verified live: `POST /api/plaid/link_token` serves (Plaid Link opens); auth via JWT Bearer interceptor; frontend `/plaid-connect` + Navbar entry deployed.
+
+### ✅ COMPLETED 2026-07-12 — Amex is live on Plaid
+
+**Final state:** `bank_connections` → id 7 `hafsa_chase`/teller (active), id **9 `amex`/plaid (active, sync_from_date=2026-06-22)**. Old Teller-Amex row **id 8 deactivated** (stops the every-3-hr `enrollment.disconnected` errors).
+
+**First sync result:** `fetched=440 → ingested=111 → inserted=111, updated=0, latest_txn=2026-07-11, cursor saved.`
+The 440→111 drop is the `sync_from_date` cutoff doing its job: Plaid returned its full ~24-month history, and we ingested **only the 111 posted txns after 2026-06-22** — the exact gap Teller left. Without it we'd have duplicated ~330 rows (Teller and Plaid assign **different** transaction ids, so `plaid_id` can't dedupe across them).
+
+**Verified:** gap filled (continuous daily coverage Jun 23 → Jul 11) · **zero cross-source duplicates** · **signs correct** (spends +, refunds/credits − — e.g. Madewell return `-146.97`, Aritzia spend `+380.18`) · categories auto-predicted by the existing `Finances::Predictions` pass.
+
+### Two gotchas hit during cutover (both fixed — read before touching this again)
+
+1. **`bank_connections` id sequence was stale** → the very first `/plaid/exchange` 500'd with
+   `PG::UniqueViolation: duplicate key ... "bank_connections_pkey"`. The sequence lagged `MAX(id)`, so the insert reused an existing id. This was a **latent DB bug that would have broken ANY new bank connection (Teller or Plaid)** — not a Plaid issue.
+   Fix: `SELECT setval('bank_connections_id_seq', (SELECT MAX(id) FROM bank_connections));`
+2. **A failed exchange throws away the Plaid credential.** The OAuth had already succeeded and Plaid had issued an `access_token`; the 500 happened on `save!`, so the token was lost. **Recovery: the `public_token` is in the Rails request log** (`docker logs jarvis-api-1 | grep public_token`) and can be re-exchanged — no need to redo the OAuth. Worth making `exchange` more defensive if this is ever touched again.
+
+### Plaid OAuth registration (for reference)
+Connecting an OAuth institution requires the **App profile** (Compliance Center) to be complete — that's what registers the app with the institution. Until then Link fails with a generic *"Internal error occurred"*; the real code (`INSTITUTION_REGISTRATION_REQUIRED`) only shows in **Plaid Dashboard → Activity → Logs**. Watch registration state at `dashboard.plaid.com/activity/status/oauth-institutions` (Amex went "In review" → "Enabled" in well under the quoted 24h).
+
+### How to observe (agent-readable)
+- **Structured:** `BankSyncLog` table via psql — status/counts/error per sync (Teller AND Plaid).
+- **Freeform:** `docker logs jarvis-worker-1` / `jarvis-api-1` `| grep '[Plaid]'` — now that `RAILS_LOG_TO_STDOUT=true`.
 
 ---
 
