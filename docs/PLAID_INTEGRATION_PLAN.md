@@ -1,4 +1,10 @@
-# Plaid Integration (Amex via OAuth)
+# Plaid Integration (Amex via OAuth) — HISTORICAL
+
+> ⚠️ **SUPERSEDED by [`BANK_SYNC_PRD.md`](./BANK_SYNC_PRD.md).** Read that first.
+>
+> This file is the *original Amex-only migration plan*, kept for history. It does not
+> cover: the decision to retire Teller entirely, the Chase migration, the bank-picker /
+> multi-bank linking, Plaid Link instrumentation, or the categorizer architecture.
 
 **Status: ✅ LIVE (2026-07-12). Amex syncs via Plaid OAuth. Teller-Amex retired.**
 **Goal:** Replace the Teller screen-scrape connection for **Amex only** with Plaid's
