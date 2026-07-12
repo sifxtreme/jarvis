@@ -22,6 +22,21 @@ interface PlaidLinkConfig {
   token: string;
   onSuccess: (publicToken: string, metadata: unknown) => void;
   onExit: (error: unknown, metadata: unknown) => void;
+  // Fires at EVERY step of the Link flow (OPEN, SELECT_INSTITUTION, OPEN_OAUTH,
+  // TRANSITION_VIEW, ERROR, EXIT...). Without this, a failure inside the bank's own
+  // OAuth page is completely invisible to us — which is exactly what happened with
+  // Chase's 500.
+  onEvent?: (eventName: string, metadata: Record<string, unknown>) => void;
+}
+
+// Plaid's exit/error payload. `request_id` + `link_session_id` are the important
+// bits — they're what you paste into Plaid Dashboard → Activity → Logs to get the
+// real server-side reason behind a generic client-side message.
+interface PlaidErrorish {
+  error_type?: string;
+  error_code?: string;
+  error_message?: string;
+  display_message?: string;
 }
 
 type StatusType = 'success' | 'error' | 'info' | null;
@@ -40,8 +55,16 @@ export default function PlaidConnectPage() {
   const [bank, setBank] = useState<string>('hafsa_chase');
   const [connecting, setConnecting] = useState(false);
   const [status, setStatus] = useState<{ message: string; type: StatusType }>({ message: "", type: null });
+  const [logs, setLogs] = useState<string[]>([]);
 
   const showStatus = (message: string, type: StatusType) => setStatus({ message, type });
+
+  const log = useCallback((line: string) => {
+    const stamped = `${new Date().toISOString().slice(11, 19)}  ${line}`;
+    // eslint-disable-next-line no-console
+    console.log("[plaid]", stamped);
+    setLogs((prev) => [...prev, stamped]);
+  }, []);
 
   useEffect(() => {
     if (window.Plaid) {
@@ -77,14 +100,35 @@ export default function PlaidConnectPage() {
 
     const bankLabel = BANKS.find((b) => b.value === bank)?.label ?? bank;
     setConnecting(true);
+    setLogs([]);
     showStatus(`Opening Plaid Link for ${bankLabel}…`, "info");
+    log(`open → bank=${bank}`);
 
     try {
       const handler = window.Plaid.create({
         token: linkToken,
+
+        // Every step of the flow. This is what makes a failure inside the bank's own
+        // OAuth page visible instead of a silent dead end.
+        onEvent: (eventName, metadata) => {
+          const m = (metadata || {}) as Record<string, unknown>;
+          const bits = [
+            m.view_name && `view=${m.view_name}`,
+            m.institution_name && `inst=${m.institution_name}`,
+            m.error_code && `error_code=${m.error_code}`,
+            m.error_type && `error_type=${m.error_type}`,
+            m.error_message && `msg=${m.error_message}`,
+            m.request_id && `request_id=${m.request_id}`,
+            m.link_session_id && `link_session_id=${m.link_session_id}`,
+          ].filter(Boolean).join("  ");
+          log(`${eventName}${bits ? "  " + bits : ""}`);
+        },
+
         onSuccess: async (publicToken) => {
+          log("SUCCESS → exchanging public_token…");
           try {
             const result: PlaidConnectionResult = await exchangePlaidPublicToken(publicToken, bank);
+            log(`exchange OK → bank_connection #${result.bank_connection_id} acct=${result.account_id}`);
             showStatus(
               `${bankLabel} connected (bank_connection #${result.bank_connection_id}). ` +
                 `The next sync backfills from where the old provider left off.`,
@@ -92,27 +136,42 @@ export default function PlaidConnectPage() {
             );
           } catch (e) {
             const message = e as { response?: { data?: { error?: string } }; message?: string };
-            showStatus(
-              "Server could not save the connection: " +
-                (message.response?.data?.error || message.message || "Unknown error"),
-              "error",
-            );
+            const why = message.response?.data?.error || message.message || "Unknown error";
+            log(`exchange FAILED → ${why}`);
+            showStatus("Server could not save the connection: " + why, "error");
           } finally {
             setConnecting(false);
           }
         },
-        onExit: (error) => {
-          const err = error as { error_message?: string } | null;
-          showStatus(err?.error_message ? `Plaid Link closed: ${err.error_message}` : "Plaid Link closed.", "info");
+
+        onExit: (error, metadata) => {
+          const err = (error || {}) as PlaidErrorish;
+          const m = (metadata || {}) as Record<string, unknown>;
+          if (err.error_code || err.error_message) {
+            log(`EXIT with error → code=${err.error_code} type=${err.error_type} msg=${err.error_message}`);
+            if (err.display_message) log(`  display: ${err.display_message}`);
+          } else {
+            log("EXIT (no error — closed by user)");
+          }
+          if (m.request_id) log(`  request_id=${m.request_id}`);
+          if (m.link_session_id) log(`  link_session_id=${m.link_session_id}`);
+
+          showStatus(
+            err.display_message || err.error_message
+              ? `Plaid Link exited: ${err.display_message || err.error_message}`
+              : "Plaid Link closed.",
+            err.error_code ? "error" : "info",
+          );
           setConnecting(false);
         },
       });
       handler.open();
     } catch (e) {
+      log(`create/open threw → ${(e as Error).message}`);
       showStatus("Error: " + (e as Error).message, "error");
       setConnecting(false);
     }
-  }, [scriptLoaded, linkToken, bank]);
+  }, [scriptLoaded, linkToken, bank, log]);
 
   const StatusIcon = ({ type }: { type: StatusType }) => {
     if (type === "success") return <CheckCircle className="h-4 w-4 text-green-600" />;
@@ -176,6 +235,30 @@ export default function PlaidConnectPage() {
               )}>
                 <StatusIcon type={status.type} />
                 {status.message}
+              </div>
+            )}
+
+            {logs.length > 0 && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Link event log</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    onClick={() => navigator.clipboard?.writeText(logs.join("\n"))}
+                  >
+                    Copy
+                  </Button>
+                </div>
+                <pre className="max-h-56 overflow-auto rounded-md border bg-muted/50 p-2 text-[11px] leading-relaxed font-mono whitespace-pre-wrap">
+                  {logs.join("\n")}
+                </pre>
+                <p className="text-[11px] text-muted-foreground">
+                  Paste the <code>request_id</code> / <code>link_session_id</code> into
+                  Plaid Dashboard → Activity → Logs to get the real server-side reason.
+                </p>
               </div>
             )}
           </CardContent>
