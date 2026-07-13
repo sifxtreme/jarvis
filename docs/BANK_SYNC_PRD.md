@@ -151,14 +151,87 @@ LAKEWOOD, CA            → a Ramadan party / movie snacks / fireworks
 
 ---
 
+## 3b. CSV import — the path for Chase (decided 2026-07-13)
+
+**Chase's OAuth API is down** (see §4), Teller's Chase feed is frozen, and Teller's repair crashes. **Asif is fine dropping CSVs.** So CSV is Chase's ingestion path for now, and a permanent escape hatch for any future aggregator failure.
+
+### ⚠️ The BofA importer will NOT work for Chase. Do not reuse it blindly.
+
+`import-bofa.mjs` dedupes on **`(date, amount, merchant_name)`**. That works for BofA because those rows didn't exist yet. **It would be a disaster for Chase:**
+
+- Teller already synced Chase **through 2026-07-05** (4,178 rows).
+- A **June** Chase CSV is therefore **~100% already in the DB**. A **July** CSV overlaps Jul 1–5.
+- Existing Teller rows carry **curated** names (`Sprouts`, `Costco`, `Madwell`); the CSV carries **raw** descriptors (`SPROUTS FARMERS MAR #123 LAKEWOOD CA`). **They never match** — so a name-based dedup inserts ~200 duplicate Chase transactions.
+
+### The correct dedup: multiset match on `(date, amount)`
+
+Name matching is impossible across providers. Match on date+amount, and **count**:
+
+```
+for each (transacted_at, amount) group:
+    csv_count = rows in the CSV
+    db_count  = existing rows for that source
+    insert    = max(0, csv_count - db_count)     # only the surplus
+```
+
+This is right on both edges: it absorbs the Teller overlap **and** preserves genuinely repeated charges (two $7.39 Masjid Cafes on the same day survive as two — cf. the documented 529-Children ×2 multi-kid exception).
+
+### Flow
+1. Asif drops the CSV (June and/or July).
+2. **Dry run** — show new vs. already-present, with counts. June should dedupe out almost entirely; that is the sanity check that dedup works.
+3. Import the surplus. July's `Jul 6 → today` is the real payload (the frozen window).
+4. Predictor categorizes the new rows. **Land the city-key fix first** (§4) — CSV rows have no Plaid enrichment, so learned history is the *only* tier that can categorize them.
+
+---
+
 ## 4. Open items
+
+> ### ▶ RESUME HERE (next session)
+> **1. Chase CSV import** — Asif is dropping a June and/or July Chase CSV. Build the importer with **multiset `(date, amount)` dedup** (§3b). **Do NOT reuse `import-bofa.mjs`'s name-based dedup — it will insert ~200 duplicates.** Dry-run, show him, then import.
+> **2. Land the city-key fix FIRST** (item 2 below) — CSV rows have no Plaid enrichment, so learned history is the only tier that can categorize them, and it's currently running at a fraction of strength.
+> **3. Awaiting Asif's call:** two suspicious duplicate income rows on **2026-01-19** (`Asif Income $6,030.04` ×2, `Hafsa Income $3,388.46` ×2) — inflating January by **$9,418**. He is paid on *different* days, so same-day identical paychecks look like a double-import. Do not touch income without his OK.
 
 | # | Item | Notes |
 |---|---|---|
-| 1 | **Migrate Chase to Plaid** | Code is **done and deployed**. Blocked by Chase. |
-| 2 | **Staleness monitor** ← *highest value* | See below. |
-| 3 | Amazon **refund** item-naming | `lookup-orders.mjs` names from `items[0]` of the order, but a return is usually only *some* items — an $8.83 nose-ring refund got labeled a cheese grater. Fix: read `/spr/returns/history` for negative amounts. |
-| 4 | Retire Teller entirely | Follows item 1. Then: delete mTLS certs, enrollments, `/teller-repair`. |
+| 1 | **Chase CSV import** | See §3b. The active task. |
+| 2 | **Categorizer: strip the CITY from `merchant_key`** ← *biggest coverage win* | See below. |
+| 3 | **Dedup + provenance** | See below. |
+| 4 | **Staleness monitor** | See below. |
+| 5 | **Migrate Chase to Plaid** | Code **done and deployed**. Blocked by Chase's dead API. |
+| 6 | Amazon **refund** item-naming | `lookup-orders.mjs` names from `items[0]` of the order, but a return is usually only *some* items — an $8.83 nose-ring refund got labeled a cheese grater. Fix: read `/spr/returns/history` for negative amounts. |
+| 7 | Retire Teller entirely | Follows item 5. Then delete mTLS certs, enrollments, `/teller-repair`. |
+
+### Item 2 — the city is inside the merchant key, and it's gutting the learned tier
+
+**Measured 2026-07-13** over the curated training set:
+
+```
+Sprouts   →  7 keys / 113 txns     ← 113 transactions teaching almost nothing
+   "sprouts", "sprouts san francisco", "sprouts farmelakewood", "sprouts farmecerritos"
+Walmart   →  8 keys /  13 txns
+Bread     →  6 keys /  18 txns
+69 merchants are split across >1 key.
+```
+
+Amex **truncates and concatenates** merchant + city: `SPROUTS FARME` + `LAKEWOOD` → `"sprouts farmelakewood"`. So the same store in two cities becomes two unrelated merchants.
+
+**Fix:** strip the location from the key — data-driven from `raw_data.location.city` where present, **plus glued-suffix handling** (a token *ending in* a known city name gets that suffix removed). Build the city vocabulary from the data itself.
+
+**⚠️ Do NOT merge these, they are correct:**
+```
+Parking → 15 keys   (airport parking, Santa Monica, Culver City…)
+Diapers → 25 txns   (Amazon, Target Cerritos, Target Garden Grove…)
+Book / Coffee / Bread / Farmers Market
+```
+**Asif's `merchant_name` is often WHAT HE BOUGHT, not who he bought from.** Those keys *should* be many-to-one. This is also why name-propagation kept exploding — `merchant_name` is doing double duty as merchant identity *and* item description.
+
+### Item 3 — dedup + provenance
+
+**~2,500 rows have no stable dedup id** (`plaid_id IS NULL`): bofa 730/734, zelle 281/281, cash 423/486, venmo 146/157, hafsa_chase 801/4178. `find_or_initialize_by(plaid_id:)` protects Plaid/Teller rows; **manual/CSV rows are unprotected.** Drop the same CSV twice → everything duplicates.
+
+**Fix:**
+- **Deterministic synthetic id** for CSV/manual rows: `csv:<source>:<date>:<amount>:<hash(descriptor)>:<n>`, where `n` is the occurrence index *within the file*. Makes re-import a no-op while preserving legitimately identical rows (the 529 ×2 case).
+- **Explicit `ingest_source` column** (`plaid` | `teller` | `csv` | `manual`). Provenance is currently only *inferable* (`raw_data.transaction_id` → Plaid; `plaid_id` but no `transaction_id` → Teller; null → manual). Fragile — and it matters, because **every provider assigns a different id to the same transaction**, which is the entire reason the Amex cutover needed a date cutoff.
 
 ### Why Chase is blocked (2026-07-12) — **not our bug**
 
