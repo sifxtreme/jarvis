@@ -77,6 +77,71 @@ class Finances::Predictions
     'Charity'              => ['irusa', 'kinderusa', 'launchgood']
   }.freeze
 
+  # The ONLY categories a learned tier is allowed to auto-fill. Asif's `category`
+  # column is overloaded with two different kinds of value, and they must be handled
+  # differently:
+  #
+  #   RECURRING LABEL — true of the same MERCHANT (or payer) every time it recurs.
+  #     Two flavours, both propagate:
+  #       - stable spending buckets: Sprouts→Groceries, Shell→Gas, the mortgage.
+  #       - the person/purpose axis: a paycheck merchant→"Hafsa Income", a specific
+  #         store→"Asif Career", the kids' recurring merchants→"Yusuf + Musa".
+  #     Backtested at 96% precision on the person/purpose rows because the ones that
+  #     actually fire are merchant-locked (income, career). Asif chose to keep these
+  #     auto-filled (2026-07-17) rather than review each by hand.
+  #
+  #   ONE-OFF OCCASION — true of a single TRIP / PROJECT / PARTY, not the merchant.
+  #     "Universal Studios" (9 merchants in 1 day), "Thanksgiving 2024" (7/9d),
+  #     "Hawaii Trip" (56/8d), "Paris Trip", "2024-12 Bathroom Project", "Parties".
+  #     The same merchant that was "Thanksgiving 2024" once is a plain grocery run
+  #     the other 51 weeks. Stamping the occasion onto every future charge is the
+  #     exact bug Asif reported — a stale event label propagating forward.
+  #
+  # The learned tiers (entity/key/prefix) vote on whatever label won, blind to which
+  # kind it is. This allowlist is the discriminator: a learned winner that is NOT in
+  # here is treated as "no confident answer" and the row is left blank for review.
+  # A new TRIP/PROJECT/PARTY tag is therefore non-propagating BY DEFAULT — it never
+  # leaks until deliberately added here (and it won't be). (PFC_CATEGORY_MAP and
+  # KEYWORD_RULES already only ever emit stable buckets, so they need no filter.)
+  #
+  # Derived from every reviewed category in the last 24 months (104 of them). The
+  # ONLY ones deliberately absent are the specific occasions — every named trip
+  # (Hawaii/Paris/Turkey/ABQ...), project (Bathroom/Bedroom/Wallpaper), party and
+  # birthday, plus bursty one-offs (Hafsa Bonus, Home Repair, AC Repairs) and junk
+  # (Payment/Transfer/Shame/??? /Walmart). Everything recurring is IN.
+  PROPAGATING_CATEGORIES = [
+    # everyday spending
+    'Groceries', 'Eating Out', 'Coffee', 'Fun',
+    # transportation
+    'Gas', 'Parking', 'Tolls', 'Car Maintenance', 'Car Insurance', 'Tesla Car Payment', 'Tesla',
+    # home & utilities
+    'Home', 'Home Software', 'Mortgage', 'Bills', 'Electricity', 'Internet', 'Cellphone',
+    'Water + Trash', 'Home Gas', 'Gardener',
+    # health & personal
+    'Medical Expenses', 'Personal Care',
+    # recurring commitments / subscriptions (merchant-locked, so perfectly stable)
+    'Dues & Subscriptions', 'Netflix', 'Spotify', 'Robinhood',
+    # giving
+    'Charity', 'Zakat',
+    # kids / education / childcare (recurring, merchant-stable)
+    'Tutoring', 'Tuition', 'Islamic Education', 'Sunday School', '529 Children',
+    'Sports and Classes', 'Babysitting',
+    # community
+    'Muslim Businesses',
+    # generic recurring travel bucket — NOT any specific named trip
+    'Travel and Trips',
+    # person / purpose axis — merchant-locked, auto-filled per Asif's call (2026-07-17)
+    'Asif', 'Asif Career', 'Asif Income', 'Asif Work', 'Asif Family', 'Asif Parents',
+    'Hafsa', 'Hafsa Career', 'Hafsa Income', 'Hafsa Work', 'Hafsa Family',
+    'Sulaiman', 'Yusuf + Musa', 'Gifts', 'Nanny'
+  ].freeze
+
+  # A learned category may only be auto-filled if it names a recurring merchant/payer
+  # label. A one-off occasion (trip/project/party) stays blank for review.
+  def self.propagatable?(category)
+    PROPAGATING_CATEGORIES.include?(category)
+  end
+
   # Merchants whose merchant_name is ITEM-SPECIFIC — a different product every time.
   # Their CATEGORY is perfectly learnable (Kindle is always Hafsa's books), but their
   # NAME must NEVER be propagated. Majority-vote will otherwise latch onto one
@@ -127,8 +192,21 @@ class Finances::Predictions
                            # to every future Lakewood charge. Predict from patterns seen
                            # twice, not from a single quirky tag.
 
+  # Re-attempt every UNREVIEWED row that is still missing EITHER field — not only
+  # rows blank on both.
+  #
+  # The old scope (merchant_name: nil AND category: nil) had a trap: a row the
+  # predictor once filled a NAME for but no category (which is common — a merchant's
+  # name is easy, its category may not clear the vote) no longer has a nil
+  # merchant_name, so it was never looked at again. It froze half-categorized
+  # forever. That is exactly how the Sprouts rows got stuck: an earlier run wrote
+  # merchant_name "Sprouts Farmers Market" with a nil category, and every run since
+  # skipped them. Retrying whenever category OR name is missing lets a later, better
+  # prediction (or newly-learned history) fill the gap. Reviewed rows are Asif's
+  # confirmed truth and are never touched.
   def predict_new_transactions
-    FinancialTransaction.where(reviewed: false, merchant_name: nil, category: nil).each do |f|
+    FinancialTransaction.where(reviewed: false)
+                        .where('category IS NULL OR merchant_name IS NULL').each do |f|
       result = predict(f)
 
       f.merchant_name = result[:merchant_name]
@@ -171,50 +249,111 @@ class Finances::Predictions
 
   # Returns {merchant_name:, category:, source:} for a transaction.
   # Tiers, highest confidence first. Learned history ALWAYS beats Plaid's guess.
+  #
+  # A tier wins only if it HAS AN ANSWER. This used to be "the first tier whose key
+  # is present wins", which is a different and much worse rule: build_index resolves
+  # every entry's category through majority(), and that returns nil whenever the
+  # votes don't clear MIN_VOTES/MAJORITY. So a merchant Asif had labelled ONCE got
+  # an index entry that existed but held nothing — and matching it returned nil and
+  # vetoed every tier below.
+  #
+  #   "SPROUTS" -> key "sprouts" -> {category_votes: {"Groceries" => 1}} -> 1 vote,
+  #   MIN_VOTES is 2 -> category nil -> matched 'learned:key' -> returned nil.
+  # ...while tier 4 (Plaid says FOOD_AND_DRINK_GROCERIES) and tier 5 (the vetted
+  # 'sprouts' keyword) BOTH knew it was Groceries and never got to run.
+  #
+  # That was not one merchant: 991 of 1,239 learned keys resolve to a nil category
+  # (the reviewed-only training set is thin, so most keys are single-vote). Every
+  # one was a dead end that silently suppressed the tiers that still worked.
+  #
+  # "Not enough evidence" must fall through. The only verdict that means
+  # "deliberately predict nothing" is location_only?, which returns above.
   def predict(txn)
     # The descriptor is just a city — there is no merchant here to reason about.
     return { merchant_name: nil, category: nil, source: 'location-only' } if location_only?(txn)
 
     key = merchant_key(txn.plaid_name)
-    entity = entity_id_for(txn)
+    learned = learned_tiers(key, entity_id_for(txn))
 
-    # 1. Learned by Plaid's stable merchant_entity_id. Same merchant => same id,
-    #    forever, regardless of how the string is formatted. Strongest signal.
-    if entity && (learned = by_entity[entity])
-      return result(learned, txn, 'learned:entity_id')
-    end
-
-    # 2. Learned by exact canonical merchant key.
-    if key && (learned = by_key[key])
-      return result(learned, txn, 'learned:key')
-    end
-
-    # 3. Learned by anchored token-PREFIX. This is what bridges Teller's raw
-    #    "amazon marketplace amzn bill" history to Plaid's clean "amazon".
-    #    Anchored at a token boundary ON PURPOSE — a naive substring match would
-    #    resurrect the "Bug Zapper Racket" -> 'racket' -> Yusuf+Musa false positive.
-    if key && key.length >= MIN_KEY_LENGTH && (learned = prefix_lookup(key))
-      return result(learned, txn, 'learned:prefix')
-    end
-
-    # 4. Plaid's own classifier, mapped conservatively to the taxonomy.
-    if (pfc = PFC_CATEGORY_MAP[pfc_detailed(txn)])
-      return { merchant_name: plaid_merchant_name(txn), category: pfc, source: 'plaid:pfc' }
-    end
-
-    # 5. Vetted keyword rules (whole-token). Lowest-confidence tier — and the only
-    #    category signal that exists at all for Teller/Chase rows, which carry no
-    #    personal_finance_category.
-    if key && (kw = keyword_category(key))
-      return { merchant_name: plaid_merchant_name(txn), category: kw, source: 'keyword' }
-    end
-
-    # 6. Nothing confident. Still hand back Plaid's clean merchant name if we have
-    #    one — a named-but-uncategorized row is far easier to review than a raw blob.
-    { merchant_name: plaid_merchant_name(txn), category: nil, source: 'unmatched' }
+    category, source = resolve_category(learned, txn, key)
+    { merchant_name: resolve_name(learned, txn, key), category: category, source: source }
   end
 
   private
+
+  # The learned tiers that matched, strongest first, as [entry, source] pairs.
+  # A match here is a CANDIDATE, not a verdict — the entry may hold no answer.
+  #
+  #   1. Plaid's stable merchant_entity_id. Same merchant => same id, forever,
+  #      regardless of how the string is formatted. Strongest signal.
+  #   2. The exact canonical merchant key.
+  #   3. Anchored token-PREFIX — bridges Teller's raw "amazon marketplace amzn bill"
+  #      history to Plaid's clean "amazon". Anchored at a token boundary ON PURPOSE:
+  #      a naive substring match would resurrect the "Bug Zapper Racket" -> 'racket'
+  #      -> Yusuf+Musa false positive.
+  def learned_tiers(key, entity)
+    tiers = []
+    tiers << [by_entity[entity], 'learned:entity_id'] if entity && by_entity[entity]
+    tiers << [by_key[key], 'learned:key'] if key && by_key[key]
+    if key && key.length >= MIN_KEY_LENGTH && (prefixed = prefix_lookup(key))
+      tiers << [prefixed, 'learned:prefix']
+    end
+    tiers
+  end
+
+  # First tier with an actual category wins: learned history, then Plaid's own
+  # classifier, then the vetted keyword rules.
+  def resolve_category(learned, txn, key)
+    learned.each do |entry, source|
+      cat = entry[:category]
+      next if cat.blank?                      # tier matched but holds no answer -> try next
+
+      # A one-off OCCASION label (a specific trip/project/party) is not a recurring
+      # merchant/payer label — never stamp it forward. This is the fix for stale event
+      # labels ("Thanksgiving 2024", "Bathroom Project", "Hawaii Trip") propagating
+      # onto unrelated future charges. Treat it as no-answer and keep looking: a
+      # weaker learned tier, or Plaid's own classifier, may still know the real bucket
+      # (Home Depot's history was polluted by a bathroom project, but Plaid still
+      # classifies it HOME_IMPROVEMENT -> Home). Downstream tiers only ever emit
+      # stable buckets, so falling through can never resurrect the occasion.
+      next unless self.class.propagatable?(cat)
+
+      return [cat, source]
+    end
+
+    # Plaid's own classifier, mapped conservatively to the taxonomy.
+    if (pfc = PFC_CATEGORY_MAP[pfc_detailed(txn)])
+      return [pfc, 'plaid:pfc']
+    end
+
+    # Vetted keyword rules (whole-token). Lowest-confidence tier — and the only
+    # category signal that exists at all for Teller/Chase rows, which carry no
+    # personal_finance_category.
+    if key && (kw = keyword_category(key))
+      return [kw, 'keyword']
+    end
+
+    # Nothing confident. resolve_name still hands back Plaid's clean merchant name
+    # if we have one — a named-but-uncategorized row is far easier to review than a
+    # raw blob.
+    [nil, 'unmatched']
+  end
+
+  # Same rule for the name: first tier that has one. For item-specific merchants a
+  # learned name is NEVER propagated — the name is what you bought that day, so we
+  # hand back Plaid's generic name and let the item-lookup pipeline resolve the real
+  # one. Propagating a learned name there is how every Kindle purchase became
+  # "Simple and Sinister".
+  def resolve_name(learned, txn, key)
+    generic = plaid_merchant_name(txn)
+    return generic if item_specific?(key)
+
+    learned.each do |entry, _source|
+      return entry[:merchant_name] if entry[:merchant_name].present?
+    end
+
+    generic
+  end
 
   # Whole-token (and whole-phrase) keyword match against the canonical merchant key.
   # Never a substring match — that is the guardrail, not an implementation detail.
@@ -232,21 +371,6 @@ class Finances::Predictions
       end
     end
     nil
-  end
-
-  # Learned CATEGORY always applies. Learned NAME does not — for item-specific
-  # merchants (Amazon, Kindle) the name is per-product, so we hand back the generic
-  # merchant name and let the item-lookup pipeline resolve the real one. Propagating
-  # a learned name there is how every Kindle purchase became "Simple and Sinister".
-  def result(learned, txn, source)
-    generic = plaid_merchant_name(txn)
-    name = if item_specific?(merchant_key(txn.plaid_name))
-             generic
-           else
-             learned[:merchant_name] || generic
-           end
-
-    { merchant_name: name, category: learned[:category], source: source }
   end
 
   def item_specific?(key)
