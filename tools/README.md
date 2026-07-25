@@ -54,7 +54,7 @@ node finance-api.mjs summary [year] [month]        # Spending by category
 ## API
 
 - **URL**: `https://sifxtre.me/api/financial_transactions`
-- **Auth**: `Authorization: ENTAROTASSADAR`
+- **Auth**: `Authorization: $JARVIS_API_KEY` (set the env var; no hardcoded key — rotated 2026-07-25). Moving to Google auth (see docs/DIRECTION.md).
 - **Frontend**: https://finances.sifxtre.me
 
 ## Related

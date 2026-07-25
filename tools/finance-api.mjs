@@ -19,7 +19,7 @@
  */
 
 const API_BASE_URL = 'https://sifxtre.me/api';
-const API_KEY = process.env.JARVIS_API_KEY || 'ENTAROTASSADAR'; // TODO(#8): drop the literal fallback after key rotation
+const API_KEY = process.env.JARVIS_API_KEY; // no hardcoded key — set JARVIS_API_KEY (god-key rotated 2026-07-25)
 
 // Transactions matching these patterns are always auto-hidden (credit card payments, internal transfers, etc.)
 const HIDE_RULES = [
@@ -59,6 +59,7 @@ export class FinanceAPI {
   constructor(options = {}) {
     this.baseUrl = options.baseUrl || API_BASE_URL;
     this.apiKey = options.apiKey || API_KEY;
+    if (!this.apiKey) throw new Error('JARVIS_API_KEY is required (no hardcoded key). Set it in your env / MCP config.');
     this._cache = new Map();
   }
 

@@ -10,7 +10,7 @@ const month = Number(process.argv[3]) || (now.getMonth() + 1);
 const api = new FinanceAPI();
 const txnsRes = await api.list({ year, month, showHidden: false });
 const txns = txnsRes.results || txnsRes;
-const budgetsRes = await fetch('https://sifxtre.me/api/budgets', { headers: { Authorization: process.env.JARVIS_API_KEY || 'ENTAROTASSADAR' } }).then(r => r.json());
+const budgetsRes = await fetch('https://sifxtre.me/api/budgets', { headers: { Authorization: process.env.JARVIS_API_KEY } }).then(r => r.json());
 const budgets = budgetsRes.results || budgetsRes;
 
 const spent = {};

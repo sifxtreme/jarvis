@@ -62,7 +62,7 @@ async function monthRows({ month, showHidden = false } = {}) {
 }
 async function budgets() {
   const url = (process.env.JARVIS_API_URL || 'https://sifxtre.me/api') + '/budgets';
-  const res = await fetch(url, { headers: { Authorization: process.env.JARVIS_API_KEY || 'ENTAROTASSADAR' } }).then((r) => r.json());
+  const res = await fetch(url, { headers: { Authorization: process.env.JARVIS_API_KEY } }).then((r) => r.json());
   return res.results || res;
 }
 
