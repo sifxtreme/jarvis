@@ -8,7 +8,7 @@
 // The server registers ONLY the tools its scope allows — scope is enforced by tool
 // availability, not by trusting the model. See docs/DIRECTION.md.
 //
-// Env: JARVIS_MCP_SCOPE=grocery|full, JARVIS_API_KEY=<rotated key>, JARVIS_API_URL (optional).
+// Env: JARVIS_MCP_SCOPE=grocery|full, JARVIS_TOKEN=<your Google JWT from finances.sifxtre.me>, JARVIS_API_URL (optional).
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';

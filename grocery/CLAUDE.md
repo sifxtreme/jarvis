@@ -43,5 +43,7 @@ Build the best grocery-insight system you can. Some directions to explore with y
 See [`CHECKLIST.md`](./CHECKLIST.md) for a simple weekly + monthly routine.
 
 ---
-*Setup: Asif adds the `jarvis` MCP server to your Claude Code with grocery scope (see
-`../mcp/README.md`). Once it's added, everything above just works.*
+*Setup (one time): sign in at https://finances.sifxtre.me with your Google account, then
+**Settings → Copy API token**. Asif adds the `jarvis` MCP to your Claude Code with that token
+(grocery scope) — see `../mcp/README.md`. When the token expires (~monthly), copy a fresh one
+the same way. After that, everything above just works.*

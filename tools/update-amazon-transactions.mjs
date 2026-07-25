@@ -1,7 +1,7 @@
 import fs from 'fs';
 
 const API_BASE_URL = 'https://sifxtre.me/api';
-const API_KEY = process.env.JARVIS_API_KEY; // no hardcoded key — set JARVIS_API_KEY
+const API_KEY = process.env.JARVIS_TOKEN; // Google-issued JWT, sent as Bearer (from finances.sifxtre.me)
 
 // Pre-defined item mappings from Amazon order lookups
 // Format: { orderId: { merchantName, category } }
@@ -114,7 +114,7 @@ async function updateTransaction(id, data) {
   const response = await fetch(`${API_BASE_URL}/financial_transactions/${id}`, {
     method: 'PUT',
     headers: {
-      'Authorization': API_KEY,
+      'Authorization': `Bearer ${API_KEY}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(data)
@@ -131,7 +131,7 @@ async function updateTransaction(id, data) {
 // Fetch a single transaction
 async function fetchTransaction(id) {
   const response = await fetch(`${API_BASE_URL}/financial_transactions?year=2025&month=12&show_hidden=false`, {
-    headers: { 'Authorization': API_KEY }
+    headers: { 'Authorization': `Bearer ${API_KEY}` }
   });
   const data = await response.json();
   return data.results.find(t => t.id === id);

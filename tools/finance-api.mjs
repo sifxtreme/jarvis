@@ -19,7 +19,9 @@
  */
 
 const API_BASE_URL = 'https://sifxtre.me/api';
-const API_KEY = process.env.JARVIS_API_KEY; // no hardcoded key — set JARVIS_API_KEY (god-key rotated 2026-07-25)
+// Auth = the same Google-issued JWT the web app uses. Copy your token from
+// finances.sifxtre.me (Google login) and set JARVIS_TOKEN. Sent as a Bearer header.
+const TOKEN = process.env.JARVIS_TOKEN;
 
 // Transactions matching these patterns are always auto-hidden (credit card payments, internal transfers, etc.)
 const HIDE_RULES = [
@@ -58,8 +60,8 @@ const CATEGORY_RULES = [
 export class FinanceAPI {
   constructor(options = {}) {
     this.baseUrl = options.baseUrl || API_BASE_URL;
-    this.apiKey = options.apiKey || API_KEY;
-    if (!this.apiKey) throw new Error('JARVIS_API_KEY is required (no hardcoded key). Set it in your env / MCP config.');
+    this.token = options.token || TOKEN;
+    if (!this.token) throw new Error('JARVIS_TOKEN is required — copy your API token from finances.sifxtre.me (Google login) into JARVIS_TOKEN.');
     this._cache = new Map();
   }
 
@@ -70,7 +72,7 @@ export class FinanceAPI {
     const options = {
       method,
       headers: {
-        'Authorization': this.apiKey,
+        'Authorization': `Bearer ${this.token}`,
         'Content-Type': 'application/json'
       }
     };

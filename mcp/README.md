@@ -33,12 +33,16 @@ Install deps once:
 cd jarvis/mcp && npm install
 ```
 
+**Get your token first:** sign in at https://finances.sifxtre.me with Google (as you already
+do), then **Settings → Copy API token**. That's `JARVIS_TOKEN` below — the same Google-issued
+JWT the web app uses (per-user, ~30 days, revocable). No shared key, no Google Console.
+
 Then add it to Claude Code. **Asif** (full scope):
 
 ```bash
 claude mcp add jarvis --scope user \
   --env JARVIS_MCP_SCOPE=full \
-  --env JARVIS_API_KEY=<the rotated key> \
+  --env JARVIS_TOKEN=<your copied token> \
   -- node /ABSOLUTE/PATH/TO/jarvis/mcp/server.mjs
 ```
 
@@ -47,7 +51,7 @@ claude mcp add jarvis --scope user \
 ```bash
 claude mcp add jarvis --scope user \
   --env JARVIS_MCP_SCOPE=grocery \
-  --env JARVIS_API_KEY=<the rotated key> \
+  --env JARVIS_TOKEN=<your copied token> \
   -- node /ABSOLUTE/PATH/TO/jarvis/mcp/server.mjs
 ```
 
@@ -59,14 +63,14 @@ Or a project `.mcp.json`:
     "jarvis": {
       "command": "node",
       "args": ["/ABSOLUTE/PATH/TO/jarvis/mcp/server.mjs"],
-      "env": { "JARVIS_MCP_SCOPE": "grocery", "JARVIS_API_KEY": "..." }
+      "env": { "JARVIS_MCP_SCOPE": "grocery", "JARVIS_TOKEN": "..." }
     }
   }
 }
 ```
 
-`JARVIS_API_KEY` falls back to the legacy key until the rotation (task #8) lands; after that
-the env var is required. `JARVIS_API_URL` defaults to `https://sifxtre.me/api`.
+`JARVIS_TOKEN` is required (the server fails fast without it). When it expires (~30 days), copy
+a fresh one the same way. `JARVIS_API_URL` defaults to `https://sifxtre.me/api`.
 
 ## Verify
 

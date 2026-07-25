@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { TrendingUp, DollarSign, Calendar, Menu, Sun, Moon, PiggyBank, Settings } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "@/hooks/useTheme";
+import { useToast } from "@/hooks/use-toast";
 import { getGoogleCalendarAuthUrl } from "@/lib/api";
 import {
   DropdownMenu,
@@ -22,7 +23,19 @@ export function Navbar() {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const { toast } = useToast();
   const [calendarConnecting, setCalendarConnecting] = useState(false);
+
+  // Surface the JWT the app already holds so it can be pasted into an MCP config (JARVIS_TOKEN).
+  const copyApiToken = async () => {
+    const token = localStorage.getItem("jarvis_auth_token");
+    if (!token) {
+      toast({ title: "Not signed in", description: "Sign in with Google first, then copy your token." });
+      return;
+    }
+    await navigator.clipboard.writeText(token);
+    toast({ title: "API token copied", description: "Paste it into your MCP config as JARVIS_TOKEN. Valid ~30 days." });
+  };
 
   const connectCalendar = async () => {
     setCalendarConnecting(true);
@@ -72,6 +85,15 @@ export function Navbar() {
               Settings
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="text-xs">
+              <DropdownMenuItem
+                className="text-xs font-medium"
+                onSelect={(event) => {
+                  event.preventDefault();
+                  copyApiToken();
+                }}
+              >
+                Copy API token
+              </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-xs font-medium"
                 onSelect={(event) => {

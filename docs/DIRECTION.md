@@ -92,10 +92,17 @@ a non-technical user needed phone/browser access — not our case.)
 
 ## Security posture
 
-- **Rotate the god-key** `JARVIS_RAILS_PASSWORD` (`ENTAROTASSADAR` is burned — it lived in
-  git history and is logged in plaintext). Move client keys to env. (task #8, #10)
-- **Stop logging the `Authorization` header** (`application_controller.rb:13`). (task #9)
-- Keep Jarvis MCP tokens separate from Google / Plaid / Teller credentials.
+- ✅ **God-key rotated** 2026-07-25. `ENTAROTASSADAR` was world-readable in this public repo and
+  still live — rotated `JARVIS_RAILS_PASSWORD` on the box (old key → 401), removed every
+  hardcoded literal. (tasks #8, #10)
+- ✅ **Auth is now Google, not a shared key.** The repo is public, so **no static key.** The MCP +
+  CLIs authenticate with the **same Google-issued JWT the web app uses** — sent as `Bearer`,
+  from env `JARVIS_TOKEN`. Get it at finances.sifxtre.me → **Settings → Copy API token** (Google
+  login, per-user, ~30-day, revocable via `JwtSession`). No Google Console changes. The static
+  `JARVIS_RAILS_PASSWORD` path remains only as server-side break-glass. Verified end-to-end
+  (valid Bearer JWT → 200, bogus → 401). (task #21)
+- ✅ **Stopped logging the `Authorization` header** (`application_controller.rb`). (task #9)
+- Keep Jarvis JWTs separate from Google / Plaid / Teller credentials.
 - **Test the backup/restore** of Postgres + credentials — untested backups are the real
   single-box risk (a t3.small is otherwise fine; no Kubernetes for two people).
 

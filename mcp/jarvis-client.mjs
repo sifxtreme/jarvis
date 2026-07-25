@@ -11,10 +11,10 @@
 
 import { FinanceAPI } from '../tools/finance-api.mjs';
 
-// Key comes from env (JARVIS_API_KEY). Falls back to the SDK default so it works before the
-// key rotation (task #8); after rotation the env var is authoritative.
+// Token comes from env (JARVIS_TOKEN — the same Google-issued JWT the web app uses,
+// copied from finances.sifxtre.me). The SDK throws if it's missing.
 const api = new FinanceAPI(
-  process.env.JARVIS_API_KEY ? { apiKey: process.env.JARVIS_API_KEY } : {},
+  process.env.JARVIS_TOKEN ? { token: process.env.JARVIS_TOKEN } : {},
 );
 
 const clamp = (n, lo, hi, dflt) => {
@@ -62,7 +62,7 @@ async function monthRows({ month, showHidden = false } = {}) {
 }
 async function budgets() {
   const url = (process.env.JARVIS_API_URL || 'https://sifxtre.me/api') + '/budgets';
-  const res = await fetch(url, { headers: { Authorization: process.env.JARVIS_API_KEY } }).then((r) => r.json());
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${process.env.JARVIS_TOKEN}` } }).then((r) => r.json());
   return res.results || res;
 }
 
