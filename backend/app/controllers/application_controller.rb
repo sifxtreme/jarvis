@@ -22,7 +22,9 @@ class ApplicationController < ActionController::API
       return
     end
 
-    render json: { msg: 'Unauthorized' }, status: 401 unless request.headers['Authorization'] == ENV['JARVIS_RAILS_PASSWORD']
+    # No bearer token → unauthorized. (Static JARVIS_RAILS_PASSWORD break-glass path removed
+    # 2026-07-25 — Google JWT is the only accepted auth.)
+    render json: { msg: 'Unauthorized' }, status: :unauthorized
   end
 
   def user_for_paper_trail
