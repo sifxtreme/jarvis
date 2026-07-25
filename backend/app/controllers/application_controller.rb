@@ -10,8 +10,6 @@ class ApplicationController < ActionController::API
   def validate_header
     return if Rails.env.development?
 
-    Rails.logger.tagged("AUTH") { Rails.logger.warn "Validating authorization header: #{request.headers['Authorization']}" }
-
     token = bearer_token
     if token.present?
       payload = decode_jwt(token)

@@ -19,7 +19,7 @@
  */
 
 const API_BASE_URL = 'https://sifxtre.me/api';
-const API_KEY = 'ENTAROTASSADAR';
+const API_KEY = process.env.JARVIS_API_KEY || 'ENTAROTASSADAR'; // TODO(#8): drop the literal fallback after key rotation
 
 // Transactions matching these patterns are always auto-hidden (credit card payments, internal transfers, etc.)
 const HIDE_RULES = [

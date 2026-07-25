@@ -1,7 +1,7 @@
 import fs from 'fs';
 
 const API_BASE_URL = 'https://sifxtre.me/api';
-const API_KEY = 'ENTAROTASSADAR';
+const API_KEY = process.env.JARVIS_API_KEY || 'ENTAROTASSADAR'; // TODO(#8): drop the literal fallback after key rotation
 
 // Load Amazon transactions from JSON
 function loadAmazonTransactions() {
