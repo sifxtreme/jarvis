@@ -1,0 +1,12 @@
+{
+  "name": "jarvis-mcp",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Local stdio MCP server exposing Jarvis finance + calendar as scoped tools for Asif + Hafsa's Claude Code.",
+  "bin": { "jarvis-mcp": "server.mjs" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.23.8"
+  }
+}
