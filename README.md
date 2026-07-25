@@ -1,8 +1,10 @@
 # Jarvis
 
-A personal finance + calendar hub for Asif & Hafsa — bank sync, spending insights, budgets, and
-a light personal calendar. Increasingly driven through **MCP tools** (each person's Claude Code)
-rather than the web UI. See [`docs/DIRECTION.md`](docs/DIRECTION.md) for the north-star.
+**Jarvis is a private personal-finance app for one household (Asif & Hafsa).** It pulls in bank
+transactions, categorizes them, tracks budgets and spending trends, and keeps a light personal
+calendar. That is the whole scope — it is **not** a chatbot, a work tool, or a multi-tenant
+product. It's increasingly driven through **MCP tools** in each person's Claude Code rather than
+the web UI. North-star: [`docs/DIRECTION.md`](docs/DIRECTION.md).
 
 ## Features
 
@@ -24,8 +26,7 @@ rather than the web UI. See [`docs/DIRECTION.md`](docs/DIRECTION.md) for the nor
 ### Access
 - **Auth: Google Sign-In → JWT.** The web app, the CLIs, and the MCP all authenticate with the
   same Google-issued JWT (Bearer). Allow-listed to Asif + Hafsa. No shared static key.
-- **MCP server** ([`mcp/`](mcp/README.md)) — exposes scoped finance/grocery tools to Claude Code,
-  per user (Asif = full, Hafsa = grocery-only).
+- **MCP server** ([`mcp/`](mcp/README.md)) — exposes read-only finance tools to Claude Code.
 
 ## Architecture
 
@@ -51,9 +52,8 @@ flowchart LR
 jarvis/
 ├── backend/              # Rails 5.2 API + Resque workers (Postgres 14, Redis)
 ├── finance-tracker-app/  # React 18 + Vite + Tailwind SPA (Netlify)
-├── tools/                # finance CLIs (SDK, CSV importers, grocery.mjs, analysis)
+├── tools/                # finance CLIs (SDK, CSV importers, analysis)
 ├── mcp/                  # local stdio MCP server for Claude Code
-├── grocery/              # Hafsa's grocery workspace (CLAUDE.md + checklist)
 └── docs/                 # DIRECTION.md, BANK_SYNC_PRD.md, …
 ```
 
@@ -119,7 +119,6 @@ The static `JARVIS_RAILS_PASSWORD` path still exists as server-side break-glass 
 cd tools && npm install
 export JARVIS_TOKEN=<your token from Settings → Copy API token>
 node budget-vs-actual.mjs 2026 7      # budget vs actual
-node grocery.mjs stores               # grocery spend by store
 node import-chase.mjs --dry-run       # import a Chase CSV (dry run first)
 ```
 

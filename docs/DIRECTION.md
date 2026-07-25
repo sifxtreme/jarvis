@@ -26,7 +26,12 @@ surface**, not the repo or the web UI.
 
 ### Keep + invest
 - **Finance**: bank sync (Plaid / CSV), categorization, budgets, trends. The whole point.
-- **`tools/`**: the consolidated finance CLIs (SDK, importers, `grocery.mjs`, analysis).
+- **`tools/`**: the consolidated finance CLIs (SDK, importers, analysis).
+
+> **Status note (2026-07-25):** everything below about **grocery tools + Hafsa's grocery
+> onboarding is DEFERRED** until Hafsa actually engages (creates a GitHub, takes action). The
+> grocery MCP tools + `grocery.mjs` + `grocery/` workspace were removed for now; the MCP is
+> **finance-only**. The design below is the plan for when it returns — not the current state.
 
 ### Keep the KERNEL, freeze the product — Calendar
 Calendar is largely superseded by cloud tools, BUT its primitives will back a future
