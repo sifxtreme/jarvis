@@ -61,9 +61,9 @@ class Plaid::API
 
       # Only ingest POSTED transactions AFTER the cutoff.
       # - pending: a pending row gets a different transaction_id once it posts,
-      #   so filtering keeps plaid_id stable.
+      #   so filtering keeps external_id stable.
       # - sync_from_date: Teller and Plaid assign DIFFERENT transaction_ids, so
-      #   find_or_initialize_by(plaid_id) can't dedupe across them. Without this
+      #   find_or_initialize_by(external_id) can't dedupe across them. Without this
       #   cutoff, Plaid's ~24-month backfill would re-insert every Amex txn Teller
       #   already synced as duplicate rows. Mirrors Teller::API's sync_from_date
       #   filter — ingest strictly after the date Teller last covered.
@@ -75,7 +75,7 @@ class Plaid::API
       Rails.logger.info "[Plaid] Found #{posted.count} posted transactions for #{bank.name}"
 
       posted.each do |trx|
-        f = FinancialTransaction.find_or_initialize_by(plaid_id: trx['transaction_id'])
+        f = FinancialTransaction.find_or_initialize_by(external_id: trx['transaction_id'])
 
         next if f.reviewed?
 
@@ -106,7 +106,7 @@ class Plaid::API
         removed_id = trx.is_a?(Hash) ? trx['transaction_id'] : trx
         next if removed_id.blank?
 
-        FinancialTransaction.where(plaid_id: removed_id).update_all(hidden: true)
+        FinancialTransaction.where(external_id: removed_id).update_all(hidden: true)
       end
 
       bank.update!(transactions_cursor: cursor)

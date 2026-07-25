@@ -17,8 +17,8 @@
 //   credit=NEG. jarvis_amount = -csv_amount, uniform across every Type.
 // DATE: Jarvis transacted_at == CSV col 1 "Transaction Date" (NOT Post Date). Verified.
 // PAYMENTS: CC pay-offs (Type=Payment) → hidden=true (Teller did the same).
-// PROVENANCE: each row gets a deterministic synthetic plaid_id (the poorly-named generic
-//   transaction_id) → csv:hafsa_chase:<date>:<amount>:<descslug>:<n>. Re-dropping the same
+// PROVENANCE: each row gets a deterministic synthetic external_id (the generic external
+//   transaction id) → csv:hafsa_chase:<date>:<amount>:<descslug>:<n>. Re-dropping the same
 //   statement is idempotent (script skips any synthetic id already in existing_csv_ids.txt).
 //
 // Run: node import-chase.mjs --dry-run   |   node import-chase.mjs
@@ -32,7 +32,7 @@ const DRY = process.argv.includes('--dry-run');
 const CSV_PATH = '/Users/asifahmed/Downloads/Chase5797_Activity_20260725.csv';
 const SCRATCH = '/private/tmp/claude-501/-Users-asifahmed-code/94ae78ab-8c9a-4016-b026-0fcfc6d3167f/scratchpad';
 const EXISTING_PATH = `${SCRATCH}/existing_hafsa_chase.txt`;      // date|amount (raw, whole window)
-const EXISTING_IDS_PATH = `${SCRATCH}/existing_csv_ids.txt`;      // synthetic plaid_ids already in DB
+const EXISTING_IDS_PATH = `${SCRATCH}/existing_csv_ids.txt`;      // synthetic external_ids already in DB
 const LAST_SYNCED = '2026-07-05';                                 // newest hafsa_chase txn Teller got
 const SOURCE = 'hafsa_chase';
 
@@ -124,12 +124,12 @@ async function main() {
     // post-freeze = genuine gap
     const oc = `${k}|${slug(r.descRaw)}`;
     const n = occ.get(oc) || 0; occ.set(oc, n+1);
-    const plaidId = `csv:${SOURCE}:${r.date}:${r.jarvisAmount.toFixed(2)}:${slug(r.descRaw)}:${n}`;
-    if (existingIds.has(plaidId)) continue; // idempotent re-run
+    const externalId = `csv:${SOURCE}:${r.date}:${r.jarvisAmount.toFixed(2)}:${slug(r.descRaw)}:${n}`;
+    if (existingIds.has(externalId)) continue; // idempotent re-run
     const mapped = MAP[r.descRaw];
     if (!mapped) { console.error(`NO MAP for: "${r.descRaw}" (${r.date} ${r.jarvisAmount})`); process.exitCode = 1; continue; }
     const [merchant, category, hidden] = mapped;
-    toImport.push({ ...r, plaidId, merchant, category, hidden: !!hidden });
+    toImport.push({ ...r, externalId, merchant, category, hidden: !!hidden });
   }
 
   console.log(`Chase CSV: ${rows.length} rows (${rows[rows.length-1].date} → ${rows[0].date})`);
@@ -155,7 +155,7 @@ async function main() {
       amount: r.jarvisAmount,
       transacted_at: r.date,
       source: SOURCE,
-      plaid_id: r.plaidId,
+      external_id: r.externalId,
       ...(r.hidden ? { hidden: true } : {}),
     });
     n++;

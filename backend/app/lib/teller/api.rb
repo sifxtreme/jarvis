@@ -76,7 +76,7 @@ class Teller::API
       Rails.logger.info "[Teller] Found #{filtered_transactions.count} transactions for #{bank.name}"
 
       filtered_transactions.each do |trx|
-        f = FinancialTransaction.find_or_initialize_by(plaid_id: trx['id'])
+        f = FinancialTransaction.find_or_initialize_by(external_id: trx['id'])
 
         next if f.reviewed?
 

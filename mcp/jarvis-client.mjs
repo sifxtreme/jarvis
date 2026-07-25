@@ -2,7 +2,7 @@
 //
 // Wraps the shared FinanceAPI SDK (tools/finance-api.mjs) and enforces the safety rules from
 // docs/DIRECTION.md, EVEN THOUGH this is a local stdio server:
-//   - MASK finance output (drop raw_data / plaid_id / account internals; keep only safe fields).
+//   - MASK finance output (drop raw_data / external_id / account internals; keep only safe fields).
 //   - "GROCERY" IS SERVER-DEFINED (category === 'Groceries'), never the model's guess.
 //   - ANNOTATE IS APPEND-ONLY (item note), and REFUSES any non-grocery row.
 //   - No generic SQL/search/mutation is exposed — only these task-shaped helpers.

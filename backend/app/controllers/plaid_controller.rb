@@ -60,7 +60,7 @@ class PlaidController < ApplicationController
       connection.is_active = true
       # On first connect, start Plaid where the previous provider left off. Plaid's
       # backfill reaches ~24 months, and Plaid txn ids DIFFER from Teller's, so
-      # find_or_initialize_by(plaid_id) cannot dedupe across them — without a cutoff
+      # find_or_initialize_by(external_id) cannot dedupe across them — without a cutoff
       # we'd re-insert the entire history as duplicates. Cut over at the last txn
       # already recorded for this source. Only set on create; never override an
       # existing cutoff on re-connect.

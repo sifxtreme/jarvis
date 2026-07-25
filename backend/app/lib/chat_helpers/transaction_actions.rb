@@ -7,7 +7,7 @@ module ChatHelpers
       end
 
       record = FinancialTransaction.create!(
-        plaid_id: nil,
+        external_id: nil,
         plaid_name: transaction['merchant'],
         merchant_name: transaction['merchant'],
         category: transaction['category'],

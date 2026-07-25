@@ -53,7 +53,7 @@ let nonGroceryId = null;
   ok(sum.total !== undefined && Array.isArray(sum.categories), 'finance_spending_summary returns live data');
 
   const txns = await call(c, 'finance_list_transactions', { limit: 20 });
-  ok(txns.every((t) => 'raw_data' in t === false && 'plaid_id' in t === false), 'output is MASKED (no raw_data/plaid_id)');
+  ok(txns.every((t) => 'raw_data' in t === false && 'external_id' in t === false), 'output is MASKED (no raw_data/external_id)');
   const ng = txns.find((t) => t.category && t.category !== 'Groceries');
   nonGroceryId = ng?.id;
   await c.close();

@@ -152,9 +152,9 @@ export class FinanceAPI {
       source: transaction.source || 'bofa',
       hidden: transaction.hidden || false
     };
-    // plaid_id is the (poorly-named) generic transaction_id. For CSV rows we pass a
-    // deterministic synthetic id so re-dropping the same statement is idempotent.
-    if (transaction.plaid_id) body.plaid_id = transaction.plaid_id;
+    // external_id is the generic external transaction id (a Plaid/Teller id, or a
+    // csv:<source>:... synthetic id for CSV rows) so re-dropping a statement is idempotent.
+    if (transaction.external_id) body.external_id = transaction.external_id;
     return this._request('POST', '/financial_transactions', body);
   }
 

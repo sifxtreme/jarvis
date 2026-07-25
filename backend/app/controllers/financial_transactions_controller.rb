@@ -13,7 +13,7 @@ class FinancialTransactionsController < ApplicationController
     show_hidden = params[:show_hidden]
     show_needs_review = params[:show_needs_review]
     exclude_income = params[:exclude_income] == 'true'
-    columns = [:id, :plaid_id, :plaid_name, :merchant_name, :category, :source, :amount, :transacted_at, :created_at,
+    columns = [:id, :external_id, :plaid_name, :merchant_name, :category, :source, :amount, :transacted_at, :created_at,
                :updated_at, :hidden, :reviewed, :amortized_months]
     columns << :raw_data if params[:include_raw_data] == 'true'
     db_query = FinancialTransaction.select(columns).all
@@ -124,7 +124,7 @@ class FinancialTransactionsController < ApplicationController
     data = JSON.parse(request.body.read)
 
     f = FinancialTransaction.new
-    f.plaid_id = data['plaid_id']
+    f.external_id = data['external_id']
     f.plaid_name = data['merchant_name']
     f.merchant_name = data['merchant_name']
     f.category = data['category']
