@@ -5,10 +5,12 @@ class RemoveWorkCalendarFeature < ActiveRecord::Migration[5.2]
   # user_locations/weather were only used by the removed Slack digest.
   # The busy_only column on calendar_connections is left as a harmless vestige.
   def up
-    execute "DELETE FROM calendar_connections WHERE busy_only = true"
+    # Drop the feature tables FIRST — busy_sync_logs/busy_blocks have FKs to
+    # calendar_connections, so deleting the connections is blocked until they're gone.
     drop_table :busy_blocks, if_exists: true
     drop_table :busy_sync_logs, if_exists: true
     drop_table :user_locations, if_exists: true
+    execute "DELETE FROM calendar_connections WHERE busy_only = true"
   end
 
   def down
