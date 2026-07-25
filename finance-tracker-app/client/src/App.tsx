@@ -6,9 +6,7 @@ import TrendsPage from './pages/TrendsPage';
 import TellerRepairPage from './pages/TellerRepairPage';
 import PlaidConnectPage from './pages/PlaidConnectPage';
 import CalendarPage from './pages/CalendarPage';
-import ChatPage from './pages/ChatPage';
 import { AuthModal } from '@/components/AuthModal';
-import { ChatWidget } from '@/components/ChatWidget';
 import { Navbar } from '@/components/Navbar';
 import { Toaster } from '@/components/ui/toaster';
 import { verifyAuthentication, useAuthStore } from '@/lib/api';
@@ -78,14 +76,12 @@ function App() {
             <Routes>
               <Route path="/" element={<TransactionsPage />} />
               <Route path="/calendar" element={<CalendarPage />} />
-              <Route path="/chat" element={<ChatPage />} />
               <Route path="/yearly-budget" element={<YearlyBudgetPage />} />
               <Route path="/trends" element={<TrendsPage />} />
               <Route path="/teller-repair" element={<TellerRepairPage />} />
               <Route path="/plaid-connect" element={<PlaidConnectPage />} />
             </Routes>
           </div>
-          <ChatWidget />
         </div>
       ) : (
         // Show login prompt only if not authenticated and modal not already showing

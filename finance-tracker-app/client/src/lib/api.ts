@@ -318,16 +318,6 @@ export interface Budget {
   display_order: number;
 }
 
-export type ChatMessage = {
-  id: number;
-  role: "user" | "assistant";
-  text: string | null;
-  image_url?: string | null;
-  created_at: string;
-  event_created?: boolean;
-  action?: string | null;
-};
-
 // Category used for transactions that don't match any budget category
 export const OTHER_CATEGORY = "Other" as const;
 export type OtherCategory = typeof OTHER_CATEGORY;
@@ -368,50 +358,6 @@ export const api = {
     const response = await axiosInstance.put<Transaction>(`/financial_transactions/${id}`, data);
     return response.data;
   }
-};
-
-export const getChatMessages = async (params?: {
-  limit?: number;
-  beforeId?: number;
-}): Promise<{ messages: ChatMessage[]; has_more?: boolean; next_before_id?: number | null }> => {
-  const response = await axiosInstance.get<{
-    messages: ChatMessage[];
-    has_more?: boolean;
-    next_before_id?: number | null;
-  }>('/chat/messages', {
-    params: {
-      limit: params?.limit,
-      before_id: params?.beforeId,
-    },
-  });
-  return response.data || { messages: [] };
-};
-
-export const createChatMessage = async (
-  text: string,
-  imageFile?: File
-): Promise<{ message: ChatMessage; reply: ChatMessage & { event_created?: boolean; action?: string | null } }> => {
-  if (imageFile) {
-    const formData = new FormData();
-    formData.append('text', text);
-    formData.append('image', imageFile);
-    const response = await axiosInstance.post<{ message: ChatMessage; reply: ChatMessage & { event_created?: boolean } }>(
-      '/chat/messages',
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
-    );
-    return response.data;
-  }
-
-  const response = await axiosInstance.post<{ message: ChatMessage; reply: ChatMessage & { event_created?: boolean } }>(
-    '/chat/messages',
-    { text }
-  );
-  return response.data;
-};
-
-export const resetChatThread = async (): Promise<void> => {
-  await axiosInstance.delete('/chat/thread');
 };
 
 export const getTransactions = async (filters: TransactionFilters): Promise<Transaction[]> => {
