@@ -5,13 +5,6 @@ transactions_syncer:
   args:
   description: "Sync Transactions from Plaid"
 
-testing_resque:
-  cron: "*/5 * * * *"
-  class: "TestJobX"
-  queue: test
-  args:
-  description: "This job queues testing jobs"
-
 calendar_busy_sync:
   cron: "*/10 * * * *"
   class: "SyncCalendarBusyBlocks"
