@@ -1,4 +1,4 @@
-import { FinanceAPI } from '/Users/asifahmed/code/experiments/finance-tools/finance-api.mjs';
+import { FinanceAPI } from './finance-api.mjs';
 const api = new FinanceAPI();
 
 const recurring = [
