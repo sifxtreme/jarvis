@@ -110,8 +110,8 @@ a non-technical user needed phone/browser access — not our case.)
   CLIs authenticate with the **same Google-issued JWT the web app uses** — sent as `Bearer`,
   from env `JARVIS_TOKEN`. Get it at finances.sifxtre.me → **Settings → Copy API token** (Google
   login, per-user, ~30-day, revocable via `JwtSession`). No Google Console changes. The static
-  `JARVIS_RAILS_PASSWORD` path remains only as server-side break-glass. Verified end-to-end
-  (valid Bearer JWT → 200, bogus → 401). (task #21)
+  `JARVIS_RAILS_PASSWORD` path was **removed** (2026-07-25, security audit) — Google JWT is the
+  only accepted auth; no bearer token → 401. Verified end-to-end. (tasks #21, security audit)
 - ✅ **Stopped logging the `Authorization` header** (`application_controller.rb`). (task #9)
 - Keep Jarvis JWTs separate from Google / Plaid / Teller credentials.
 - **Test the backup/restore** of Postgres + credentials — untested backups are the real

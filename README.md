@@ -97,7 +97,7 @@ sequenceDiagram
   A-->>C: data
 ```
 
-The static `JARVIS_RAILS_PASSWORD` path still exists as server-side break-glass only.
+The static `JARVIS_RAILS_PASSWORD` path was **removed** (2026-07-25) — Google JWT is the only accepted auth; no bearer token → 401.
 
 ## Deploy
 
