@@ -21,8 +21,6 @@ Rails.application.routes.draw do
   post 'plaid/link_token', to: 'plaid#link_token'
   post 'plaid/exchange', to: 'plaid#exchange'
 
-  resources :user_locations, only: [:index, :create, :update, :destroy]
-
   get 'auth/google_oauth2/callback', to: 'google_calendar_auth#callback'
   get 'auth/session', to: 'session#show'
   post 'auth/session', to: 'session#create'

@@ -10,13 +10,12 @@ class CalendarController < ApplicationController
     calendars = client.list_calendars
 
     calendars.each do |cal|
-      next unless cal[:primary] || cal[:access_role] == 'freeBusyReader'
+      next unless cal[:primary] # personal calendars only — no work/freeBusyReader calendars
 
       CalendarConnection.find_or_initialize_by(user: user, calendar_id: cal[:id]).update(
         summary: cal[:summary],
         access_role: cal[:access_role],
         primary: cal[:primary] || false,
-        busy_only: cal[:access_role] == 'freeBusyReader',
         sync_enabled: true,
         time_zone: cal[:time_zone]
       )
@@ -32,20 +31,12 @@ class CalendarController < ApplicationController
     users = User.where(active: true)
 
     connections = CalendarConnection.where(user: users).index_by { |c| [c.user_id, c.calendar_id] }
-    work_calendars = CalendarConnection.where(user: users, busy_only: true, sync_enabled: true)
-                                        .select(:calendar_id, :summary)
-                                        .distinct
 
     events = CalendarEvent.where(user: users)
                           .where.not(status: 'cancelled')
                           .where(start_at: start_time..end_time)
                           .order(:start_at)
                           .map { |event| serialize_event(event, connections) }
-
-    busy_blocks = BusyBlock.where(user: users)
-                           .where(start_at: start_time..end_time)
-                           .order(:start_at)
-                           .map { |block| serialize_busy(block, connections) }
 
     render json: {
       window: {
@@ -54,8 +45,8 @@ class CalendarController < ApplicationController
       },
       current_user_id: current_user&.id,
       users: users.map { |u| { id: u.id, email: u.email } },
-      work_calendars: work_calendars.map { |cal| { calendar_id: cal.calendar_id, summary: cal.summary } },
-      items: (events + busy_blocks).sort_by { |item| item[:start_at] }
+      work_calendars: [], # work-calendar / busy-block feature removed
+      items: events
     }
   end
 
@@ -63,10 +54,9 @@ class CalendarController < ApplicationController
     user = current_user
     return render json: { msg: 'Unauthorized' }, status: :unauthorized unless user
 
-    data = params.permit(:calendar_id, :busy_only, :sync_enabled)
+    data = params.permit(:calendar_id, :sync_enabled)
     connection = CalendarConnection.find_or_initialize_by(user: user, calendar_id: data[:calendar_id])
     connection.update(
-      busy_only: ActiveModel::Type::Boolean.new.cast(data[:busy_only]),
       sync_enabled: ActiveModel::Type::Boolean.new.cast(data[:sync_enabled])
     )
 
@@ -236,22 +226,7 @@ class CalendarController < ApplicationController
       calendar_id: event.calendar_id,
       calendar_summary: connection&.summary,
       user_id: event.user_id,
-      busy_only: false,
       is_recurring: raw['recurringEventId'].present? || raw['recurrence'].present? || raw['originalStartTime'].present?
-    }
-  end
-
-  def serialize_busy(block, connections)
-    connection = connections[[block.user_id, block.calendar_id]]
-    {
-      id: block.id,
-      type: 'busy',
-      start_at: block.start_at&.iso8601,
-      end_at: block.end_at&.iso8601,
-      calendar_id: block.calendar_id,
-      calendar_summary: connection&.summary,
-      user_id: block.user_id,
-      busy_only: true
     }
   end
 end

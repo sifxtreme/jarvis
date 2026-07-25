@@ -39,45 +39,6 @@ class SyncCalendarEvents
     end
   end
 
-  def self.sync_busy_blocks(connection, client, time_min, time_max)
-    response = client.freebusy(calendar_ids: [connection.calendar_id], time_min: time_min, time_max: time_max)
-    busy_times = response.calendars[connection.calendar_id]&.busy || []
-
-    BusyBlock.where(user_id: connection.user_id, calendar_id: connection.calendar_id)
-             .where("start_at < ? OR start_at > ?", time_min, time_max)
-             .delete_all
-
-    existing = BusyBlock.where(user_id: connection.user_id, calendar_id: connection.calendar_id)
-                        .where(start_at: time_min..time_max)
-                        .pluck(:id, :start_at, :end_at)
-                        .map { |id, start_at, end_at| [busy_key(start_at, end_at), id] }
-                        .to_h
-
-    seen_keys = []
-    busy_times.each do |block|
-      start_at = parse_time(block.start)
-      end_at = parse_time(block.end)
-      next unless start_at && end_at
-
-      key = busy_key(start_at, end_at)
-      seen_keys << key
-
-      next if existing.key?(key)
-
-      BusyBlock.create!(
-        user_id: connection.user_id,
-        calendar_id: connection.calendar_id,
-        start_at: start_at,
-        end_at: end_at
-      )
-    end
-
-    stale_ids = existing.reject { |key, _id| seen_keys.include?(key) }.values
-    BusyBlock.where(id: stale_ids).delete_all if stale_ids.any?
-
-    connection.update(last_synced_at: Time.current)
-  end
-
   def self.sync_full_events(connection, client, time_min, time_max)
     events = client.list_events(
       calendar_id: connection.calendar_id,
@@ -139,10 +100,6 @@ class SyncCalendarEvents
     Time.zone.parse(value.to_s)
   rescue StandardError
     nil
-  end
-
-  def self.busy_key(start_at, end_at)
-    "#{start_at.iso8601}-#{end_at.iso8601}"
   end
 
   def self.handle_calendar_auth_expired!(user, error: nil, calendar_id: nil, source: 'unknown')
