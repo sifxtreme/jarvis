@@ -698,3 +698,17 @@ export const getRecurringStatus = async (filters: RecurringStatusFilters = {}): 
     throw new Error(`Failed to fetch recurring status: ${errorMessage}`);
   }
 };
+
+export type SyncAccount = {
+  source: string;
+  label: string;
+  method: 'plaid' | 'csv';
+  newest: string | null;
+  days_stale: number | null;
+  status: 'ok' | 'aging' | 'stale' | 'check' | 'unknown';
+};
+
+export const getSyncStatus = async (): Promise<{ as_of: string; accounts: SyncAccount[] }> => {
+  const response = await axiosInstance.get<{ as_of: string; accounts: SyncAccount[] }>('/sync/status');
+  return response.data;
+};

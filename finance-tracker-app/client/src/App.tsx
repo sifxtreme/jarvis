@@ -6,6 +6,7 @@ import TrendsPage from './pages/TrendsPage';
 import TellerRepairPage from './pages/TellerRepairPage';
 import PlaidConnectPage from './pages/PlaidConnectPage';
 import CalendarPage from './pages/CalendarPage';
+import SyncStatusPage from './pages/SyncStatusPage';
 import { AuthModal } from '@/components/AuthModal';
 import { Navbar } from '@/components/Navbar';
 import { Toaster } from '@/components/ui/toaster';
@@ -80,6 +81,7 @@ function App() {
               <Route path="/trends" element={<TrendsPage />} />
               <Route path="/teller-repair" element={<TellerRepairPage />} />
               <Route path="/plaid-connect" element={<PlaidConnectPage />} />
+              <Route path="/sync" element={<SyncStatusPage />} />
             </Routes>
           </div>
         </div>

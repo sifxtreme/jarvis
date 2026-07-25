@@ -94,6 +94,9 @@ export function Navbar() {
               >
                 Copy API token
               </DropdownMenuItem>
+              <DropdownMenuItem className="text-xs font-medium" asChild>
+                <Link to="/sync">Sync Status</Link>
+              </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-xs font-medium"
                 onSelect={(event) => {
