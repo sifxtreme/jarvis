@@ -1,0 +1,12 @@
+node_modules/
+
+# Personal purchase data — scraped Amazon orders/items. Never commit.
+amazon_transactions.json
+amazon_matches.json
+order_details.json
+*_status.json
+
+# Secrets
+.env
+.env.*
+package-lock.json

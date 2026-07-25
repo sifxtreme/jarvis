@@ -1,0 +1,15 @@
+{
+  "name": "amazon-finance-matcher",
+  "version": "1.0.0",
+  "description": "Scripts to automatically categorize Amazon transactions in the finance tracker at https://finances.sifxtre.me",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "playwright-core": "^1.61.1"
+  }
+}
