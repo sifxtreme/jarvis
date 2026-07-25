@@ -44,14 +44,20 @@ event", "show me what Claude created so I can fix it"):
 to review events after MCP launches, retire the grid later (service layer stays).
 First carve a narrow `CalendarService` boundary with tests around sync + CRUD, *then* cut.
 
-### Cut entirely
-- **Web chat panel** (in-app Gemini chat that created events/txns) — "not a useful way to
-  operate." Slack + MCP replace it. (task #5)
-- **Memory feature** (write-only, no read UI) — superseded by the real memory system. (task #5)
-- **Work-calendar features**: busy-block sync, weekly Slack "work report", morning weather
-  digest, work classifications — replaced by cloud tools. (task #6)
-- **Dead scaffolding**: `TestJobX` + `Dummy` model — done (commit `045103b`).
-- **`mobile-app/`** — done (commit `3c693b8`).
+### Cut entirely — ✅ DONE + DEPLOYED 2026-07-25
+- ✅ **Web chat panel** + **Slack bot** + the shared Gemini/chat engine — "not a useful way to
+  operate; no more Slack." Removed frontend + 40 backend files. (task #5)
+- ✅ **Memory feature** — removed; the 5 stored memories were archived to
+  `cerebro-prds/personal/` first (mostly bot mis-captures). (task #5)
+- ✅ **Work-calendar / busy-block feature** — busy-block sync + reads, weekly "work report",
+  weather digest, `user_locations`, and the **776 + GoodRx work-cal connections** all removed.
+  We no longer read Asif's or Hafsa's work calendars. Personal calendar sync/CRUD/UI kept and
+  verified serving. (task #6)
+- ✅ **Dead scaffolding**: `TestJobX` + `Dummy` model (`045103b`); **`mobile-app/`** (`3c693b8`).
+- ✅ **Orphaned tables dropped**: chat/Slack/Memory/`dummies` (263K rows) + busy/weather tables
+  (`busy_sync_logs` 56K rows). Data archived where meaningful. (tasks #22, #6)
+
+The calendar UI is now truly the **freeze-only kernel**: personal events only, no work/busy.
 
 ---
 
