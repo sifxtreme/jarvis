@@ -1,7 +1,27 @@
 # Bank Sync & Categorization — Architecture / Decision Record
 
-**Owner:** Asif · **Last updated:** 2026-07-12
+**Owner:** Asif · **Last updated:** 2026-07-25
 **Supersedes:** `PLAID_INTEGRATION_PLAN.md` (which was the Amex-only migration plan; kept for history)
+
+---
+
+## 2026-07-25 — major changes (full teardown in `DIRECTION.md`)
+
+- **Auth is now Google JWT — no static key.** MCP + CLIs use the same Google-issued JWT the web
+  app uses (Bearer, env `JARVIS_TOKEN`; grab it at finances.sifxtre.me → Settings → Copy API
+  token). The god-key `ENTAROTASSADAR` was world-readable in this **public** repo → rotated on
+  the box + all hardcoded literals removed.
+- **`plaid_id` → `external_id`** — column was misnamed (holds Plaid/Teller/`csv:` ids). Renamed
+  everywhere (migration + Teller/Plaid sync + tools + MCP).
+- **Sync Status UI** (`/sync`, Settings menu) — shows only the accounts we actually sync
+  (Amex/Plaid, Chase/CSV, BofA/CSV), flags stale ones intelligently. Ad-hoc zelle/venmo/cash and
+  old closed accounts are hidden.
+- **Teardown:** web chat + Slack bot + Gemini engine, the Memory feature, and the
+  work-calendar/busy-block feature all removed. **No more Slack; we no longer read Asif's or
+  Hafsa's work calendars.** Orphaned tables dropped (chat/Slack/Memory/`dummies` 263K rows +
+  busy 56K rows).
+- **Chase** is CSV-only now (Teller frozen; retirement = task #16). **Amex** stays on Plaid
+  (auto-sync, healthy). CSV dedup = multiset `(date, amount)` + date-floor (§3b).
 
 ---
 
