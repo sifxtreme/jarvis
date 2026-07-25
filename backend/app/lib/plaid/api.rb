@@ -97,6 +97,9 @@ class Plaid::API
         f.amount = trx['amount'].to_f
         f.source = bank.name
         f.raw_data = trx
+        # CC-payment / autopay rows are transfers, not spend — auto-hide them
+        # (e.g. "MOBILE PAYMENT - THANK YOU", "AUTOPAY PAYMENT - THANK YOU").
+        f.hidden = true if f.plaid_name.to_s =~ /payment.*thank/i
 
         f.save!
       end
