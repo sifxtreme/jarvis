@@ -107,9 +107,6 @@ export function Navbar() {
                 {calendarConnecting ? "Connecting..." : "Connect Calendar"}
               </DropdownMenuItem>
               <DropdownMenuItem className="text-xs font-medium" asChild>
-                <Link to="/teller-repair">Teller Repair</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="text-xs font-medium" asChild>
                 <Link to="/plaid-connect">Connect Amex</Link>
               </DropdownMenuItem>
               <DropdownMenuItem className="text-xs font-medium" asChild>

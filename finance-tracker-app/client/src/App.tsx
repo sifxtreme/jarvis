@@ -3,7 +3,6 @@ import { Routes, Route, useLocation } from 'react-router-dom';
 import TransactionsPage from './pages/TransactionsPage';
 import YearlyBudgetPage from './pages/YearlyBudgetPage';
 import TrendsPage from './pages/TrendsPage';
-import TellerRepairPage from './pages/TellerRepairPage';
 import PlaidConnectPage from './pages/PlaidConnectPage';
 import CalendarPage from './pages/CalendarPage';
 import SyncStatusPage from './pages/SyncStatusPage';
@@ -38,7 +37,6 @@ function App() {
       "/calendar": "Calendar",
       "/trends": "Trends",
       "/yearly-budget": "Yearly Budget",
-      "/teller-repair": "Teller Repair",
       "/plaid-connect": "Connect Amex",
     };
     const suffix = titleMap[location.pathname] || "Dashboard";
@@ -79,7 +77,6 @@ function App() {
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/yearly-budget" element={<YearlyBudgetPage />} />
               <Route path="/trends" element={<TrendsPage />} />
-              <Route path="/teller-repair" element={<TellerRepairPage />} />
               <Route path="/plaid-connect" element={<PlaidConnectPage />} />
               <Route path="/sync" element={<SyncStatusPage />} />
             </Routes>

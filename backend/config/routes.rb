@@ -10,13 +10,6 @@ Rails.application.routes.draw do
 
   resources :budgets, only: [:index]
 
-  # Teller API utilities
-  get 'teller/accounts', to: 'teller#accounts'
-  get 'teller/health', to: 'teller#health'
-  post 'teller/connections/:id/repair', to: 'teller#repair'
-  get 'teller/enrollment', to: 'teller_enrollments#show'
-  post 'teller/enrollment', to: 'teller_enrollments#create'
-
   # Plaid API utilities (Amex via OAuth)
   post 'plaid/link_token', to: 'plaid#link_token'
   post 'plaid/exchange', to: 'plaid#exchange'
