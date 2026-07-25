@@ -1,268 +1,133 @@
 # Jarvis
 
-Personal finance + calendar hub with bank sync, spending insights, and scheduling.
+A personal finance + calendar hub for Asif & Hafsa — bank sync, spending insights, budgets, and
+a light personal calendar. Increasingly driven through **MCP tools** (each person's Claude Code)
+rather than the web UI. See [`docs/DIRECTION.md`](docs/DIRECTION.md) for the north-star.
 
 ## Features
 
-### Transaction Management
-- **Multi-Bank Sync** - Automatically syncs transactions from multiple banks via Teller API (every 3 hours)
-- **Smart Categorization** - ML-based prediction of transaction categories and merchant names
-- **Transaction Search** - Fast search with trigram indexing
-- **Quick Add** - Easily add manual transactions (cash, Zelle, Venmo, etc.)
+### Money (the core)
+- **Amex** — auto-syncs every 3 hours via **Plaid** (`bank_connections` id 9).
+- **Chase & BofA** — **CSV import** (`tools/import-chase.mjs` / `import-bofa.mjs`), with multiset
+  `(date, amount)` + date-floor dedup so re-drops don't double-count. See
+  [`docs/BANK_SYNC_PRD.md`](docs/BANK_SYNC_PRD.md).
+- **Categorization** — learned-history + rules (per-person: e.g. Target→kids, Kindle→Hafsa),
+  not a black-box ML model. Amazon rows are categorized by item via a separate lookup.
+- **Budgets & Trends** — month-over-month by category/merchant; budget-vs-actual; missing-recurring.
+- **Sync Status** (`/sync`) — surfaces *only* the accounts we actually sync and flags stale ones
+  (Amex auto, Chase/BofA CSV). Ad-hoc entries (Zelle/Venmo/cash) and old closed accounts are hidden.
 
-### Spending Insights
-- **Trends Dashboard** - Month-over-month spending by category and merchant
-- **Budget Tracking** - Track spending against budgets with visualizations
-- **Missing Recurring Alerts** - Automatically detects recurring transactions that haven't hit yet
+### Calendar (kernel only)
+- **Personal** Google Calendar sync + a `/calendar` UI (day/week/2-week/month), create/update/delete.
+- Frozen to the essentials — **no work calendars, no busy-blocks, no in-app chat.**
 
-### Bank Integrations
-- **Teller Repair Tool** - Built-in tool to fix disconnected bank connections (MFA)
-- **Supported Banks** - Chase, Amex, Bank of America, Citi, Capital One, 5000+ others
-
-### Calendar + Automation
-- **Calendar Sync** [Live] — Personal events + busy-only work calendars. See docs/features/CALENDAR_SYNC.md.
-- **Calendar UI** [Live] — /calendar page with day/week/2-week/month views. See docs/features/CALENDAR_UI.md.
-- **Calendar Chat (Web)** [Live] — In-app chat to create events (text only). See docs/features/JARVIS_CHAT.md.
-- **Calendar Delete** [Live] — Delete calendar events from the UI (syncs to Google).
-- **Slack Bot** [Live] — Screenshot + text ingestion for calendar events. See docs/features/SLACK_BOT.md.
-- **Gemini Extraction** [Live] — Intent + extraction with cost logging. See docs/features/GEMINI_EXTRACTION.md.
-- **Google Auth** [Live] — Google Sign-In + session auth for the API. See docs/features/GOOGLE_AUTH.md.
-- **Calendar Future** [Planned] — Bulk actions + chat panel improvements. See docs/features/CALENDAR_FUTURE.md.
-
-### Planned / Not Live Yet
-- **Slack Data Agent** [Planned] — Ask finance questions in Slack with read-only SQL. See docs/features/SLACK_DATA_AGENT.md.
+### Access
+- **Auth: Google Sign-In → JWT.** The web app, the CLIs, and the MCP all authenticate with the
+  same Google-issued JWT (Bearer). Allow-listed to Asif + Hafsa. No shared static key.
+- **MCP server** ([`mcp/`](mcp/README.md)) — exposes scoped finance/grocery tools to Claude Code,
+  per user (Asif = full, Hafsa = grocery-only).
 
 ## Architecture
 
+```mermaid
+flowchart LR
+  web["Web app<br/>finances.sifxtre.me"]
+  cc["Claude Code<br/>(Asif · Hafsa)"]
+  mcp["Jarvis MCP<br/>scoped per user"]
+  api["Rails API<br/>Google-JWT auth"]
+  pg[("Postgres")]
+  plaid["Amex → Plaid<br/>auto every 3h"]
+  csv["Chase / BofA<br/>CSV import"]
+
+  web -->|Bearer JWT| api
+  cc --> mcp
+  mcp -->|Bearer JWT| api
+  api --> pg
+  plaid --> api
+  csv -->|import-*.mjs| api
+```
+
 ```
 jarvis/
-├── backend/                 # Rails API + background workers
-├── finance-tracker-app/     # React frontend (SPA)
-├── docs/                    # Documentation
-└── docker-compose.yml       # Container orchestration
+├── backend/              # Rails 5.2 API + Resque workers (Postgres 14, Redis)
+├── finance-tracker-app/  # React 18 + Vite + Tailwind SPA (Netlify)
+├── tools/                # finance CLIs (SDK, CSV importers, grocery.mjs, analysis)
+├── mcp/                  # local stdio MCP server for Claude Code
+├── grocery/              # Hafsa's grocery workspace (CLAUDE.md + checklist)
+└── docs/                 # DIRECTION.md, BANK_SYNC_PRD.md, …
 ```
 
-| Component | Tech Stack | Deployment |
-|-----------|------------|------------|
-| Backend | Rails 5.2, PostgreSQL 14, Redis, Resque | Docker (self-hosted) |
-| Frontend | React 18, Vite, TailwindCSS, Radix UI, Recharts | Netlify (auto-deploy) |
+| Component | Stack | Deploy |
+|---|---|---|
+| Backend | Rails 5.2, Postgres 14, Redis, Resque | Docker on the box (`./deploy.sh`) |
+| Frontend | React 18, Vite, Tailwind, Radix | Netlify (auto on push to `master`) |
 
-## Quick Start
-
-### Prerequisites
-- Docker & Docker Compose
-- Node.js (for frontend development)
-
-### Backend
-```bash
-# Copy environment file
-cp jarvis.env.template jarvis.env
-# Edit with your secrets
-vim jarvis.env
-
-# Start all services
-docker-compose up -d
-
-# Run migrations
-docker-compose run api rake db:migrate
-```
-
-### Frontend
-```bash
-cd finance-tracker-app
-npm install
-npm run dev  # http://localhost:3001
-```
-
-## Frontend Pages
+## Frontend pages
 
 | Route | Description |
-|-------|-------------|
-| `/` | Transaction list with filters and search |
-| `/trends` | Spending trends with charts (MoM by category/merchant) |
-| `/calendar` | Calendar with day/week/2-week/month views |
+|---|---|
+| `/` | Transactions — list, filters, search |
+| `/trends` | Spending trends (MoM by category/merchant) |
+| `/calendar` | Personal calendar (day/week/2-week/month) |
 | `/yearly-budget` | Annual budget overview |
-| `/teller-repair` | Fix disconnected bank enrollments |
+| `/sync` | **Sync status** — which accounts need a refresh |
+| `/plaid-connect` | Connect Amex via Plaid |
 
-## Bank Connections
+Settings menu also has **Copy API token** (your JWT, for MCP configs).
 
-The `bank_connections` table stores credentials for multiple bank accounts.
+## Auth (how tokens work)
 
-| Column | Description |
-|--------|-------------|
-| `name` | Bank identifier (e.g., "chase", "amex") - used as `source` on transactions |
-| `token` | Access token from Teller |
-| `provider` | "teller" or "plaid" |
-| `account_id` | Teller account ID (acc_xxx) |
-| `sync_from_date` | Only sync transactions after this date (nullable) |
-| `is_active` | Whether to sync this bank |
+1. Sign in at https://finances.sifxtre.me with Google → the app POSTs the Google ID token to
+   `POST /api/auth/session`, which validates it and issues a **30-day JWT** (revocable via
+   `jwt_sessions`).
+2. The web app stores that JWT and sends it as `Authorization: Bearer <jwt>`.
+3. CLIs + MCP use the **same** JWT via env `JARVIS_TOKEN` (grab it: Settings → Copy API token).
 
-### Adding a New Bank Connection
-
-1. **Get Access Token** - Use the Teller Repair page (`/teller-repair`) to create a new enrollment
-2. **Get Account ID** - Use the "Lookup Account ID" feature in the repair tool
-3. **Add to Database:**
-   ```ruby
-   BankConnection.create!(
-     name: 'chase',
-     token: 'token_xxx',
-     account_id: 'acc_xxx',
-     provider: 'teller',
-     sync_from_date: Date.today - 90.days,  # optional
-     is_active: true
-   )
-   ```
-
-## API Endpoints
-
-### Transactions
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/financial_transactions` | List transactions with filters |
-| POST | `/financial_transactions` | Create manual transaction |
-| PUT | `/financial_transactions/:id` | Update transaction |
-| GET | `/financial_transactions/trends` | Spending trends and aggregations |
-| GET | `/financial_transactions/recurring_status` | Missing recurring transactions |
-
-**Query Parameters:**
-- `year` - Filter by year
-- `month` - Filter by month
-- `query` - Search category, merchant_name, plaid_name, or source
-- `show_hidden` - "true" or "false"
-- `show_needs_review` - "true" for unreviewed transactions
-
-### Teller
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/teller/accounts?token=xxx` | List accounts for a token |
-
-## Deployment
-
-### Frontend (Netlify)
-
-Auto-deploys on push to `master`.
-
-- **Config:** [`netlify.toml`](netlify.toml)
-- **Build:** `npm run build`
-- **Publish:** `finance-tracker-app/client/dist`
-
-### Backend (Docker)
-
-Self-hosted via Docker Compose. Services:
-- `api` - Rails server (port 3000)
-- `worker` - Resque background job processor
-- `scheduler` - Resque scheduler (cron jobs)
-- `db` - PostgreSQL 14
-- `redis` - Redis (job queue + cache)
-
-```bash
-# Deploy updates
-git pull
-docker-compose build api
-docker-compose up -d
-docker-compose run api rake db:migrate
+```mermaid
+sequenceDiagram
+  participant U as You (Google)
+  participant W as Web app
+  participant A as Rails API
+  participant C as CLI / MCP
+  U->>W: Sign in with Google
+  W->>A: POST /auth/session {id_token}
+  A-->>W: 30-day JWT
+  Note over W,C: Settings → Copy API token → JARVIS_TOKEN
+  C->>A: Authorization: Bearer <JWT>
+  A-->>C: data
 ```
 
-## Environment Variables
+The static `JARVIS_RAILS_PASSWORD` path still exists as server-side break-glass only.
 
-Create `jarvis.env`:
+## Deploy
 
-```bash
-QUEUE=*
-RAILS_ENV=development
+- **Frontend:** push to `master` → Netlify builds `finance-tracker-app/client/dist`.
+- **Backend:** `./deploy.sh` → SSHes to the box and runs `update_server.sh`
+  (git pull → docker build → `rake db:migrate` → docker-compose up).
 
-# API Authentication
-JARVIS_RAILS_PASSWORD=your-secret-password
-
-# Email (for daily summaries)
-JARVIS_GMAIL_EMAIL=your-email@gmail.com
-JARVIS_GMAIL_PASSWORD=app-password
-```
-
-Teller credentials (certificates) go in `backend/app/lib/teller/` - see [docs/teller.md](docs/teller.md).
-
-## Background Jobs
-
-Jobs run via Resque. View status at `http://localhost:3000/resque`
+## Background jobs (Resque)
 
 | Job | Schedule | Description |
-|-----|----------|-------------|
-| `SyncTransactionsForBanks` | Every 3 hours | Fetch new transactions from Teller |
-| `Finances::Predictions` | After sync | Predict categories for new transactions |
+|---|---|---|
+| `SyncTransactionsForBanks` | every 3h | fetch new transactions (Plaid) |
+| `Finances::Predictions` | after sync | categorize new transactions |
+| `SyncCalendarEvents` | every 10m | sync personal calendar events |
 
-## Development
-
-### Useful Commands
+## Local tools
 
 ```bash
-# Backend console
-docker-compose run api rails console
-
-# Run specific job manually
-docker-compose run api rails runner "SyncTransactionsForBanks.perform"
-
-# Sync a specific bank
-docker-compose run api rails runner "Teller::API.new.sync_transactions_for_bank(BankConnection.find_by(name: 'chase'))"
-
-# View logs
-docker-compose logs -f api
-docker-compose logs -f worker
+cd tools && npm install
+export JARVIS_TOKEN=<your token from Settings → Copy API token>
+node budget-vs-actual.mjs 2026 7      # budget vs actual
+node grocery.mjs stores               # grocery spend by store
+node import-chase.mjs --dry-run       # import a Chase CSV (dry run first)
 ```
 
-## Common Issues
+## Removed (2026-07-25 teardown)
 
-**Transactions not syncing:**
-1. Check `is_active: true` on bank connection
-2. Check `sync_from_date` isn't filtering them out
-3. Check transaction `status` is "posted"
-4. Check logs: `docker-compose logs -f worker`
-
-**Bank keeps disconnecting (especially Amex):**
-- This is normal bank security behavior
-- Use the Teller Repair page (`/teller-repair`) to reconnect
-- Amex is particularly aggressive with MFA requirements
-
-## Documentation
-
-### General
-- [Backend README](backend/README.md) - Rails API details
-- [Frontend README](finance-tracker-app/README.md) - React app details
-- [Teller Integration](docs/teller.md) - Bank sync, troubleshooting
-- [Future Vision](docs/FUTURE_VISION.md) - Product direction and roadmap
-- [Layout Standards](docs/LAYOUTS.md) - `split-panel` and `full-width` patterns
-- [Next Features](docs/NEXT_FEATURES.md) - Shortlist for upcoming work
-- [Progress Log](docs/progress.md) - Ongoing development notes
-
-### Config & Setup
-- [Slack Setup](docs/SLACK_SETUP.md) - Slack app and event wiring
-- [Gemini Config + Testing](docs/GEMINI_CONFIGURATION_AND_TESTING.md) - Local setup and validation
-
-### Features
-- [Feature: Google Auth] [Live](docs/features/GOOGLE_AUTH.md)
-- [Feature: Finance Trends] [Live](docs/features/FINANCE_TRENDS.md)
-- [Feature: Calendar Sync] [Live](docs/features/CALENDAR_SYNC.md)
-- [Feature: Slack Data Agent] [Planned](docs/features/SLACK_DATA_AGENT.md)
-- [Feature: Jarvis Chat] [Live](docs/features/JARVIS_CHAT.md)
-- [Feature: Calendar Future] [Planned](docs/features/CALENDAR_FUTURE.md)
-- [Feature: Slack Bot] [Live](docs/features/SLACK_BOT.md)
-- [Feature: Gemini Extraction] [Live](docs/features/GEMINI_EXTRACTION.md)
-- [Feature: Calendar UI] [Live](docs/features/CALENDAR_UI.md)
-
-### Feature Status
-
-| Feature Doc | Status |
-|-------------|--------|
-| [Google Auth](docs/features/GOOGLE_AUTH.md) | Live |
-| [Finance Trends](docs/features/FINANCE_TRENDS.md) | Live |
-| [Calendar Sync](docs/features/CALENDAR_SYNC.md) | Live |
-| [Slack Data Agent](docs/features/SLACK_DATA_AGENT.md) | Planned |
-| [Jarvis Chat](docs/features/JARVIS_CHAT.md) | Live |
-| [Calendar Future](docs/features/CALENDAR_FUTURE.md) | Planned |
-| [Slack Bot](docs/features/SLACK_BOT.md) | Live |
-| [Gemini Extraction](docs/features/GEMINI_EXTRACTION.md) | Live |
-| [Calendar UI](docs/features/CALENDAR_UI.md) | Live |
+Web chat panel, Slack bot, Gemini extraction, the Memory feature, work-calendar/busy-block
+sync, and the mobile-app prototype were all removed — replaced by the MCP surface. Their
+tables were dropped and any meaningful data archived. See `docs/DIRECTION.md`.
 
 ## License
 
